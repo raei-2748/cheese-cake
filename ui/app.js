@@ -53,6 +53,8 @@ function notify(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(()=>{toast.hidden=true;},3400);
 }
+const LOCAL_KEY = 'hsc-study-desk:state:v1';
+let localMode = false;
 function status(label, mode = '') {
   indicator.textContent = label;
   indicator.dataset.mode = mode;
@@ -68,7 +70,13 @@ async function save() {
   saving = true;
   dirty = false;
   try {
-    const response = await fetch('/api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,data})});
+    if (localMode) {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+      if (!dirty) status('Saved in this browser');
+      saving = false;
+      return;
+    }
+    const response = await fetch('api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,data})});
     const result = await response.json();
     if (!response.ok) {
       conflict = response.status === 409;
@@ -92,12 +100,24 @@ window.addEventListener('beforeunload', event => {
 });
 async function open() {
   try {
-    const response = await fetch('/api/state');
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error);
-    revision = result.revision;
-    data = result.data ?? empty();
-    status('Private workspace');
+    let result = null;
+    try {
+      const response = await fetch('api/state');
+      result = await response.json();
+      if (!response.ok) result = null;
+    } catch { result = null; }
+    if (result) {
+      revision = result.revision;
+      data = result.data ?? empty();
+      status('Private workspace');
+    } else {
+      // No backend (e.g. GitHub Pages): keep records in this browser only.
+      localMode = true;
+      let stored = null;
+      try { stored = JSON.parse(localStorage.getItem(LOCAL_KEY)); } catch {}
+      data = stored ?? empty();
+      status('Saved in this browser');
+    }
     render();
   } catch (error) {
     status('Storage unavailable','error');
