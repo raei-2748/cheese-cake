@@ -163,7 +163,7 @@ const button = (label, action, id='', tone='secondary') => '<button type="button
 const badge = (label, tone='neutral') => '<span class="badge '+tone+'">'+h(label)+'</span>';
 const subject = id => id && course(id) ? '<span class="subject" style="--subject:'+course(id).colour+'"><i></i>'+h(course(id).short)+'</span>' : '<span class="subject general"><i></i>General</span>';
 const emptyCard = (title, description, action='') => '<div class="empty"><strong>'+h(title)+'</strong><p>'+h(description)+'</p>'+action+'</div>';
-const pageHead = (eyebrow,title,copy,action='') => '<div class="page-head"><div><div class="eyebrow">'+h(eyebrow)+'</div><h1>'+h(title)+'</h1><p>'+h(copy)+'</p></div><div class="head-action">'+action+'</div></div>';
+const pageHead = (eyebrow,title,copy,action='') => '<div class="page-head"><div>'+(eyebrow?'<div class="eyebrow">'+h(eyebrow)+'</div>':'')+'<h1>'+h(title)+'</h1><p>'+h(copy)+'</p></div><div class="head-action">'+action+'</div></div>';
 const section = (title, sub, body, action='') => '<section class="card"><div class="card-head"><div><h2>'+h(title)+'</h2>'+(sub?'<p>'+h(sub)+'</p>':'')+'</div>'+action+'</div>'+body+'</section>';
 const metric = (label,value,detail,tone='') => '<div class="metric '+tone+'"><span>'+h(label)+'</span><strong>'+h(value)+'</strong><small>'+h(detail)+'</small></div>';
 const tabGroup = (label,action,selected,items) => '<div class="tabs" role="group" aria-label="'+h(label)+'">'+items.map(item=>{const [id,name]=Array.isArray(item)?item:[item,item];return '<button type="button" aria-pressed="'+(id===selected)+'" class="'+(id===selected?'selected':'')+'" data-action="'+action+'" data-id="'+h(id)+'">'+h(name)+'</button>';}).join('')+'</div>';
@@ -211,7 +211,7 @@ function weekly() {
   const totals = plan.reduce((a,d)=>({available:a.available+d.available, remaining:a.remaining+d.remaining, completed:a.completed+d.completed}),{available:0,remaining:0,completed:0});
   const headroom = totals.available-totals.remaining-totals.completed;
   const moved = carry();
-  return pageHead('01 / PLAN','Weekly plan','Make room for the school work that carries marks, then fit revision into the time you have.',button('+ Study block','edit-task','','primary'))+
+  return pageHead('','Weekly plan','Make room for the school work that carries marks, then fit revision into the time you have.',button('+ Study block','edit-task','','primary'))+
     '<div class="toolbar">'+weekPicker()+'<div class="line">'+button('+ Commitment','edit-commitment')+button('Set capacity','edit-capacity')+'</div></div>'+
     '<div class="metrics">'+metric('Usable time',minutes(totals.available),weekData().energy+' energy · '+weekData().reserve+'% buffer')+
       metric('Work left',minutes(totals.remaining),weekTasks().filter(taskOpen).length+' open blocks')+
@@ -247,7 +247,7 @@ function assessments() {
     const points = marked.reduce((sum,a)=>sum+a.mark/a.outOf*a.weight,0);
     return '<tr><th scope="row">'+subject(c.id)+'</th><td>'+percent(loggedWeight)+(loggedWeight>100?' '+badge('Check weights','alert'):'')+'</td><td>'+percent(covered)+'</td><td>'+(covered?percent(points/covered*100):'—')+'</td><td>'+(covered?Number(points.toFixed(2))+' / 100':'—')+'</td></tr>';
   }).join('');
-  return pageHead('02 / SCHOOL MARKS','Assessments & Trials','Use your school notices for dates, task weightings and assessed content.',button('+ Assessment','edit-assessment','','primary'))+
+  return pageHead('','Assessments & Trials','Use your school notices for dates, task weightings and assessed content.',button('+ Assessment','edit-assessment','','primary'))+
     section('Assessment register','Upcoming work and returned marks',tabGroup('Assessment type','assessment-filter',assessmentFilter,['All','Assessment','Trial'])+
     (shown.length?'<div class="record-list">'+shown.map(a=>{
       const steps=a.kind==='Trial'?trialSteps:assessmentSteps;
@@ -268,7 +268,7 @@ function topicsPage() {
   const flagged=courses.flatMap(topicsFor).filter(t=>topicState(t.id).priority!=='Normal')
     .sort((a,b)=>priorities.indexOf(topicState(b.id).priority)-priorities.indexOf(topicState(a.id).priority));
   const courseTabs=tabGroup('Course','course',courseId,courses.map(c=>[c.id,c.short]));
-  return pageHead('03 / COVERAGE','Syllabus & priorities','Track evidence at topic level and turn the weakest areas into specific study blocks.',button('+ Custom topic','new-topic','','primary'))+
+  return pageHead('','Syllabus & priorities','Track evidence at topic level and turn the weakest areas into specific study blocks.',button('+ Custom topic','new-topic','','primary'))+
     section('Revision priorities','Urgent topics first, then high-priority topics across all courses.',flagged.length?'<div class="focus-list">'+flagged.map(t=>'<div class="focus-row"><div><div class="line">'+subject(t.course)+badge(topicState(t.id).priority,topicState(t.id).priority==='Urgent'?'alert':'gold')+'</div><strong>'+h(t.title)+'</strong><small>'+h(t.module)+'</small></div>'+button('Plan practice','plan-topic',t.id,'text')+'</div>').join('')+'</div>':emptyCard('Your priority list is clear','Open a topic and set its priority when marked work, feedback or a deadline gives you a reason.'))+
     section(c.name,'Year 12 · '+c.year+' syllabus · '+all.filter(t=>topicState(t.id).stage==='Retested').length+' of '+all.length+' topics retested',courseTabs+
     '<div class="topic-tools"><label><input type="checkbox" id="priority-only" '+(priorityOnly?'checked':'')+'> Priorities only</label><a class="subtle-link" href="'+h(c.url)+'" target="_blank" rel="noopener">Official NESA syllabus ↗</a></div>'+
@@ -293,14 +293,14 @@ function errorRow(e) {
 function practice() {
   const items=dated(data.errors.filter(e=>practiceFilter==='All'||(practiceFilter==='Passed'?e.stage==='Passed':e.stage!=='Passed')),'retest');
   const sessions=dated(data.tasks.filter(t=>Object.hasOwn(templates,t.kind))).reverse();
-  return pageHead('04 / PRACTICE','Practice & repair','Retrieve from memory, practise under time, then use fresh questions to check whether a repair worked.',button('+ Log error','edit-error','','primary'))+
+  return pageHead('','Practice & repair','Retrieve from memory, practise under time, then use fresh questions to check whether a repair worked.',button('+ Log error','edit-error','','primary'))+
     '<div class="template-grid">'+Object.entries(templates).map(([key,t])=>'<section class="card template"><span class="template-icon">'+icon(key==='Active retrieval'?'bolt':key==='Timed practice'?'calendar':'check')+'</span><h2>'+h(key)+'</h2><p>'+br(t.text)+'</p>'+button('Use template · '+t.minutes+'m','template',key)+'</section>').join('')+'</div>'+
     section('Error log','Capture the cause, then move from repair to a fresh retest with evidence.',tabGroup('Error status','practice-filter',practiceFilter,['Open','Passed','All'])+
     (items.length?'<div class="record-list">'+items.map(errorRow).join('')+'</div>':emptyCard('No '+practiceFilter.toLowerCase()+' errors here','When a question costs you marks, log the specific error and set a date to test the fix.')))+
     section('Practice history','Open a session to log actual time, score and what to change next.',sessions.length?'<div class="record-list">'+sessions.map(t=>'<article class="record compact"><div><div class="line">'+subject(t.course)+badge(t.status,t.status==='Done'?'green':'neutral')+'</div><h3>'+h(t.title)+'</h3><p>'+h(pretty(t.date))+' · '+h(t.kind)+(t.result?' · '+h(t.result):'')+'</p></div>'+button('Open session','edit-task',t.id)+'</article>').join('')+'</div>':emptyCard('No practice sessions yet','Use a template to create a block in the weekly plan.'));
 }
 function feedback() {
-  return pageHead('05 / FEEDBACK','Teacher feedback','Capture what your teacher said, the criterion it affects, and a specific change to test.',button('+ Feedback note','edit-feedback','','primary'))+
+  return pageHead('','Teacher feedback','Capture what your teacher said, the criterion it affects, and a specific change to test.',button('+ Feedback note','edit-feedback','','primary'))+
     section('Feedback notes','Convert the feedback that could save marks into a scheduled action.',data.feedback.length?'<div class="record-list">'+dated(data.feedback).reverse().map(f=>'<article class="record"><div class="record-head"><div><div class="line">'+subject(f.course)+badge(f.status,f.status==='Applied'?'green':'neutral')+'</div><h3>'+h(f.title)+'</h3><p>'+h(pretty(f.date))+(f.context?' · '+h(f.context):'')+'</p></div><div class="line">'+button('Plan action','plan-feedback',f.id)+button('Edit','edit-feedback',f.id)+'</div></div><p class="record-detail">'+br(f.note)+'</p>'+(f.next?'<p class="record-detail"><strong>Next change</strong> '+br(f.next)+'</p>':'')+(f.evidence?'<p class="record-detail"><strong>Evidence</strong> '+br(f.evidence)+'</p>':'')+'</article>').join('')+'</div>':emptyCard('No feedback recorded yet','Use the next returned task or teacher conversation to log one change you can test.'));
 }
 function reviews() {
@@ -309,7 +309,7 @@ function reviews() {
   const open=tasks.filter(taskOpen);
   const review=weekData().review;
   const history=Object.entries(data.weeks).filter(([key,w])=>key!==week&&w.review).sort(([a],[b])=>b.localeCompare(a));
-  return pageHead('06 / REFLECT','Weekly reviews','Use evidence from the week to decide what to protect, repair and carry forward.',button(review?'Edit review':'+ Write review','edit-review','','primary'))+
+  return pageHead('','Weekly reviews','Use evidence from the week to decide what to protect, repair and carry forward.',button(review?'Edit review':'+ Write review','edit-review','','primary'))+
     '<div class="toolbar">'+weekPicker()+'</div><div class="metrics">'+
     metric('Blocks finished',done.length,open.length+' still open')+
     metric('Time completed',minutes(done.reduce((n,t)=>n+(t.actual!==''?Number(t.actual):t.minutes),0)),'Actual time where logged')+
@@ -375,7 +375,7 @@ const startDay = () => monday(today())===week ? today() : week;
 const courseDefault = () => courseId || 'mx1';
 const defaultTask = () => ({title:'',course:'',list:'',date:startDay(),time:'',minutes:30,actual:'',kind:'Assessment prep',status:'Planned',priority:0,tags:[],subtasks:[],repeat:'',notes:'',result:'',link:null,completedAt:null});
 const taskKinds = ['Assessment prep','Active retrieval','Timed practice','Repair & retest','Teacher feedback','Homework','Other'];
-const PRI = [['0','None','#8e978d'],['1','Low','#4a7fb0'],['2','Medium','#cf9126'],['3','High','#c4513d']];
+const PRI = [['0','None','#8b94a1'],['1','Low','#2c6fa8'],['2','Medium','#d98a0f'],['3','High','#c8372d']];
 const priColour = p => PRI[Number(p)||0][2];
 const parseTags = v => [...new Set(String(v||'').split(/[,\s]+/).map(x=>x.replace(/^#/,'').toLowerCase()).filter(Boolean))];
 let currentEditor;
@@ -594,16 +594,16 @@ function listSpec(r) {
       open:t=>t.date&&t.date<=t0, done:t=>doneDay(t)===t0};
     case 'next7': return {title:'Next 7 days',eyebrow:pretty(t0)+' – '+pretty(addDays(t0,6)),where:'Today',defaults:{date:t0},
       open:t=>t.date&&t.date<=addDays(t0,6), done:t=>doneDay(t)>=addDays(t0,-6)};
-    case 'inbox': return {title:'Inbox',eyebrow:'Capture first, sort later',where:'Inbox',defaults:{},open:t=>!t.course&&!t.list,done:t=>!t.course&&!t.list};
-    case 'all': return {title:'All tasks',eyebrow:'Every open task',where:'Inbox',defaults:{},open:()=>true,done:()=>true};
-    case 'tag': return {title:'#'+r.arg,eyebrow:'Tag',where:'#'+r.arg,defaults:{tags:[r.arg]},open:t=>(t.tags||[]).includes(r.arg),done:t=>(t.tags||[]).includes(r.arg)};
+    case 'inbox': return {title:'Inbox',eyebrow:'',where:'Inbox',defaults:{},open:t=>!t.course&&!t.list,done:t=>!t.course&&!t.list};
+    case 'all': return {title:'All tasks',eyebrow:'',where:'Inbox',defaults:{},open:()=>true,done:()=>true};
+    case 'tag': return {title:'#'+r.arg,eyebrow:'',where:'#'+r.arg,defaults:{tags:[r.arg]},open:t=>(t.tags||[]).includes(r.arg),done:t=>(t.tags||[]).includes(r.arg)};
     case 'search': return {title:'Search',eyebrow:r.arg?'Results for “'+r.arg+'”':'Type in the search box',where:'Inbox',defaults:{},
       open:t=>!!q&&[t.title,t.notes,t.result,...(t.tags||[])].join(' ').toLowerCase().includes(q), done:t=>!!q&&[t.title,t.notes,...(t.tags||[])].join(' ').toLowerCase().includes(q)};
     case 'list': {
       const c=course(r.arg);
-      if (c) return {title:c.name,eyebrow:'Subject',where:c.short,defaults:{course:c.id},open:t=>t.course===c.id,done:t=>t.course===c.id,course:c};
+      if (c) return {title:c.name,eyebrow:'',where:c.short,defaults:{course:c.id},open:t=>t.course===c.id,done:t=>t.course===c.id,course:c};
       const l=customList(r.arg);
-      return {title:l?.name??'List',eyebrow:'List',where:l?.name??'list',defaults:{list:r.arg},open:t=>t.list===r.arg,done:t=>t.list===r.arg,custom:l};
+      return {title:l?.name??'List',eyebrow:'',where:l?.name??'list',defaults:{list:r.arg},open:t=>t.list===r.arg,done:t=>t.list===r.arg,custom:l};
     }
   }
 }
@@ -626,7 +626,7 @@ function taskPage(r) {
   if (spec.course) actions=button('Syllabus','open-topics',spec.course.id,'text');
   if (spec.custom) actions=button('Rename','edit-list',spec.custom.id,'text')+button('Delete list','delete-list',spec.custom.id,'text');
   const groups=groupTasks(open);
-  return '<div class="list-head"><div><div class="eyebrow">'+h(spec.eyebrow.toUpperCase())+'</div><h1>'+h(spec.title)+'</h1></div><div class="list-stats"><span>'+open.length+' open</span>'+(mins?'<span>'+minutes(mins)+' planned</span>':'')+actions+'</div></div>'+
+  return '<div class="list-head"><div>'+(spec.eyebrow?'<div class="eyebrow">'+h(spec.eyebrow)+'</div>':'')+'<h1>'+h(spec.title)+'</h1></div><div class="list-stats"><span>'+open.length+' open</span>'+(mins?'<span>'+minutes(mins)+' planned</span>':'')+actions+'</div></div>'+
     (r.name==='today'?todayStrip():'')+
     (r.name==='search'?'':quickAdd(spec.where,spec.defaults))+
     (groups.length?groups.map(g=>'<section class="group"><h2 class="group-title'+(g.label==='Overdue'?' overdue':'')+'">'+h(g.label)+'<span>'+g.items.length+'</span>'+(g.label==='Overdue'?button('Move all to today','postpone-overdue',r.name+'|'+r.arg,'text'):'')+'</h2>'+g.items.map(t=>stackRow(t)).join('')+'</section>').join('')
@@ -637,7 +637,7 @@ function completedPage() {
   const list=data.tasks.filter(t=>['Done','Dropped'].includes(t.status)).sort((a,b)=>(b.completedAt||b.date||'').localeCompare(a.completedAt||a.date||''));
   const byDay=new Map();
   list.forEach(t=>{ const k=doneDay(t)||t.date||'Undated'; if(!byDay.has(k)) byDay.set(k,[]); byDay.get(k).push(t); });
-  return '<div class="list-head"><div><div class="eyebrow">LOGBOOK</div><h1>Completed</h1></div><div class="list-stats"><span>'+list.length+' tasks</span></div></div>'+
+  return '<div class="list-head"><div><h1>Completed</h1></div><div class="list-stats"><span>'+list.length+' tasks</span></div></div>'+
     (list.length?[...byDay.entries()].slice(0,40).map(([k,items])=>'<section class="group"><h2 class="group-title">'+h(/^\d{4}-/.test(k)?pretty(k,{weekday:'long',day:'numeric',month:'short'}):k)+'<span>'+items.length+'</span></h2>'+items.map(t=>stackRow(t)).join('')+'</section>').join('')
       :'<div class="zero"><strong>Nothing finished yet</strong><p>Completed tasks are kept here as a record of the work you have done.</p></div>');
 }
@@ -683,7 +683,7 @@ function calendarPage() {
   const monthStart=calAnchor.slice(0,8)+'01';
   const title=calMode==='month'?pretty(monthStart,{month:'long',year:'numeric'}):pretty(monday(calAnchor))+' – '+pretty(addDays(monday(calAnchor),6),{day:'numeric',month:'short',year:'numeric'});
   const unscheduled=data.tasks.filter(t=>taskOpen(t)&&!t.date);
-  return '<div class="list-head"><div><div class="eyebrow">CALENDAR</div><h1>'+h(title)+'</h1></div><div class="list-stats">'+
+  return '<div class="list-head"><div><h1>'+h(title)+'</h1></div><div class="list-stats">'+
     '<div class="week-picker"><button type="button" aria-label="Previous" data-action="cal-shift" data-id="-1">‹</button>'+button('Today','cal-today','','text')+'<button type="button" aria-label="Next" data-action="cal-shift" data-id="1">›</button></div>'+
     tabGroup('Calendar view','cal-mode',calMode,[['month','Month'],['week','Week']])+'</div></div>'+
     '<div class="cal-wrap">'+(calMode==='month'?monthGrid(monthStart):weekGrid())+
@@ -723,7 +723,7 @@ function weekGrid() {
 // Same default rule as TickTick: the quadrant is the task's priority.
 const quads=[[3,'Urgent & important','Do it now'],[2,'Important, not urgent','Schedule it'],[1,'Urgent, not important','Fit it in'],[0,'Not urgent or important','Park or drop it']];
 function matrixPage() {
-  return '<div class="list-head"><div><div class="eyebrow">PRIORITISE</div><h1>Eisenhower matrix</h1></div><div class="list-stats"><span>Drag tasks between boxes to change priority</span></div></div>'+
+  return '<div class="list-head"><div><h1>Eisenhower matrix</h1></div><div class="list-stats"><span>Drag tasks between boxes to change priority</span></div></div>'+
     '<div class="matrix">'+quads.map(([p,title,sub])=>{
       const items=sortTasks(data.tasks.filter(t=>taskOpen(t)&&(t.priority||0)===p));
       return '<section class="quad" data-drop-priority="'+p+'" style="--p:'+priColour(p)+'"><header><h2>'+h(title)+'</h2><span>'+h(sub)+' · '+items.length+'</span></header>'+
@@ -806,7 +806,7 @@ function focusPage() {
   const s=focusStats(), left=timeLeft(), total=phaseSecs(timer.phase);
   const open=sortTasks(data.tasks.filter(taskOpen));
   const t=timer.taskId&&row('tasks',timer.taskId);
-  return '<div class="list-head"><div><div class="eyebrow">POMODORO</div><h1>Focus</h1></div><div class="list-stats">'+button('Timer settings','settings','','text')+'</div></div>'+
+  return '<div class="list-head"><div><h1>Focus</h1></div><div class="list-stats">'+button('Timer settings','settings','','text')+'</div></div>'+
     '<div class="focus-wrap"><section class="card focus-card">'+
       tabGroup('Timer phase','timer-phase',timer.phase,[['focus','Focus'],['short','Short break'],['long','Long break']])+
       '<div class="ring" data-phase="'+timer.phase+'"><svg viewBox="0 0 240 240" aria-hidden="true"><circle cx="120" cy="120" r="110" class="ring-bg"/><circle id="timer-ring" cx="120" cy="120" r="110" class="ring-fg" style="stroke-dashoffset:'+(691*(left/total))+'"/></svg>'+
@@ -845,7 +845,7 @@ function habitRate(hb, span=30) {
 const habitSuggestions=[['Flashcard review',''],['One past-paper question',''],['Read for English','eng'],['Lights out by 11pm',''],['Exercise 30 min','']];
 function habitsPage() {
   const days=Array.from({length:7},(_,i)=>addDays(today(),i-6));
-  return '<div class="list-head"><div><div class="eyebrow">ROUTINES</div><h1>Habits</h1></div><div class="list-stats">'+button('+ New habit','edit-habit','','primary')+'</div></div>'+
+  return '<div class="list-head"><div><h1>Habits</h1></div><div class="list-stats">'+button('+ New habit','edit-habit','','primary')+'</div></div>'+
     (data.habits.length?'<div class="card habits"><div class="habit-row head"><span></span>'+days.map(d=>'<span class="hd'+(d===today()?' today':'')+'">'+pretty(d,{weekday:'narrow'})+'<small>'+Number(d.slice(8))+'</small></span>').join('')+'<span>Streak</span></div>'+
       data.habits.map(hb=>'<div class="habit-row"><button type="button" class="habit-name" data-action="habit-open" data-id="'+h(hb.id)+'">'+(course(hb.course)?'<i class="dot" style="--c:'+course(hb.course).colour+'"></i>':'')+'<strong>'+h(hb.name)+'</strong><small>'+(hb.days&&hb.days.includes(false)?dayNames.filter((_,i)=>hb.days[i]).join(' '):'Every day')+' · '+habitRate(hb)+'% last 30 days</small></button>'+
         days.map(d=>scheduled(hb,d)?'<button type="button" class="hcheck'+(habitDone(hb,d)?' on':'')+'" data-action="habit-toggle" data-id="'+h(hb.id)+'" data-date="'+d+'" aria-pressed="'+habitDone(hb,d)+'" aria-label="'+h(hb.name)+' on '+h(pretty(d))+'">'+(habitDone(hb,d)?'✓':'')+'</button>':'<span class="hrest" title="Rest day">·</span>').join('')+
