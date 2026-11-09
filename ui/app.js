@@ -2,11 +2,12 @@ import { courses, templates } from './data.js';
 import { parseQuickAdd, nextRepeat, repeatLabels } from './parse.js';
 
 const smart = [['today','Today','sun'],['next7','Next 7 days','week7'],['inbox','Inbox','inbox'],['all','All tasks','list'],['done','Completed','done']];
-const tools = [['calendar','Calendar','grid'],['matrix','Matrix','matrix'],['focus','Focus','timer'],['habits','Habits','repeat']];
+const tools = [['calendar','Calendar','grid'],['matrix','Matrix','matrix'],['habits','Habits','repeat']];
 const views = [
   ['week','Weekly plan','calendar'], ['assess','Assessments','flag'], ['topics','Syllabus & priorities','layers'],
-  ['practice','Practice & repair','bolt'], ['feedback','Teacher feedback','message'], ['review','Weekly reviews','check']
+  ['practice','Practice & repair','bolt'], ['papers','Past papers','paper'], ['feedback','Teacher feedback','message'], ['review','Weekly reviews','check']
 ];
+const dash = ['dash','Overview','home'];
 const icons = {
   calendar:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 10h18m-13 5h2m4 0h2"/>',
   flag:'<path d="M5 21V4m0 1c5-4 9 4 15 0v10c-6 4-10-4-15 0"/>',
@@ -30,7 +31,9 @@ const icons = {
   sub:'<path d="M5 4v10a3 3 0 0 0 3 3h11m-4-4 4 4-4 4"/>',
   play:'<path d="M7 4v16l13-8Z"/>',
   close:'<path d="M6 6l12 12M18 6 6 18"/>',
-  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>'
+  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+  home:'<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+  paper:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7M9 8h3"/>'
 };
 const icon = name => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+icons[name]+'</svg>';
 const main = document.querySelector('#main');
@@ -53,11 +56,18 @@ const pretty = (d, options = {day:'numeric',month:'short'}) => new Intl.DateTime
 const minutes = m => m < 60 ? m+'m' : Math.floor(m/60)+'h'+(m%60?' '+m%60+'m':'');
 const percent = n => Number(n.toFixed(1))+'%';
 const defaultWeek = () => ({ energy:'Steady', reserve:15, capacity:[75,75,75,75,45,120,90], review:null });
-const empty = () => ({version:1, weeks:{}, tasks:[], commitments:[], assessments:[], topics:{}, customTopics:[], errors:[], feedback:[], lists:[], habits:[], habitLog:{}, focus:[], settings:{pomo:{focus:25,short:5,long:15,every:4}}});
-// Fill in fields added by HSC Stack so older records keep working.
+const empty = () => ({version:1, weeks:{}, tasks:[], commitments:[], assessments:[], topics:{}, customTopics:[], errors:[], feedback:[], lists:[], habits:[], habitLog:{}, focus:[], papers:[], settings:{pomo:{focus:25,short:5,long:15,every:4},studyGoal:120,trialStart:'',hscStart:'',lastExport:''}});
+// Fill in fields added by HSC Stack so older records keep working, and repair
+// any collection that a damaged or hand-edited backup left as the wrong type.
 function normalise(d) {
   const base = empty();
   const out = {...base, ...d, settings:{...base.settings, ...(d?.settings||{}), pomo:{...base.settings.pomo, ...(d?.settings?.pomo||{})}}};
+  for (const [k,v] of Object.entries(base)) {
+    if (Array.isArray(v) && !Array.isArray(out[k])) out[k]=[];
+    else if (v && typeof v==='object' && !Array.isArray(v) && (typeof out[k]!=='object' || out[k]===null || Array.isArray(out[k]))) out[k]=structuredClone(v);
+  }
+  for (const k of Object.keys(base)) if (Array.isArray(out[k])) out[k]=out[k].filter(x=>x && typeof x==='object');
+  out.tasks.forEach(t=>{ if (!t.id) t.id=uid(); if (typeof t.title!=='string') t.title=String(t.title??'Untitled'); });
   out.tasks = (out.tasks||[]).map(t=>({priority:0, tags:[], subtasks:[], time:'', repeat:'', list:'', completedAt:null, ...t, minutes:Number(t.minutes)||0}));
   return out;
 }
@@ -70,13 +80,15 @@ function weekData() {
   return { ...defaultWeek(), capacity:baseline.capacity, reserve:baseline.reserve, ...current };
 }
 const course = id => courses.find(c => c.id === id);
-const routeNames = Object.fromEntries([...smart,...tools,...views].map(([k,n])=>[k,n]));
+const study = ['focus','Study','timer'];
+const routeNames = Object.fromEntries([dash,study,...smart,...tools,...views].map(([k,n])=>[k,n]));
 function route() {
   const raw = location.hash.slice(1), cut = raw.indexOf('/');
   const name = cut<0 ? raw : raw.slice(0,cut);
-  const arg = cut<0 ? '' : decodeURIComponent(raw.slice(cut+1));
+  let arg = '';
+  try { arg = cut<0 ? '' : decodeURIComponent(raw.slice(cut+1)); } catch { arg = raw.slice(cut+1); }
   if (['list','tag','search'].includes(name)) return {name,arg};
-  return routeNames[name] ? {name,arg:''} : {name:'today',arg:''};
+  return routeNames[name] ? {name,arg:''} : {name:'dash',arg:''};
 }
 const courseOptions = () => courses.map(c => [c.id,c.name]);
 const row = (key,id) => data[key].find(item=>item.id === id);
@@ -88,7 +100,19 @@ function notify(message) {
   toastTimer = setTimeout(()=>{toast.hidden=true;},3400);
 }
 const LOCAL_KEY = 'hsc-study-desk:state:v1'; // key kept so existing records carry over
+const SNAP_KEY = 'hsc-stack:snapshots:v1';
 let localMode = false;
+// Browser-only mode keeps a copy of the records as they were when first opened
+// each day, for the last 7 days, so one bad edit or import can be undone.
+function snapshots() { try { return JSON.parse(localStorage.getItem(SNAP_KEY)) || {}; } catch { return {}; } }
+function snapshot() {
+  const snaps = snapshots(), day = today();
+  if (snaps[day] || !data.tasks.length && !data.assessments.length && !data.focus.length) return;
+  snaps[day] = data;
+  const keep = Object.keys(snaps).sort().slice(-7);
+  try { localStorage.setItem(SNAP_KEY, JSON.stringify(Object.fromEntries(keep.map(k=>[k,snaps[k]])))); }
+  catch { try { localStorage.setItem(SNAP_KEY, JSON.stringify({[day]:data})); } catch {} }
+}
 function status(label, mode = '') {
   indicator.textContent = label;
   indicator.dataset.mode = mode;
@@ -105,9 +129,15 @@ async function save() {
   dirty = false;
   try {
     if (localMode) {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
-      if (!dirty) status('Saved in this browser');
+      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); }
+      catch (error) {
+        // Usually a full quota. Old snapshots are the first thing to give up.
+        try { localStorage.removeItem(SNAP_KEY); localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); }
+        catch { throw new Error('This browser would not save your changes (storage may be full or blocked). Export a backup now from Backup & settings.'); }
+      }
+      if (!dirty) status(syncOn() ? 'Saved · syncing…' : 'Saved in this browser');
       saving = false;
+      queueSync();
       return;
     }
     const response = await fetch('api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,data})});
@@ -128,7 +158,7 @@ async function save() {
   saving = false;
   if (dirty) queueSave();
 }
-indicator.addEventListener('click',()=>{ if (!conflict && dirty) save(); });
+indicator.addEventListener('click',()=>{ if (!conflict && dirty) save(); else if (lastSyncError) syncNow(); });
 window.addEventListener('beforeunload', event => {
   if (saving || dirty) { event.preventDefault(); event.returnValue = ''; }
 });
@@ -151,13 +181,150 @@ async function open() {
       try { stored = JSON.parse(localStorage.getItem(LOCAL_KEY)); } catch {}
       data = normalise(stored ?? empty());
       status('Saved in this browser');
+      snapshot();
     }
     render();
+    if (localMode && syncOn()) syncNow();
   } catch (error) {
     status('Storage unavailable','error');
     main.innerHTML = '<div class="card empty"><h2>Could not open your records</h2><p>'+h(error.message)+'</p><button class="button" data-action="reload">Try again</button></div>';
   }
 }
+
+// ───────────────────────── Sync across devices ─────────────────────────
+// The site is static, so devices meet in one private (secret) GitHub Gist on the
+// student's own account. Each device keeps the copy it last synced (the base).
+// When two devices both changed things, a three-way merge keeps both sets of
+// edits: records are matched by id and merged field by field, and only a field
+// changed differently on both sides falls back to this device's version.
+const SYNC_KEY = 'hsc-stack:sync:v1', BASE_KEY = 'hsc-stack:sync-base:v1', GIST_FILE = 'hsc-stack.json', GIST_DESC = 'HSC Stack sync (private study records)';
+let syncCfg = (()=>{ try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch { return {}; } })();
+let syncing = false, syncAgain = false, syncTimer, lastSyncError = '';
+const syncOn = () => !!(syncCfg.token && syncCfg.gistId);
+const forceNextSync = () => { if (syncOn()) { syncCfg.force = true; storeSync(); } };
+const storeSync = () => { try { localStorage.setItem(SYNC_KEY, JSON.stringify(syncCfg)); } catch {} };
+const same = (a,b) => JSON.stringify(a)===JSON.stringify(b);
+const plain = v => v && typeof v==='object' && !Array.isArray(v);
+const keyed = v => Array.isArray(v) && v.every(x=>plain(x) && x.id!=null);
+function merge3(base, mine, theirs) {
+  if (same(mine,theirs)) return mine;
+  if (base!==undefined && same(mine,base)) return theirs;
+  if (base!==undefined && same(theirs,base)) return mine;
+  if (keyed(mine) && keyed(theirs) && (base===undefined || keyed(base))) {
+    const b=new Map((base||[]).map(x=>[x.id,x])), t=new Map(theirs.map(x=>[x.id,x])), m=new Map(mine.map(x=>[x.id,x]));
+    const out=[];
+    for (const x of mine) {
+      if (t.has(x.id)) out.push(merge3(b.get(x.id),x,t.get(x.id)));
+      else if (!b.has(x.id) || !same(x,b.get(x.id))) out.push(x);   // new here, or edited here after being deleted there
+    }
+    for (const x of theirs) if (!m.has(x.id) && (!b.has(x.id) || !same(x,b.get(x.id)))) out.push(x);
+    return out;
+  }
+  if (plain(mine) && plain(theirs) && (base===undefined || plain(base))) {
+    const out={}, b=base||{};
+    for (const k of new Set([...Object.keys(mine),...Object.keys(theirs)])) {
+      const inM=Object.hasOwn(mine,k), inT=Object.hasOwn(theirs,k), inB=Object.hasOwn(b,k);
+      if (inM && inT) out[k]=merge3(inB?b[k]:undefined,mine[k],theirs[k]);
+      else if (inM) { if (!inB || !same(mine[k],b[k])) out[k]=mine[k]; }
+      else if (!inB || !same(theirs[k],b[k])) out[k]=theirs[k];
+    }
+    return out;
+  }
+  return mine;
+}
+async function gh(path, options={}) {
+  const response = await fetch('https://api.github.com'+path,{cache:'no-store',...options,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+syncCfg.token,'X-GitHub-Api-Version':'2022-11-28',...(options.body?{'Content-Type':'application/json'}:{})}});
+  if (response.status===401) throw new Error('GitHub rejected the sync token. It may have expired. Reconnect in Backup & settings.');
+  if (response.status===403 || response.status===404) throw new Error(path.startsWith('/gists/') && response.status===404 ? 'The sync gist was not found. Reconnect in Backup & settings.' : 'GitHub refused access. Check the token has Gists read and write permission.');
+  if (!response.ok) throw new Error('GitHub sync failed ('+response.status+'). It will retry.');
+  return response.json();
+}
+async function readRemote() {
+  const gist = await gh('/gists/'+syncCfg.gistId);
+  const file = gist.files?.[GIST_FILE];
+  if (!file) return null;
+  const text = file.truncated ? await (await fetch(file.raw_url,{cache:'no-store'})).text() : file.content;
+  const parsed = JSON.parse(text);
+  return parsed?.data?.version===1 ? parsed : null;
+}
+const writeRemote = (rev) => gh('/gists/'+syncCfg.gistId,{method:'PATCH',body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify({rev,savedAt:new Date().toISOString(),device:syncCfg.device||'',data})}}})});
+function readBase() { try { return JSON.parse(localStorage.getItem(BASE_KEY)); } catch { return null; } }
+function writeBase() { try { localStorage.setItem(BASE_KEY, JSON.stringify(data)); } catch {} }
+const hasRecords = d => !!(d.tasks.length||d.assessments.length||d.focus.length||d.papers.length||d.habits.length||Object.keys(d.topics).length);
+function queueSync(delay=2500) { if (!localMode || !syncOn()) return; clearTimeout(syncTimer); syncTimer=setTimeout(syncNow,delay); }
+async function syncNow() {
+  if (!localMode || !syncOn() || !data) return;
+  if (syncing) { syncAgain=true; return; }
+  // Never swap the records out from under an open form or an unsaved edit.
+  if (dialog.open || dirty || saving) { queueSync(4000); return; }
+  if (!navigator.onLine) { status('Offline · will sync later','busy'); return; }
+  try { const stored=JSON.parse(localStorage.getItem(SYNC_KEY)); if (stored?.gistId===syncCfg.gistId) syncCfg=stored; } catch {}
+  syncing=true;
+  try {
+    const remote = await readRemote();
+    if (dialog.open || dirty || saving) { syncing=false; queueSync(4000); return; }
+    let rev = remote?.rev || 0;
+    if (remote && rev!==syncCfg.rev && !syncCfg.force) {
+      const base = readBase();
+      const local = data;
+      const merged = !base && !hasRecords(local) ? remote.data : merge3(base ?? undefined, local, remote.data);
+      data = normalise(merged);
+      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); } catch {}
+      if (!same(local,data)) { if (selected && !row('tasks',selected)) selected=null; render(); }
+    }
+    if (!remote || !same(data,remote.data)) { rev += 1; await writeRemote(rev); }
+    syncCfg.rev = rev; syncCfg.lastSync = new Date().toISOString(); delete syncCfg.force; storeSync(); writeBase();
+    lastSyncError = '';
+    status('Synced '+hhmm(Date.now()));
+  } catch (error) {
+    lastSyncError = error.message;
+    status('Sync failed · tap to retry','error');
+    queueSync(30000);
+  }
+  syncing=false;
+  if (syncAgain) { syncAgain=false; queueSync(500); }
+}
+async function connectSync(token, device) {
+  syncCfg = {token, device};
+  const mine = await gh('/gists?per_page=100');
+  const found = mine.find(g=>g.files?.[GIST_FILE] && g.description===GIST_DESC);
+  if (found) syncCfg.gistId = found.id;
+  else {
+    const made = await gh('/gists',{method:'POST',body:JSON.stringify({description:GIST_DESC,public:false,files:{[GIST_FILE]:{content:JSON.stringify({rev:1,savedAt:new Date().toISOString(),device,data})}}})});
+    Object.assign(syncCfg,{gistId:made.id,rev:1});
+    writeBase();
+  }
+  storeSync();
+  return !!found;
+}
+function syncModal() {
+  const on = syncOn();
+  modal('Sync across devices', on
+    ? '<div class="form-grid"><div class="field full"><span>Status</span><small class="note">'+(syncCfg.device?'This device: '+h(syncCfg.device)+'. ':'')+(syncCfg.lastSync?'Last synced '+h(pretty(sydney.format(new Date(syncCfg.lastSync)),{day:'numeric',month:'short'}))+' at '+h(hhmm(Date.parse(syncCfg.lastSync)))+'.':'Not synced yet.')+'</small>'+
+      (lastSyncError?'<small class="form-error">'+h(lastSyncError)+'</small>':'')+
+      '<div class="line wrap">'+button('Sync now','sync-now','','primary')+'<a class="button secondary" href="https://gist.github.com/'+h(syncCfg.gistId)+'" target="_blank" rel="noopener">Open gist ↗</a>'+button('Disconnect this device','sync-off','','danger')+'</div></div>'+
+      '<p class="note full">Changes sync a few seconds after you make them, and whenever you come back to this tab. Your records stay in this browser if you disconnect.</p></div>'
+    : '<div class="form-grid"><p class="note full">Your records are kept in a private gist on your own GitHub account. Every device you connect reads and writes the same copy. If two devices change different things, both changes are kept.</p>'+
+      '<ol class="steps full"><li>On GitHub, open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Settings → Developer settings → Fine-grained tokens → Generate</a>.</li><li>Under <strong>Account permissions</strong>, set <strong>Gists</strong> to <em>Read and write</em>. Leave everything else off. Pick an expiry date after the HSC.</li><li>Copy the token, paste it below, and connect. Do the same on each device, using the same token or a new one.</li></ol>'+
+      field('token','GitHub token','',{type:'password',full:true,required:true,placeholder:'github_pat_…'})+
+      field('device','Name for this device','',{placeholder:'e.g. School laptop, iPad'})+
+      '<p class="note full">The token is stored only in this browser. A secret gist is unlisted, but anyone who has its exact link can read it. On a shared computer, disconnect when you finish.</p></div>',
+    on?'':'Connect', on?null:v=>{
+      const token=v.token.replace(/\s+/g,'');
+      if (!/^(github_pat_|ghp_|gho_)[A-Za-z0-9_]{20,}$/.test(token)) { formError('That does not look like a GitHub token. It should start with github_pat_.'); return false; }
+      const submit=dialog.querySelector('[type=submit]'); submit.disabled=true; submit.textContent='Connecting…';
+      connectSync(token, v.device||'').then(found=>{
+        dialog.close();
+        notify(found?'Connected. Merging the records from your other devices…':'Connected. This device’s records are now in your private gist.');
+        syncCfg.rev = found ? -1 : syncCfg.rev; storeSync();
+        syncNow();
+      }).catch(error=>{ syncCfg={}; storeSync(); submit.disabled=false; submit.textContent='Connect'; formError(error.message); });
+      return false;
+    });
+}
+addEventListener('online',()=>queueSync(300));
+document.addEventListener('visibilitychange',()=>{ if (document.visibilityState==='visible') queueSync(300); else if (dirty) save(); });
+setInterval(()=>{ if (document.visibilityState==='visible') syncNow(); },90000);
 
 const button = (label, action, id='', tone='secondary') => '<button type="button" class="button '+tone+'" data-action="'+action+'" data-id="'+h(id)+'">'+h(label)+'</button>';
 const badge = (label, tone='neutral') => '<span class="badge '+tone+'">'+h(label)+'</span>';
@@ -262,13 +429,45 @@ function topicsFor(c) {
 }
 function topicRecord(id) { return courses.flatMap(topicsFor).find(t=>t.id===id); }
 function topicState(id) { return data.topics[id] ?? {stage:'Unstarted',priority:'Normal',evidence:''}; }
+// Spaced review. Each review sets the gap to the next one from how well recall
+// went: Again → tomorrow, Hard → a little longer, Good → about double, Easy → triple.
+const grades = [['Again','Could not recall it'],['Hard','Got there with effort'],['Good','Recalled with small slips'],['Easy','Fluent and accurate']];
+function nextGap(prev, grade) {
+  const i = Number(prev)||0;
+  const gap = grade==='Again' ? 1 : grade==='Hard' ? Math.max(2,Math.round(i*1.3)) : grade==='Good' ? (i?Math.round(i*2.2):3) : (i?Math.round(i*3):6);
+  return Math.min(60,Math.max(1,gap));
+}
+const reviewDue = st => !!st.next && st.next<=today();
+const dueTopics = () => courses.flatMap(topicsFor).filter(t=>reviewDue(topicState(t.id))).sort((a,b)=>topicState(a.id).next.localeCompare(topicState(b.id).next));
+function reviewLabel(st) {
+  if (!st.next) return '';
+  const d = daysFrom(st.next,today());
+  return d<0 ? 'Review overdue '+(-d)+'d' : d===0 ? 'Review today' : 'Next review '+pretty(st.next);
+}
+function reviewTopic(t) {
+  const st = topicState(t.id);
+  modal('Review · '+t.title,'<div class="form-grid"><p class="note full">'+h(course(t.course).short)+' · '+h(t.module)+(st.reviews?' · reviewed '+st.reviews+' time'+(st.reviews===1?'':'s')+(st.last?', last '+h(pretty(st.last)):''):' · first review')+'</p>'+
+    '<p class="note full">Close your notes and answer two or three questions on this topic from memory first. Then rate how it went.</p>'+
+    '<fieldset class="field full grade-pick"><legend>How did recall go?</legend>'+grades.map(([g,d],i)=>'<label><input type="radio" name="grade" value="'+g+'" '+(i===2?'checked':'')+'><strong>'+g+'</strong><small>'+d+' · next in '+nextGap(st.gap,g)+'d</small></label>').join('')+'</fieldset>'+
+    textArea('evidence','What you tested, or the gap you found',st.evidence,false,'e.g. Two Le Châtelier questions, forgot temperature effect on K')+'</div>','Save review',v=>{
+      const gap = nextGap(st.gap,v.grade);
+      change(()=>{
+        const stage = st.stage==='Unstarted' ? 'Learning' : st.stage;
+        const priority = v.grade==='Again' && st.priority==='Normal' ? 'High' : st.priority;
+        data.topics[t.id] = {...st, stage, priority, evidence:v.evidence, gap, next:addDays(today(),gap), last:today(), reviews:(st.reviews||0)+1, history:[...(st.history||[]).slice(-19),{date:today(),grade:v.grade}]};
+      });
+      notify('Next review of “'+t.title+'” on '+pretty(addDays(today(),gap),{weekday:'short',day:'numeric',month:'short'})+'.');
+    });
+}
 function topicsPage() {
   const c=course(courseId);
   const all=topicsFor(c);
   const flagged=courses.flatMap(topicsFor).filter(t=>topicState(t.id).priority!=='Normal')
     .sort((a,b)=>priorities.indexOf(topicState(b.id).priority)-priorities.indexOf(topicState(a.id).priority));
   const courseTabs=tabGroup('Course','course',courseId,courses.map(c=>[c.id,c.short]));
+  const due=dueTopics();
   return pageHead('','Syllabus & priorities','Track evidence at topic level and turn the weakest areas into specific study blocks.',button('+ Custom topic','new-topic','','primary'))+
+    (due.length?section('Due for review',due.length+' topic'+(due.length===1?'':'s')+' across all courses. Recall from memory, then rate it to set the next gap.',reviewList(due.slice(0,12))):'')+
     section('Revision priorities','Urgent topics first, then high-priority topics across all courses.',flagged.length?'<div class="focus-list">'+flagged.map(t=>'<div class="focus-row"><div><div class="line">'+subject(t.course)+badge(topicState(t.id).priority,topicState(t.id).priority==='Urgent'?'alert':'gold')+'</div><strong>'+h(t.title)+'</strong><small>'+h(t.module)+'</small></div>'+button('Plan practice','plan-topic',t.id,'text')+'</div>').join('')+'</div>':emptyCard('Your priority list is clear','Open a topic and set its priority when marked work, feedback or a deadline gives you a reason.'))+
     section(c.name,'Year 12 · '+c.year+' syllabus · '+all.filter(t=>topicState(t.id).stage==='Retested').length+' of '+all.length+' topics retested',courseTabs+
     '<div class="topic-tools"><label><input type="checkbox" id="priority-only" '+(priorityOnly?'checked':'')+'> Priorities only</label><a class="subtle-link" href="'+h(c.url)+'" target="_blank" rel="noopener">Official NESA syllabus ↗</a></div>'+
@@ -279,7 +478,7 @@ function topicsPage() {
       if (!shown.length) return '';
       return '<details class="module" '+(priorityOnly||module===all[0]?.module?'open':'')+'><summary><strong>'+h(module)+'</strong><span>'+subset.filter(t=>topicState(t.id).stage==='Retested').length+'/'+subset.length+' retested</span></summary>'+shown.map(t=>{
         const rec=topicState(t.id);
-        return '<div class="topic-row"><div><strong>'+h(t.title)+'</strong>'+(rec.evidence?'<small>'+h(rec.evidence)+'</small>':'')+'</div><div class="line">'+badge(rec.stage,rec.stage==='Retested'?'green':'neutral')+(rec.priority!=='Normal'?badge(rec.priority,rec.priority==='Urgent'?'alert':'gold'):'')+button('Update','edit-topic',t.id,'text')+'</div></div>';
+        return '<div class="topic-row"><div><strong>'+h(t.title)+'</strong>'+(rec.evidence?'<small>'+h(rec.evidence)+'</small>':'')+(rec.next?'<small class="'+(reviewDue(rec)?'due':'')+'">'+h(reviewLabel(rec))+'</small>':'')+'</div><div class="line">'+badge(rec.stage,rec.stage==='Retested'?'green':'neutral')+(rec.priority!=='Normal'?badge(rec.priority,rec.priority==='Urgent'?'alert':'gold'):'')+button(reviewDue(rec)?'Review now':'Review','review-topic',t.id,reviewDue(rec)?'secondary':'text')+button('Update','edit-topic',t.id,'text')+'</div></div>';
       }).join('')+'</details>';
     }).join('')+(priorityOnly&&!all.some(t=>topicState(t.id).priority!=='Normal')?emptyCard('No flagged topics for this course','Turn off the filter to see the full checklist.'):''), '');
 }
@@ -335,7 +534,7 @@ function render() {
   nav.innerHTML=navHtml(r);
   const opened=[...main.querySelectorAll('details.module[open] summary strong')].map(x=>x.textContent);
   const pages={week:weekly,assess:assessments,topics:topicsPage,practice,feedback,review:reviews,
-    calendar:calendarPage,matrix:matrixPage,focus:focusPage,habits:habitsPage,done:completedPage};
+    calendar:calendarPage,matrix:matrixPage,focus:focusPage,habits:habitsPage,done:completedPage,dash:dashPage,papers:papersPage};
   main.innerHTML=(pages[r.name]??taskPage)(r);
   if(r.name==='topics'&&opened.some(title=>[...main.querySelectorAll('details.module summary strong')].some(x=>x.textContent===title))) {
     main.querySelectorAll('details.module').forEach(d=>{d.open=priorityOnly||opened.includes(d.querySelector('summary strong').textContent);});
@@ -381,7 +580,7 @@ const parseTags = v => [...new Set(String(v||'').split(/[,\s]+/).map(x=>x.replac
 let currentEditor;
 function modal(title,body,submit,onSubmit,remove) {
   currentEditor={onSubmit,remove};
-  dialog.innerHTML='<div class="dialog-head"><h2 id="editor-title">'+h(title)+'</h2><button type="button" data-action="close-dialog" aria-label="Close">×</button></div><form id="edit-form"><div class="dialog-content">'+body+'<p id="form-error" class="form-error" role="alert" hidden></p></div><div class="dialog-actions">'+(remove?button('Delete','delete-record','','danger'):'')+'<div></div>'+button('Cancel','close-dialog')+(submit?'<button class="button primary" type="submit">'+h(submit)+'</button>':'')+'</div></form>';
+  dialog.innerHTML='<div class="dialog-head"><h2 id="editor-title">'+h(title)+'</h2><button type="button" data-action="close-dialog" aria-label="Close">×</button></div><form id="edit-form"><div class="dialog-content">'+body+'<p id="form-error" class="form-error" role="alert" hidden></p></div><div class="dialog-actions">'+(remove?button(remove.label??'Delete','delete-record','','danger'):'')+'<div></div>'+button('Cancel','close-dialog')+(submit?'<button class="button primary" type="submit">'+h(submit)+'</button>':'')+'</div></form>';
   if (!dialog.open) dialog.showModal();
   dialog.querySelector('input:not([type=hidden]), textarea, select')?.focus();
 }
@@ -457,11 +656,11 @@ function editTopic(t) {
         if(custom) Object.assign(custom,info); else data.customTopics.push(info);
         courseId=info.course;
       }
-      data.topics[id]={stage:v.stage,priority:v.priority,evidence:v.evidence};
+      data.topics[id]={...(data.topics[id]||{}),stage:v.stage,priority:v.priority,evidence:v.evidence};
     }),custom?()=>change(()=>{data.customTopics=data.customTopics.filter(x=>x.id!==t.id);delete data.topics[t.id];}):null);
 }
-function editError(record) {
-  const v=record??{title:'',course:courseDefault(),source:'',cause:'Concept',stage:'Logged',retest:addDays(today(),2),repair:'',attempts:[]};
+function editError(record, prefill={}) {
+  const v=record??{title:'',course:courseDefault(),source:'',cause:'Concept',stage:'Logged',retest:addDays(today(),2),repair:'',attempts:[],...prefill};
   crud('errors',record,required('title','What went wrong?',v.title)+chooseCourse(v.course)+field('source','Topic / source / question',v.source)+
     select('cause','Error type',v.cause,['Concept','Method','Recall','Misread','Execution','Timing','Expression'])+
     select('stage','Repair status',v.stage,record?.stage==='Passed'?stages:stages.slice(0,-1))+dateField('retest','Next retest date',v.retest)+
@@ -670,7 +869,7 @@ function detailPanel(t) {
     '</div>'+
     (linked?'<p class="detail-link">Linked to <a href="'+linked[1]+'">'+linked[0]+' →</a></p>':'')+
     (sessions.length?'<p class="detail-link">'+sessions.length+' focus session'+(sessions.length===1?'':'s')+' · '+minutes(sessions.reduce((n,f)=>n+f.minutes,0))+'</p>':'')+
-    '</div><div class="detail-foot">'+button('▶ Focus on this','focus-task',t.id,'primary')+'<span></span>'+button('Delete','delete-task',t.id,'danger')+'</div>';
+    '</div><div class="detail-foot">'+button('▶ Study this','focus-task',t.id,'primary')+'<span></span>'+button('Delete','delete-task',t.id,'danger')+'</div>';
 }
 
 // ───────────────────────── Calendar ─────────────────────────
@@ -731,39 +930,62 @@ function matrixPage() {
     }).join('')+'</div>';
 }
 
-// ───────────────────────── Focus (Pomodoro) ─────────────────────────
-const TIMER_KEY='hsc-stack:timer:v1';
-let timer=(()=>{ try { return JSON.parse(localStorage.getItem(TIMER_KEY)) || null; } catch { return null; } })() || {phase:'focus',running:false,remaining:null,endsAt:0,taskId:null,startedAt:null,cycle:0};
+// ───────────────────────── Study sessions ─────────────────────────
+// One timer for the whole app. "open" counts up until you finish; "timed" runs
+// Pomodoro rounds. Elapsed time is stored, not derived from a deadline, so
+// pausing, reloading and switching tabs never lose minutes.
+const TIMER_KEY='hsc-stack:timer:v2';
+const freshTimer = () => ({mode:'open',phase:'focus',running:false,elapsed:0,runFrom:0,startedAt:null,taskId:null,course:'',cycle:0});
+let timer=(()=>{ try { return {...freshTimer(),...JSON.parse(localStorage.getItem(TIMER_KEY))}; } catch { return freshTimer(); } })();
 const pomo = () => data?.settings?.pomo ?? {focus:25,short:5,long:15,every:4};
+const studyGoal = () => Number(data?.settings?.studyGoal) || 120;
 const phaseSecs = p => (p==='focus'?pomo().focus:p==='short'?pomo().short:pomo().long)*60;
-const timeLeft = () => timer.running ? Math.max(0,Math.round((timer.endsAt-Date.now())/1000)) : (timer.remaining ?? phaseSecs(timer.phase));
-const clock = s => pad2(Math.floor(s/60))+':'+pad2(s%60);
-const phaseName = {focus:'Focus',short:'Short break',long:'Long break'};
+const elapsedSecs = () => Math.floor((timer.elapsed+(timer.running?Date.now()-timer.runFrom:0))/1000);
+const countsUp = () => timer.mode==='open' && timer.phase==='focus';
+const shownSecs = () => countsUp() ? elapsedSecs() : Math.max(0,phaseSecs(timer.phase)-elapsedSecs());
+const sessionActive = () => timer.running || timer.elapsed>0;
+const clock = s => (s>=3600?Math.floor(s/3600)+':':'')+pad2(Math.floor(s%3600/60))+':'+pad2(s%60);
+const phaseName = {focus:'Study',short:'Short break',long:'Long break'};
+const ratings = ['Focused','OK','Distracted'];
+const sydneyTime = new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+const hhmm = ms => sydneyTime.format(new Date(ms));
 function storeTimer() { try { localStorage.setItem(TIMER_KEY,JSON.stringify(timer)); } catch {} }
+function resetTimer(extra={}) { Object.assign(timer,{running:false,elapsed:0,runFrom:0,startedAt:null},extra); storeTimer(); }
 function startTimer() {
   if (timer.running) return;
-  timer.endsAt=Date.now()+timeLeft()*1000;
-  timer.running=true;
   if (timer.phase==='focus' && !timer.startedAt) timer.startedAt=Date.now();
+  timer.runFrom=Date.now();
+  timer.running=true;
   storeTimer();
-  if ('Notification' in window && Notification.permission==='default') Notification.requestPermission().catch(()=>{});
+  if (timer.mode==='timed' && 'Notification' in window && Notification.permission==='default') Notification.requestPermission().catch(()=>{});
 }
-function pauseTimer() { timer.remaining=timeLeft(); timer.running=false; storeTimer(); }
-function logFocus(mins) {
-  if (mins<1) return;
-  const t=timer.taskId&&row('tasks',timer.taskId);
-  change(()=>{
-    data.focus.push({id:uid(),taskId:t?.id??null,title:t?.title??'Untitled focus',course:t?.course??'',date:today(),end:new Date().toISOString(),minutes:mins});
-    if (t) t.actual=(Number(t.actual)||0)+mins;
-  });
-}
-function stopTimer() {
-  if (timer.phase==='focus' && timer.startedAt) {
-    const mins=Math.floor((phaseSecs('focus')-timeLeft())/60);
-    if (mins>=5) { logFocus(mins); notify('Logged '+minutes(mins)+' of focus.'); }
-  }
-  Object.assign(timer,{phase:'focus',running:false,remaining:null,startedAt:null});
+function pauseTimer() {
+  if (!timer.running) return;
+  timer.elapsed+=Date.now()-timer.runFrom;
+  timer.running=false;
   storeTimer();
+}
+const sessionTitle = s => row('tasks',s.taskId)?.title ?? (s.title && s.title!=='Untitled focus' ? s.title : course(s.course)?.short ?? 'Study');
+const sessionStart = s => s.start ? Date.parse(s.start) : Date.parse(s.end)-s.minutes*60000;
+function addSession(s) {
+  const t=s.taskId&&row('tasks',s.taskId);
+  data.focus.push({id:uid(),note:'',rating:'',...s,title:t?.title??s.title??''});
+  if (t) t.actual=(Number(t.actual)||0)+s.minutes;
+}
+// Timed mode: a finished round goes straight into the log; you can add a note later.
+function finishPhase() {
+  const was=timer.phase;
+  if (was==='focus') {
+    const mins=pomo().focus, end=Date.now(), startMs=timer.startedAt??end-mins*60000;
+    change(()=>addSession({taskId:timer.taskId,course:timer.course,date:sydney.format(new Date(startMs)),start:new Date(startMs).toISOString(),end:new Date(end).toISOString(),minutes:mins}));
+    timer.cycle=(timer.cycle||0)+1;
+    resetTimer({phase:timer.cycle%pomo().every===0?'long':'short'});
+  } else resetTimer({phase:'focus'});
+  chime();
+  const msg=was==='focus'?'Logged '+minutes(pomo().focus)+'. Time for a '+phaseName[timer.phase].toLowerCase()+'.':'Break over. Start the next round when you are ready.';
+  notify(msg);
+  try { if ('Notification' in window && Notification.permission==='granted' && document.hidden) new Notification('HSC Stack',{body:msg}); } catch {}
+  if (data) render();
 }
 function chime() {
   try {
@@ -771,56 +993,139 @@ function chime() {
     [0,.25,.5].forEach((d,i)=>{ const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.value=[660,880,990][i]; g.gain.setValueAtTime(.0001,ctx.currentTime+d); g.gain.exponentialRampToValueAtTime(.2,ctx.currentTime+d+.02); g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+d+.22); o.connect(g).connect(ctx.destination); o.start(ctx.currentTime+d); o.stop(ctx.currentTime+d+.25); });
   } catch {}
 }
-function finishPhase() {
-  const was=timer.phase;
-  if (was==='focus') { logFocus(pomo().focus); timer.cycle=(timer.cycle||0)+1; timer.phase=timer.cycle%pomo().every===0?'long':'short'; }
-  else timer.phase='focus';
-  Object.assign(timer,{running:false,remaining:null,startedAt:null});
-  storeTimer();
-  chime();
-  const msg=was==='focus'?'Focus done. Time for a '+phaseName[timer.phase].toLowerCase()+'.':'Break over. Ready for the next focus?';
-  notify(msg);
-  try { if ('Notification' in window && Notification.permission==='granted' && document.hidden) new Notification('HSC Stack',{body:msg}); } catch {}
-  if (data) render();
+function toggleTimer() {
+  if (timer.running) pauseTimer(); else startTimer();
+  render();
 }
+
+// One form for finishing a session, logging a past one, and editing the log.
+function sessionForm(s, title, submit, onDiscard) {
+  const open=sortTasks(data.tasks.filter(t=>taskOpen(t)||t.id===s.taskId));
+  const start=sessionStart(s);
+  modal(title,'<div class="form-grid">'+
+    select('course','Subject',s.course||'',[['','General'],...courseOptions()])+
+    select('taskId','Task (optional)',s.taskId||'',[['','No task'],...open.map(t=>[t.id,t.title])])+
+    dateField('date','Date',s.date,true)+
+    field('start','Started at',hhmm(start),{type:'time',required:true})+
+    number('minutes','Minutes studied',s.minutes,{min:1,max:720,required:true})+
+    select('rating','How it went',s.rating||'',[['','—'],...ratings.map(r=>[r,r])])+
+    textArea('note','What you did',s.note||'',false,'e.g. 2023 paper Q11–14, need to redo the projectile question')+
+    '</div>',submit,v=>{
+      const mins=Math.round(Number(v.minutes));
+      if (!(mins>=1&&mins<=720)) { formError('Minutes must be between 1 and 720.'); return false; }
+      const startMs=Date.parse(v.date+'T'+v.start);
+      if (Number.isNaN(startMs)) { formError('Check the date and start time.'); return false; }
+      const t=v.taskId&&row('tasks',v.taskId);
+      const next={taskId:v.taskId||null,course:v.course||t?.course||'',date:v.date,start:new Date(startMs).toISOString(),end:new Date(startMs+mins*60000).toISOString(),minutes:mins,rating:v.rating,note:v.note};
+      change(()=>{
+        if (s.id) {
+          const old=row('tasks',s.taskId); if (old) old.actual=Math.max(0,(Number(old.actual)||0)-s.minutes);
+          Object.assign(row('focus',s.id),next,{title:t?.title??''});
+          if (t) t.actual=(Number(t.actual)||0)+mins;
+        } else addSession(next);
+      });
+      if (!s.id) { resetTimer({phase:'focus'}); notify('Logged '+minutes(mins)+(course(next.course)?' of '+course(next.course).short:'')+'.'); render(); }
+    },onDiscard);
+}
+function finishSession() {
+  pauseTimer();
+  const secs=timer.phase==='focus'?elapsedSecs():0;
+  const mins=Math.max(1,Math.round(secs/60)), startMs=timer.startedAt??Date.now()-secs*1000;
+  sessionForm({taskId:timer.taskId,course:timer.course,date:sydney.format(new Date(startMs)),start:new Date(startMs).toISOString(),minutes:mins},
+    'Finish session · '+clock(secs),'Save to log',
+    {label:'Discard',title:'Discard this session?',body:'The timer resets and nothing is logged.',run:()=>{resetTimer({phase:'focus'});render();}});
+  render();
+}
+const logPast = () => sessionForm({course:timer.course,date:today(),start:new Date(Date.now()-3600000).toISOString(),minutes:60},'Log a past session','Save to log');
+const editSession = s => sessionForm(s,'Edit session','Save',{label:'Delete',title:'Delete this session?',body:'It is removed from your log and its minutes come off the task.',run:()=>change(()=>{
+  const t=row('tasks',s.taskId); if (t) t.actual=Math.max(0,(Number(t.actual)||0)-s.minutes);
+  data.focus=data.focus.filter(f=>f.id!==s.id);
+})});
+
 function updateTimerDom() {
-  const left=timeLeft(), total=phaseSecs(timer.phase);
-  const text=$('timer-text'); if (text) text.textContent=clock(left);
-  const ring=$('timer-ring'); if (ring) ring.style.strokeDashoffset=String(691*(left/total));
+  const secs=shownSecs();
+  const text=$('timer-text'); if (text) text.textContent=clock(secs);
+  const bar=$('timer-bar'); if (bar) bar.style.width=(countsUp()?0:100*(1-secs/phaseSecs(timer.phase)))+'%';
   const mini=$('mini-timer');
-  if (mini) { mini.hidden=!timer.running && timer.remaining==null; mini.textContent=(timer.running?'● ':'❚❚ ')+phaseName[timer.phase]+' '+clock(left); mini.dataset.phase=timer.phase; }
-  document.title=timer.running?clock(left)+' · '+phaseName[timer.phase]+' · HSC Stack':'HSC Stack';
+  if (mini) {
+    mini.hidden=!sessionActive();
+    const who=timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase];
+    mini.textContent=(timer.running?'● ':'❚❚ ')+who+' '+clock(secs);
+    mini.dataset.phase=timer.phase;
+  }
+  document.title=timer.running?clock(secs)+' · '+(timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase])+' · HSC Stack':'HSC Stack';
 }
-setInterval(()=>{ if (!data) return; if (timer.running && timeLeft()<=0) finishPhase(); else updateTimerDom(); },1000);
-function focusStats() {
+setInterval(()=>{ if (!data) return; if (timer.running && !countsUp() && elapsedSecs()>=phaseSecs(timer.phase)) finishPhase(); else updateTimerDom(); },1000);
+
+function studyStats() {
   const t0=today(), wk=monday(t0);
-  const todays=data.focus.filter(f=>f.date===t0), week=data.focus.filter(f=>f.date>=wk);
   const sum=list=>list.reduce((n,f)=>n+f.minutes,0);
-  const bySubject=courses.map(c=>[c,sum(week.filter(f=>f.course===c.id))]).concat([[{short:'General',colour:'#8e978d'},sum(week.filter(f=>!course(f.course)))]]).filter(([,m])=>m>0);
-  const max=Math.max(1,...bySubject.map(([,m])=>m));
-  const days=Array.from({length:7},(_,i)=>addDays(wk,i)).map(d=>[d,sum(data.focus.filter(f=>f.date===d))]);
-  const dmax=Math.max(1,...days.map(([,m])=>m));
-  return {todays,week,sum,bySubject,max,days,dmax};
+  const on=d=>data.focus.filter(f=>f.date===d);
+  const week=data.focus.filter(f=>f.date>=wk && f.date<=addDays(wk,6));
+  const bySubject=courses.map(c=>[c,sum(week.filter(f=>f.course===c.id))]).concat([[{short:'General',colour:'#8b94a1'},sum(week.filter(f=>!course(f.course)))]]).filter(([,m])=>m>0).sort((a,b)=>b[1]-a[1]);
+  const days=Array.from({length:7},(_,i)=>addDays(wk,i)).map(d=>[d,sum(on(d))]);
+  let streak=0, d=sum(on(t0))>0?t0:addDays(t0,-1);
+  while (sum(on(d))>0) { streak++; d=addDays(d,-1); }
+  return {sum,today:sum(on(t0)),todayCount:on(t0).length,week:sum(week),weekCount:week.length,bySubject,max:Math.max(1,...bySubject.map(([,m])=>m)),days,dmax:Math.max(1,studyGoal(),...days.map(([,m])=>m)),streak};
+}
+let logDays=7;
+function dayName(d) {
+  const n=daysFrom(today(),d);
+  return n===0?'Today':n===1?'Yesterday':pretty(d,{weekday:'short',day:'numeric',month:'short'});
+}
+function studyLog() {
+  const dates=[...new Set(data.focus.map(f=>f.date))].sort().reverse();
+  if (!dates.length) return '<div class="log-empty"><strong>Nothing logged yet</strong><p>Start a session above, or log one you did without the timer.</p></div>';
+  const shown=dates.slice(0,logDays);
+  return shown.map(d=>{
+    const list=data.focus.filter(f=>f.date===d).sort((a,b)=>sessionStart(b)-sessionStart(a));
+    const total=list.reduce((n,f)=>n+f.minutes,0);
+    return '<section class="log-day"><header><h3>'+h(dayName(d))+'</h3><span>'+minutes(total)+'</span></header>'+list.map(f=>{
+      const c=course(f.course), st=sessionStart(f);
+      return '<button type="button" class="log-row" data-action="edit-session" data-id="'+h(f.id)+'" style="--c:'+(c?.colour??'#8b94a1')+'">'+
+        '<span class="log-time">'+hhmm(st)+'–'+hhmm(st+f.minutes*60000)+'</span>'+
+        '<span class="log-what"><strong><i></i>'+h(c?.short??'General')+'</strong> '+(f.taskId||(f.title&&f.title!=='Untitled focus')?'<span>'+h(sessionTitle(f))+'</span>':'')+
+        (f.note?'<small>'+h(f.note)+'</small>':'')+'</span>'+
+        (f.rating?'<span class="log-rating" data-rating="'+h(f.rating)+'">'+h(f.rating)+'</span>':'<span></span>')+
+        '<span class="log-mins">'+minutes(f.minutes)+'</span></button>';
+    }).join('')+'</section>';
+  }).join('')+(dates.length>logDays?'<button type="button" class="button text log-more" data-action="log-more">Show older days ('+(dates.length-logDays)+')</button>':'');
 }
 function focusPage() {
-  const s=focusStats(), left=timeLeft(), total=phaseSecs(timer.phase);
+  const s=studyStats(), secs=shownSecs(), active=sessionActive(), onBreak=timer.phase!=='focus';
   const open=sortTasks(data.tasks.filter(taskOpen));
-  const t=timer.taskId&&row('tasks',timer.taskId);
-  return '<div class="list-head"><div><h1>Focus</h1></div><div class="list-stats">'+button('Timer settings','settings','','text')+'</div></div>'+
-    '<div class="focus-wrap"><section class="card focus-card">'+
-      tabGroup('Timer phase','timer-phase',timer.phase,[['focus','Focus'],['short','Short break'],['long','Long break']])+
-      '<div class="ring" data-phase="'+timer.phase+'"><svg viewBox="0 0 240 240" aria-hidden="true"><circle cx="120" cy="120" r="110" class="ring-bg"/><circle id="timer-ring" cx="120" cy="120" r="110" class="ring-fg" style="stroke-dashoffset:'+(691*(left/total))+'"/></svg>'+
-        '<div class="ring-inner"><span id="timer-text" class="timer-text" role="timer" aria-live="off">'+clock(left)+'</span><small>'+phaseName[timer.phase]+' · round '+((timer.cycle||0)%pomo().every+1)+' of '+pomo().every+'</small></div></div>'+
-      '<label class="focus-task"><span>Working on</span><select data-timer-task><option value="">No task selected</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+(x.date?' · '+h(dueLabel(x)):'')+'</option>').join('')+'</select></label>'+
-      (t?'<p class="note">'+(course(t.course)?subject(t.course)+' ':'')+(t.actual?minutes(Number(t.actual))+' logged so far':'No time logged yet')+'</p>':'')+
-      '<div class="focus-buttons">'+(timer.running?button('Pause','timer-pause','','secondary'):button(timer.remaining!=null?'Resume':'Start '+phaseName[timer.phase].toLowerCase(),'timer-start','','primary'))+
-        (timer.running||timer.remaining!=null?button('Stop','timer-stop','','secondary'):'')+(timer.phase!=='focus'?button('Skip break','timer-skip','','text'):'')+'</div>'+
-    '</section><div class="focus-side">'+
-      '<div class="metrics three">'+metric('Today',minutes(s.sum(s.todays)),s.todays.length+' session'+(s.todays.length===1?'':'s'))+metric('This week',minutes(s.sum(s.week)),s.week.length+' sessions')+metric('All time',minutes(s.sum(data.focus)),data.focus.length+' sessions')+'</div>'+
-      section('This week','Focus minutes per day','<div class="bars">'+s.days.map(([d,m])=>'<div class="bar-col'+(d===today()?' today':'')+'"><i style="height:'+(m/s.dmax*100)+'%"></i><span>'+pretty(d,{weekday:'narrow'})+'</span><small>'+(m?minutes(m):'')+'</small></div>').join('')+'</div>')+
-      section('By subject','This week',s.bySubject.length?s.bySubject.map(([c,m])=>'<div class="hbar"><span>'+h(c.short)+'</span><div><i style="width:'+(m/s.max*100)+'%;background:'+c.colour+'"></i></div><b>'+minutes(m)+'</b></div>').join(''):'<p class="note">Finish a focus session to see where your time goes.</p>')+
-      section('Recent sessions','',data.focus.length?'<div class="sessions">'+[...data.focus].reverse().slice(0,12).map(f=>'<div class="session"><span>'+(course(f.course)?subject(f.course):'')+' '+h(f.title)+'</span><small>'+h(pretty(f.date))+' · '+minutes(f.minutes)+'</small><button type="button" class="icon-btn small" data-action="focus-delete" data-id="'+h(f.id)+'" aria-label="Delete session">'+icon('close')+'</button></div>').join('')+'</div>':'<p class="note">No sessions yet.</p>')+
-    '</div></div>';
+  const goal=studyGoal(), pct=Math.min(100,s.today/goal*100);
+  const chips=[['','General','#8b94a1'],...courses.map(c=>[c.id,c.short,c.colour])].map(([id,label,col])=>
+    '<button type="button" class="subj-chip" style="--c:'+col+'" aria-pressed="'+((timer.course||'')===id)+'" data-action="study-course" data-id="'+id+'"><i></i>'+h(label)+'</button>').join('');
+  const controls = timer.running
+    ? button('Pause','timer-pause','','secondary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','primary'))
+    : active
+      ? button('Resume','timer-start','','primary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','secondary'))
+      : onBreak ? button('Start '+phaseName[timer.phase].toLowerCase(),'timer-start','','primary')+button('Skip break','timer-skip','','text')
+      : button('Start studying','timer-start','','primary');
+  return '<div class="list-head"><div><h1>Study</h1></div><div class="list-stats">'+button('Timer settings','settings','','text')+'</div></div>'+
+    '<div class="study-top">'+
+    '<section class="card session'+(timer.running?' running':'')+(onBreak?' break':'')+'">'+
+      '<div class="session-mode">'+tabGroup('Timer type','study-mode',timer.mode,[['open','Open'],['timed','Timed · '+pomo().focus+'m']])+
+        '<span class="session-state">'+(timer.running?'<i></i>'+(onBreak?'On a break':'Studying'):active?'Paused':onBreak?'Break':'Ready')+'</span></div>'+
+      (onBreak?'':'<div class="subj-chips" role="group" aria-label="Subject">'+chips+'</div>'+
+        '<label class="session-task"><span>Task</span><select data-timer-task><option value="">No task, just the subject</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+'</option>').join('')+'</select></label>')+
+      '<div class="session-clock"><span id="timer-text" class="timer-text" role="timer" aria-live="off">'+clock(secs)+'</span>'+
+        '<small>'+(onBreak?phaseName[timer.phase]+' · round '+((timer.cycle||0)%pomo().every||pomo().every)+' of '+pomo().every+' done'
+          :timer.mode==='timed'?'Round '+((timer.cycle||0)%pomo().every+1)+' of '+pomo().every+' · counts down from '+pomo().focus+'m'
+          :active?'Started '+hhmm(timer.startedAt):'Counts up until you finish')+'</small>'+
+        (countsUp()?'':'<div class="session-bar"><i id="timer-bar" style="width:'+(100*(1-secs/phaseSecs(timer.phase)))+'%"></i></div>')+'</div>'+
+      '<div class="session-buttons">'+controls+'</div>'+
+      '<p class="session-hint"><kbd>s</kbd> start or pause</p>'+
+    '</section>'+
+    '<div class="study-side">'+
+      '<section class="card goal"><div class="goal-head"><div><span>Today</span><strong>'+minutes(s.today)+'</strong></div><div class="goal-of">of '+minutes(goal)+' goal'+(s.today>=goal?' · done':'')+'</div></div>'+
+        '<div class="goal-bar"><i style="width:'+pct+'%"></i></div>'+
+        '<div class="goal-facts"><span><b>'+s.streak+'</b> day streak</span><span><b>'+minutes(s.week)+'</b> this week</span><span><b>'+s.todayCount+'</b> session'+(s.todayCount===1?'':'s')+' today</span></div></section>'+
+      section('This week','','<div class="bars">'+s.days.map(([d,m])=>'<div class="bar-col'+(d===today()?' today':'')+(m>=goal?' hit':'')+'"><i style="height:'+(m/s.dmax*100)+'%"></i><span>'+pretty(d,{weekday:'narrow'})+'</span><small>'+(m?minutes(m):'')+'</small></div>').join('')+'</div>')+
+      (s.bySubject.length?section('By subject','This week',s.bySubject.map(([c,m])=>'<div class="hbar"><span>'+h(c.short)+'</span><div><i style="width:'+(m/s.max*100)+'%;background:'+c.colour+'"></i></div><b>'+minutes(m)+'</b></div>').join('')):'')+
+    '</div></div>'+
+    '<section class="study-log"><div class="log-head"><h2>Study log</h2>'+button('+ Log a past session','log-past','','secondary')+'</div>'+studyLog()+'</section>';
 }
 
 // ───────────────────────── Habits ─────────────────────────
@@ -871,6 +1176,123 @@ function editHabit(hb) {
     }, hb?()=>change(()=>{ data.habits=data.habits.filter(z=>z.id!==hb.id); delete data.habitLog[hb.id]; }):null);
 }
 
+// ───────────────────────── Overview dashboard ─────────────────────────
+const countdown = (label, day, empty) => {
+  if (!day) return metric(label,'—',empty);
+  const n=daysFrom(day,today());
+  return metric(label, n<0?'Done':n===0?'Today':n+'d', pretty(day,{weekday:'short',day:'numeric',month:'short',year:'numeric'})+(n>0?' · '+Math.ceil(n/7)+' wk'+(Math.ceil(n/7)===1?'':'s'):''), n>=0&&n<=14?'alert':'');
+};
+function reviewList(list) {
+  return '<div class="focus-list">'+list.map(t=>{
+    const st=topicState(t.id);
+    return '<div class="focus-row"><div><div class="line">'+subject(t.course)+(st.priority!=='Normal'?badge(st.priority,st.priority==='Urgent'?'alert':'gold'):'')+'</div><strong>'+h(t.title)+'</strong><small>'+h(t.module)+' · '+h(reviewLabel(st))+'</small></div>'+button('Review','review-topic',t.id,'text')+'</div>';
+  }).join('')+'</div>';
+}
+const paperPct = p => hasMark(p) ? p.mark/p.outOf*100 : null;
+function subjectBalance() {
+  const t0=today(), from7=addDays(t0,-6), from28=addDays(t0,-27);
+  return courses.map(c=>{
+    const mins=from=>data.focus.filter(f=>f.course===c.id&&f.date>=from&&f.date<=t0).reduce((n,f)=>n+f.minutes,0);
+    const topics=topicsFor(c), covered=topics.filter(t=>['Practised','Retested'].includes(topicState(t.id).stage)).length;
+    const due=topics.filter(t=>reviewDue(topicState(t.id))).length;
+    const errors=data.errors.filter(e=>e.course===c.id&&e.stage!=='Passed').length;
+    const papers=data.papers.filter(p=>p.course===c.id&&paperPct(p)!=null);
+    const avg=papers.length?papers.reduce((n,p)=>n+paperPct(p),0)/papers.length:null;
+    const next=deadlines().find(a=>a.course===c.id&&a.date>=t0);
+    const soon=next&&daysFrom(next.date,t0)<=21;
+    return {c,week:mins(from7),month:mins(from28),topics:topics.length,covered,due,errors,papers:papers.length,avg,next,flag:mins(from7)===0&&(soon||due>0)};
+  });
+}
+function dashPage() {
+  const t0=today(), s=studyStats(), goal=studyGoal(), set=data.settings;
+  const trial=set.trialStart||data.assessments.filter(a=>a.kind==='Trial'&&a.date&&a.date>=t0).map(a=>a.date).sort()[0]||'';
+  const next=deadlines().find(a=>a.date>=t0);
+  const overdue=data.tasks.filter(t=>taskOpen(t)&&t.date&&t.date<t0);
+  const todays=sortTasks(data.tasks.filter(t=>taskOpen(t)&&t.date&&t.date<=t0));
+  const due=dueTopics();
+  const retestsDue=data.errors.filter(e=>e.stage!=='Passed'&&e.retest&&e.retest<=addDays(t0,7)).sort((a,b)=>a.retest.localeCompare(b.retest));
+  const newFeedback=data.feedback.filter(f=>f.status==='New');
+  const rows=subjectBalance(), maxMonth=Math.max(1,...rows.map(r=>r.month));
+  const hasRecords=data.tasks.length||data.assessments.length||data.focus.length||data.papers.length;
+  const staleBackup=localMode&&hasRecords&&(!set.lastExport||daysFrom(t0,set.lastExport)>=7);
+  return '<div class="list-head"><div><div class="eyebrow">'+h(pretty(t0,{weekday:'long',day:'numeric',month:'long'}))+'</div><h1>Overview</h1></div><div class="list-stats">'+button('Set exam dates','settings','','text')+button('▶ Study','go-study','','primary')+'</div></div>'+
+    (staleBackup?'<div class="banner"><div><strong>'+(set.lastExport?'Last backup was '+daysFrom(t0,set.lastExport)+' days ago':'You have not exported a backup yet')+'</strong><span>Your records live only in this browser. Clearing site data or losing the device would lose them.</span></div>'+button('Export backup','export','','primary')+'</div>':'')+
+    '<div class="metrics">'+
+      (next?metric('Next assessment',daysFrom(next.date,t0)===0?'Today':daysFrom(next.date,t0)+'d',next.title+(next.weight!==''?' · '+next.weight+'%':''),daysFrom(next.date,t0)<=7?'alert':''):metric('Next assessment','—','None logged'))+
+      countdown('Trials',trial,'Add a Trial or set the date')+
+      countdown('HSC exams',set.hscStart,'Set the first exam date')+
+      metric('Studied this week',minutes(s.week),(s.streak?s.streak+' day streak · ':'')+'goal '+minutes(goal*7),s.week>=goal*7?'accent':'')+
+    '</div>'+
+    '<div class="dash-grid">'+
+      section('Today',todays.length?todays.length+' open'+(overdue.length?' · '+overdue.length+' overdue':''):'Nothing due',
+        (todays.length?todays.slice(0,6).map(t=>stackRow(t,true)).join('')+(todays.length>6?'<a class="subtle-link more-link" href="#today">'+(todays.length-6)+' more →</a>':''):emptyCard('Clear for today','Add a task, or pick a topic that is due for review.'))+quickAdd('Today',{date:t0},true),
+        '<a class="subtle-link" href="#today">Today →</a>')+
+      section('Due for review',due.length?due.length+' topic'+(due.length===1?'':'s')+' ready to recall':'Spaced review keeps topics from fading',
+        due.length?reviewList(due.slice(0,6))+(due.length>6?'<a class="subtle-link more-link" href="#topics">'+(due.length-6)+' more →</a>':''):emptyCard('No reviews due','Press Review on any syllabus topic after you study it. It comes back here when it is due.','<a class="button secondary" href="#topics">Open syllabus</a>'),
+        '<a class="subtle-link" href="#topics">Syllabus →</a>')+
+      section('Fix before it costs marks',retestsDue.length+newFeedback.length?'Retests due this week and feedback not yet acted on':'Nothing waiting',
+        (retestsDue.length||newFeedback.length?'<div class="focus-list">'+
+          retestsDue.slice(0,5).map(e=>'<div class="focus-row"><div><div class="line">'+subject(e.course)+badge(e.retest<t0?'Overdue':'Retest','gold')+'</div><strong>'+h(e.title)+'</strong><small>'+h(dueLabel({date:e.retest}))+'</small></div>'+button('Record','retest',e.id,'text')+'</div>').join('')+
+          newFeedback.slice(0,3).map(f=>'<div class="focus-row"><div><div class="line">'+subject(f.course)+badge('Feedback')+'</div><strong>'+h(f.title)+'</strong><small>'+h(f.next||'No change planned yet')+'</small></div>'+button('Plan','plan-feedback',f.id,'text')+'</div>').join('')+'</div>'
+          :emptyCard('All clear','Errors you log and teacher feedback you record show here when they need action.')),
+        '<a class="subtle-link" href="#practice">Errors →</a>')+
+    '</div>'+
+    section('Subject balance','Study time, syllabus coverage and practice by course. A course is flagged when it got no study this week but has an assessment within 3 weeks or reviews due.',
+      '<div class="table-scroll"><table class="balance"><thead><tr><th>Course</th><th>Last 7 days</th><th>Last 28 days</th><th>Syllabus practised</th><th>Reviews due</th><th>Open errors</th><th>Past papers</th><th>Next assessment</th></tr></thead><tbody>'+
+      rows.map(r=>'<tr'+(r.flag?' class="flag"':'')+'><th scope="row"><a href="#list/'+r.c.id+'">'+subject(r.c.id)+'</a>'+(r.flag?' '+badge('Needs time','alert'):'')+'</th>'+
+        '<td>'+(r.week?minutes(r.week):'—')+'</td>'+
+        '<td><div class="mini-bar"><i style="width:'+(r.month/maxMonth*100)+'%;background:'+r.c.colour+'"></i></div>'+(r.month?minutes(r.month):'—')+'</td>'+
+        '<td>'+r.covered+' / '+r.topics+' <small>('+Math.round(r.covered/Math.max(1,r.topics)*100)+'%)</small></td>'+
+        '<td>'+(r.due?'<b class="due">'+r.due+'</b>':'0')+'</td>'+
+        '<td>'+r.errors+'</td>'+
+        '<td>'+(r.papers?r.papers+' · avg '+percent(r.avg):'—')+'</td>'+
+        '<td>'+(r.next?h(r.next.title)+' <small>'+(daysFrom(r.next.date,t0)===0?'today':'in '+daysFrom(r.next.date,t0)+'d')+'</small>':'—')+'</td></tr>').join('')+
+      '</tbody></table></div>');
+}
+
+// ───────────────────────── Past papers ─────────────────────────
+let paperFilter = 'all';
+const paperSources = ['HSC','Trial (other school)','Own school past task','Textbook or other'];
+function spark(values) {
+  if (values.length<2) return '';
+  const w=140, ht=36, step=w/(values.length-1);
+  const pts=values.map((v,i)=>[+(i*step).toFixed(1), +(ht-3-v/100*(ht-6)).toFixed(1)]);
+  return '<svg class="spark" viewBox="-3 0 '+(w+6)+' '+ht+'" aria-hidden="true"><line x1="0" x2="'+w+'" y1="'+(ht-3-0.5*(ht-6))+'" y2="'+(ht-3-0.5*(ht-6))+'" class="spark-mid"/><polyline points="'+pts.map(p=>p.join(',')).join(' ')+'"/>'+pts.map((p,i)=>i===pts.length-1?'<circle cx="'+p[0]+'" cy="'+p[1]+'" r="2.6"/>':'').join('')+'</svg>';
+}
+function papersPage() {
+  const all=dated(data.papers);
+  const shown=all.filter(p=>paperFilter==='all'||p.course===paperFilter).reverse();
+  const cards=courses.map(c=>{
+    const list=all.filter(p=>p.course===c.id&&paperPct(p)!=null);
+    if (!list.length) return '';
+    const pcts=list.map(paperPct), last=pcts.at(-1), avg=pcts.reduce((a,b)=>a+b,0)/pcts.length;
+    const recent=pcts.slice(-3), earlier=pcts.slice(-6,-3);
+    const trend=earlier.length?recent.reduce((a,b)=>a+b,0)/recent.length-earlier.reduce((a,b)=>a+b,0)/earlier.length:null;
+    return '<section class="card paper-card" style="--c:'+c.colour+'"><div class="line">'+subject(c.id)+'<span class="note">'+list.length+' marked</span></div><div class="paper-nums"><div><span>Latest</span><strong>'+percent(last)+'</strong></div><div><span>Average</span><strong>'+percent(avg)+'</strong></div><div><span>Best</span><strong>'+percent(Math.max(...pcts))+'</strong></div></div>'+spark(pcts.slice(-12))+
+      (trend!=null?'<small class="trend '+(trend>=0?'up':'down')+'">'+(trend>=0?'▲ ':'▼ ')+Math.abs(trend).toFixed(1)+' points, last 3 vs previous 3</small>':'<small class="trend">Trend shows after 4 marked papers</small>')+'</section>';
+  }).join('');
+  return pageHead('','Past papers','Sit full papers under exam conditions, mark them honestly, and turn every lost mark into an error to repair.',button('+ Log paper','edit-paper','','primary'))+
+    (cards?'<div class="paper-grid">'+cards+'</div>':'')+
+    section('Paper log','Newest first. Time used is compared with the time allowed.',
+      tabGroup('Course','paper-filter',paperFilter,[['all','All'],...courses.map(c=>[c.id,c.short])])+
+      (shown.length?'<div class="record-list">'+shown.map(p=>{
+        const pct=paperPct(p), over=p.minutes&&p.limit&&Number(p.minutes)>Number(p.limit);
+        return '<article class="record"><div class="record-head"><div><div class="line">'+subject(p.course)+badge(p.source||'Paper',p.source==='HSC'?'gold':'neutral')+(over?badge('Over time','alert'):'')+'</div><h3>'+h(p.title)+'</h3><p>'+(p.date?h(pretty(p.date,{day:'numeric',month:'short',year:'numeric'})):'Undated')+' · '+(pct!=null?h(p.mark)+' / '+h(p.outOf)+' ('+percent(pct)+')':'Not marked yet')+(p.minutes?' · '+minutes(Number(p.minutes))+(p.limit?' of '+minutes(Number(p.limit)):''):'')+'</p></div>'+
+          '<div class="line">'+button('Log error','paper-error',p.id)+button('Edit','edit-paper',p.id)+'</div></div>'+(p.notes?'<p class="record-detail">'+br(p.notes)+'</p>':'')+'</article>';
+      }).join('')+'</div>':emptyCard('No papers logged'+(paperFilter==='all'?'':' for '+course(paperFilter).short),'Log each past paper you sit with its mark and time. Trends per course appear above once you have two.',button('+ Log paper','edit-paper'))));
+}
+function editPaper(record) {
+  const v=record??{title:'',course:paperFilter!=='all'?paperFilter:courseDefault(),source:'HSC',date:today(),mark:'',outOf:'',minutes:'',limit:'',notes:''};
+  crud('papers',record,required('title','Paper',v.title)+chooseCourse(v.course)+select('source','Source',v.source,paperSources)+dateField('date','Date sat',v.date,true)+
+    number('mark','Mark',v.mark,{max:1000,step:.5})+number('outOf','Out of',v.outOf,{min:1,max:1000,step:.5})+
+    number('minutes','Time used (min)',v.minutes,{max:600})+number('limit','Time allowed (min)',v.limit,{max:600})+
+    textArea('notes','Where marks were lost',v.notes,false,'e.g. Q14(c) projectile range, Section I Q7 misread'),record?'Edit paper':'Log a past paper',x=>{
+      asNumbers(x,['mark','outOf','minutes','limit']);
+      if ((x.mark==='')!==(x.outOf==='') || (x.mark!==''&&x.mark>x.outOf)) { formError('Enter both mark and total. The mark must be at or below the total.'); return null; }
+      return x;
+    },v);
+}
+
 // ───────────────────────── Sidebar ─────────────────────────
 function navHtml(r) {
   const count=fn=>data.tasks.filter(t=>taskOpen(t)&&fn(t)).length;
@@ -880,7 +1302,9 @@ function navHtml(r) {
   const sec=(title,body,extra='')=>'<div class="nav-sec"><div class="nav-title"><span>'+title+'</span>'+extra+'</div>'+body+'</div>';
   const counts={today:count(t=>t.date&&t.date<=t0),next7:count(t=>t.date&&t.date<=addDays(t0,6)),inbox:count(t=>!t.course&&!t.list),all:count(()=>true)};
   const tags=allTags();
-  return smart.map(([k,n,ic])=>link(k,n,icon(ic),cur(k),k==='done'?0:counts[k])).join('')+
+  const studied=data.focus.filter(f=>f.date===t0).reduce((n,f)=>n+f.minutes,0);
+  const reviews=dueTopics().length;
+  return link('dash','Overview',icon('home'),cur('dash'),reviews?reviews+' due':0)+link('focus','Study',icon('timer'),cur('focus'),studied?minutes(studied):0).replace('<a ','<a class="nav-study" ')+'<div class="nav-gap"></div>'+smart.map(([k,n,ic])=>link(k,n,icon(ic),cur(k),k==='done'?0:counts[k])).join('')+
     sec('Subjects',courses.map(c=>link('list/'+c.id,c.short,'<i class="dot" style="--c:'+c.colour+'"></i>',cur('list',c.id),count(t=>t.course===c.id))).join(''))+
     sec('Lists',data.lists.map(l=>link('list/'+encodeURIComponent(l.id),l.name,'<i class="dot" style="--c:'+(l.colour||'#8e978d')+'"></i>',cur('list',l.id),count(t=>t.list===l.id))).join('')||'<span class="nav-empty">No lists yet</span>','<button type="button" class="nav-add" data-action="edit-list" aria-label="New list">+</button>')+
     (tags.length?sec('Tags',tags.map(g=>link('tag/'+encodeURIComponent(g),g,icon('hash'),cur('tag',g),count(t=>(t.tags||[]).includes(g)))).join('')):'')+
@@ -900,14 +1324,28 @@ function editList(l) {
 function settingsModal() {
   const p=pomo();
   modal('Backup & settings','<div class="form-grid">'+
-    number('focus','Focus length (min)',p.focus,{min:5,max:120,required:true})+number('short','Short break (min)',p.short,{min:1,max:60,required:true})+
+    number('goal','Daily study goal (min)',studyGoal(),{min:15,max:720,step:15,required:true})+number('focus','Timed round length (min)',p.focus,{min:5,max:120,required:true})+number('short','Short break (min)',p.short,{min:1,max:60,required:true})+
     number('long','Long break (min)',p.long,{min:1,max:90,required:true})+number('every','Long break after (rounds)',p.every,{min:2,max:12,required:true})+
+    dateField('trialStart','Trials start',data.settings.trialStart)+dateField('hscStart','First HSC exam',data.settings.hscStart)+
+    '<small class="note full">Use your school’s Trial timetable and the NESA HSC timetable. The Overview counts down to both.</small>'+
+    (localMode?'<div class="field full"><span>Sync across devices</span><div class="line wrap">'+button(syncOn()?'Sync settings':'Set up sync','sync-setup','',syncOn()?'secondary':'primary')+'<small class="note">'+(syncOn()?'On'+(syncCfg.device?' · '+h(syncCfg.device):'')+(syncCfg.lastSync?' · last synced '+h(hhmm(Date.parse(syncCfg.lastSync))):''):'Off. Records stay in this browser only.')+'</small></div></div>':'')+
     '<div class="field full"><span>Backup</span><div class="line wrap">'+button('Export backup (.json)','export')+'<label class="button secondary file-btn">Import backup<input type="file" id="import-file" accept="application/json,.json" hidden></label></div>'+
-    '<small class="note">'+(localMode?'Your records are saved in this browser only. Export a backup now and then, and import it to move to another device.':'Your records sync through your account.')+'</small></div>'+
-    '<div class="field full"><span>Shortcuts</span><small class="note"><kbd>q</kbd> quick add · <kbd>/</kbd> search · <kbd>Esc</kbd> close details</small></div></div>',
-    'Save settings',v=>change(()=>{ data.settings.pomo={focus:+v.focus,short:+v.short,long:+v.long,every:+v.every}; if(!timer.running&&timer.remaining==null) storeTimer(); }));
+    '<small class="note">'+(localMode?(data.settings.lastExport?'Last exported '+h(pretty(data.settings.lastExport,{day:'numeric',month:'short',year:'numeric'}))+'. ':'')+'Export a backup now and then even with sync on, and keep it somewhere safe.':'Your records sync through your account.')+'</small></div>'+
+    (localMode&&Object.keys(snapshots()).length?'<div class="field full"><span>Daily snapshots</span><small class="note">This browser keeps your records as they were when you first opened HSC Stack each day, for the last 7 days.</small><div class="line wrap">'+Object.keys(snapshots()).sort().reverse().map(d=>button('Restore '+pretty(d,{weekday:'short',day:'numeric',month:'short'}),'restore-snap',d,'text')).join('')+'</div></div>':'')+
+    '<div class="field full"><span>Shortcuts</span><small class="note"><kbd>s</kbd> start or pause studying · <kbd>q</kbd> quick add · <kbd>/</kbd> search · <kbd>Esc</kbd> close details</small></div></div>',
+    'Save settings',v=>change(()=>{ data.settings.pomo={focus:+v.focus,short:+v.short,long:+v.long,every:+v.every}; data.settings.studyGoal=+v.goal; data.settings.trialStart=v.trialStart; data.settings.hscStart=v.hscStart; }));
+}
+function restoreSnapshot(day) {
+  const snap=snapshots()[day];
+  if (!snap) { notify('That snapshot is no longer stored.'); return; }
+  modal('Restore '+pretty(day,{weekday:'long',day:'numeric',month:'short'})+'?','<p>This replaces your current records with the copy from the start of that day ('+(snap.tasks?.length??0)+' tasks). Anything you changed since is lost'+(syncOn()?', and the restored copy syncs to your other devices':'')+'. Export a backup first if you are unsure.</p>','Restore',()=>{
+    change(()=>{ data=normalise(snap); });
+    forceNextSync();   // a deliberate restore replaces the synced copy instead of merging with it
+    notify('Restored the '+pretty(day)+' snapshot.');
+  });
 }
 function exportData() {
+  change(()=>{ data.settings.lastExport=today(); });
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -919,7 +1357,7 @@ async function importData(file) {
   let parsed;
   try { parsed=JSON.parse(await file.text()); } catch { notify('That file is not valid JSON.'); return; }
   if (!parsed || parsed.version!==1 || !Array.isArray(parsed.tasks)) { notify('That file is not an HSC Stack backup.'); return; }
-  modal('Replace your records?','<p>This replaces everything in HSC Stack with the backup from the file ('+parsed.tasks.length+' tasks). Export first if you want to keep what is here now.</p>','Replace',()=>{ change(()=>{ data=normalise(parsed); }); notify('Backup imported.'); });
+  modal('Replace your records?','<p>This replaces everything in HSC Stack with the backup from the file ('+parsed.tasks.length+' tasks)'+(syncOn()?' on every synced device':'')+'. Export first if you want to keep what is here now.</p>','Replace',()=>{ change(()=>{ data=normalise(parsed); }); forceNextSync(); notify('Backup imported.'); });
 }
 
 // ───────────────────────── Actions and input wiring ─────────────────────────
@@ -929,7 +1367,7 @@ function stackActions(id, el) {
     'set-priority':()=>change(()=>{row('tasks',selected).priority=Number(id);}),
     'delete-task':()=>modal('Delete this task?','<p>'+h(row('tasks',id)?.title)+'</p>','Delete',()=>{change(()=>{data.tasks=data.tasks.filter(t=>t.id!==id);});selected=null;}),
     'sub-delete':()=>change(()=>{const t=row('tasks',selected);t.subtasks=t.subtasks.filter(x=>x.id!==id);}),
-    'focus-task':()=>{ if(timer.running&&timer.phase==='focus'&&timer.taskId!==id) stopTimer(); timer.taskId=id; timer.phase='focus'; storeTimer(); startTimer(); selected=null; location.hash='#focus'; render(); },
+    'focus-task':()=>{ const t=row('tasks',id); Object.assign(timer,{taskId:id,course:t?.course??timer.course}); if (timer.phase!=='focus') resetTimer({phase:'focus'}); startTimer(); selected=null; location.hash='#focus'; render(); },
     'toggle-done':()=>{ showDone=!showDone; },
     'postpone-overdue':()=>change(()=>{ data.tasks.filter(t=>taskOpen(t)&&t.date&&t.date<today()).forEach(t=>{t.date=today();}); }),
     'open-topics':()=>{courseId=id;location.hash='#topics';},
@@ -942,23 +1380,35 @@ function stackActions(id, el) {
     'cal-add':()=>modal('Add task · '+pretty(id,{weekday:'long',day:'numeric',month:'short'}),field('q','Task','',{full:true,required:true,placeholder:'e.g. Physics depth study 4pm 1h #phy'}),'Add',v=>{ createFromQuick(v.q,{date:id}); }),
     'timer-start':()=>{startTimer();render();},
     'timer-pause':()=>{pauseTimer();render();},
-    'timer-stop':()=>{stopTimer();render();},
-    'timer-skip':()=>{Object.assign(timer,{phase:'focus',running:false,remaining:null,startedAt:null});storeTimer();render();},
-    'timer-phase':()=>{ if(timer.running) { notify('Pause or stop the timer first.'); return; } Object.assign(timer,{phase:id,remaining:null,startedAt:null}); storeTimer(); render(); },
-    'focus-delete':()=>change(()=>{data.focus=data.focus.filter(f=>f.id!==id);}),
+    'timer-finish':finishSession,
+    'timer-skip':()=>{resetTimer({phase:'focus'});render();},
+    'study-mode':()=>{ if (sessionActive()) { notify('Finish or discard this session to switch timer type.'); return; } resetTimer({mode:id,phase:'focus',cycle:0}); render(); },
+    'study-course':()=>{ timer.course=id; const t=row('tasks',timer.taskId); if (t&&(t.course||'')!==id) timer.taskId=null; storeTimer(); render(); },
+    'edit-session':()=>{ const s=row('focus',id); if (s) editSession(s); },
+    'log-past':logPast,
+    'log-more':()=>{logDays+=14;render();},
     'edit-habit':()=>editHabit(data.habits.find(x=>x.id===id)),
     'habit-open':()=>{habitOpen=habitOpen===id?null:id;render();},
     'habit-toggle':()=>change(()=>{ const log=(data.habitLog[id]??={}); const d=el.dataset.date; if(log[d]) delete log[d]; else log[d]=1; }),
     'habit-suggest':()=>{ const [name,c]=id.split('|'); change(()=>data.habits.push({id:uid(),name,course:c,days:Array(7).fill(true),created:today()})); },
     settings:settingsModal,
     export:exportData,
+    'go-study':()=>{ location.hash='#focus'; },
+    'review-topic':()=>{ const t=topicRecord(id); if (t) reviewTopic(t); },
+    'edit-paper':()=>editPaper(row('papers',id)),
+    'paper-filter':()=>{ paperFilter=id; render(); },
+    'paper-error':()=>{ const p=row('papers',id); editError(null,{course:p.course,source:p.title,retest:addDays(today(),2)}); },
+    'restore-snap':()=>restoreSnapshot(id),
+    'sync-setup':syncModal,
+    'sync-now':()=>{ dialog.close(); syncNow(); },
+    'sync-off':()=>{ syncCfg={}; storeSync(); try { localStorage.removeItem(BASE_KEY); } catch {} lastSyncError=''; dialog.close(); status('Saved in this browser'); notify('Sync is off on this device. Your records are still here.'); },
     menu:()=>document.body.classList.toggle('nav-open')
   };
 }
 function addMonth(value,n){ const d=date(value); d.setUTCMonth(d.getUTCMonth()+n); return iso(d); }
 function stackChange(el) {
   if (el.id==='import-file') { if (el.files[0]) importData(el.files[0]); return true; }
-  if (el.matches('[data-timer-task]')) { timer.taskId=el.value||null; storeTimer(); render(); return true; }
+  if (el.matches('[data-timer-task]')) { timer.taskId=el.value||null; const t=row('tasks',timer.taskId); if (t) timer.course=t.course||''; storeTimer(); render(); return true; }
   const t=selected&&row('tasks',selected);
   if (el.dataset.subToggle && t) { change(()=>{ t.subtasks.find(x=>x.id===el.dataset.subToggle).done=el.checked; }); return true; }
   if (el.dataset.subTitle && t) { change(()=>{ const x=t.subtasks.find(z=>z.id===el.dataset.subTitle); if (el.value.trim()) x.title=el.value.trim(); else t.subtasks=t.subtasks.filter(z=>z!==x); }); return true; }
@@ -1014,6 +1464,7 @@ document.addEventListener('keydown',event=>{
   if (el.closest('input,textarea,select,[contenteditable]') || event.metaKey || event.ctrlKey || event.altKey || dialog.open) return;
   if (event.key==='q' || event.key==='n') { const q=main.querySelector('.quick input'); if (q) { event.preventDefault(); q.focus(); } }
   if (event.key==='/') { event.preventDefault(); $('search').focus(); }
+  if (event.key==='s' && data) { event.preventDefault(); toggleTimer(); }
 });
 document.addEventListener('dragstart',event=>{
   const el=event.target.closest?.('[data-drag]');
@@ -1050,7 +1501,14 @@ document.addEventListener('drop',event=>{
     }
   });
 });
-window.addEventListener('storage',event=>{ if (event.key===TIMER_KEY) { try { timer=JSON.parse(event.newValue)||timer; } catch {} if (data) render(); } });
+window.addEventListener('storage',event=>{
+  if (event.key===TIMER_KEY) { try { timer={...freshTimer(),...JSON.parse(event.newValue)}; } catch {} if (data) render(); }
+  // Another tab saved. Pick up its records so this tab does not overwrite them.
+  if (event.key===LOCAL_KEY && localMode && data && event.newValue) {
+    if (dirty || saving || dialog.open) { notify('This workspace also changed in another tab. The tab that saves last wins.'); return; }
+    try { data=normalise(JSON.parse(event.newValue)); status('Updated from another tab'); render(); } catch {}
+  }
+});
 window.addEventListener('hashchange',()=>document.body.classList.remove('nav-open'));
 
 document.addEventListener('click',event=>{
@@ -1097,7 +1555,8 @@ document.addEventListener('click',event=>{
     'close-dialog':()=>dialog.close(),
     'delete-record':()=>{
       const remove=currentEditor.remove;
-      modal('Delete this record?','<p>This removes the record from your study workspace.</p>','Delete',()=>remove());
+      if (typeof remove==='function') modal('Delete this record?','<p>This removes the record from your study workspace.</p>','Delete',()=>remove());
+      else modal(remove.title,'<p>'+h(remove.body)+'</p>',remove.label,()=>remove.run());
     }
   };
   actions[action]?.();

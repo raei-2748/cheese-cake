@@ -17,17 +17,32 @@ A TickTick-style study system for the HSC, built around Year 12 school assessmen
 - **Task details panel:** subtasks, notes, priority, repeat, estimate vs actual time, status and work type.
 - **Calendar:** month and week (hourly) views. Drag a task to reschedule it. Assessments show as flags.
 - **Eisenhower matrix:** quadrants follow priority, as in TickTick's default. Drag a task to another quadrant to change its priority.
-- **Focus:** a Pomodoro timer linked to a task. Logs minutes to the task, shows per-day and per-subject stats, and keeps running across tabs and reloads.
+- **Study:** pick a subject (and optionally a task) and start. Open sessions count up until you finish; timed sessions run Pomodoro rounds with breaks. Finishing asks for the minutes, what you did and how it went, then saves it to the study log. The log is grouped by day with start and end times; click any entry to edit it, or log a session you did without the timer. Shows a daily goal, a streak, this week per day and per subject. The timer keeps running across tabs and reloads, and minutes go onto the linked task.
 - **Habits:** daily or chosen weekdays, with streaks, a 16-week heatmap and today's habits on the Today page.
 
-**HSC tools** (from the original Study Desk)
-Weekly plan with capacity budgets, assessments and Trials with weighted marks, syllabus checklist and priorities, the error log with retests, teacher feedback and weekly reviews. Any study block you plan there is a normal task in the lists, calendar and matrix too.
+**Overview** (the home page)
+- Countdowns to the next assessment, the Trials and the first HSC exam. Set the Trial and HSC dates in **Backup & settings**.
+- Today's tasks, topics due for review, retests due this week and teacher feedback you have not acted on yet.
+- **Subject balance:** for each course, the study time over 7 and 28 days, syllabus topics practised, reviews due, open errors, past-paper average and next assessment. A course is flagged when it got no study this week but has an assessment within 3 weeks or reviews due.
 
-**Keyboard:** `q` quick add · `/` search · `Esc` close details.
+**HSC tools**
+- **Weekly plan** with capacity budgets, **assessments and Trials** with weighted marks, the **error log** with retests, **teacher feedback** and **weekly reviews**. Any study block you plan there is a normal task in the lists, calendar and matrix too.
+- **Syllabus & spaced review:** press **Review** on any syllabus topic after recalling it from memory, then rate it Again / Hard / Good / Easy. The next review is set from that rating, from 1 day up to 60. Topics that are due show on the Overview and at the top of the syllabus page.
+- **Past papers:** log each paper with its mark, time used and time allowed, and where you lost marks. Each course shows its latest, average and best score with a trend line. **Log error** turns a lost mark into an error-log entry with a retest date.
 
-## Data
+**Keyboard:** `s` start or pause studying · `q` quick add · `/` search · `Esc` close details.
 
-On GitHub Pages your records are saved in this browser's local storage. Use **Backup & settings** (bottom of the sidebar) to export a `.json` backup, or import one on another device.
+## Data and sync
+
+On GitHub Pages your records are saved in this browser's local storage.
+
+**Sync across devices:** open **Backup & settings → Set up sync** on each device (laptop, iPad, phone) and paste a GitHub fine-grained token whose only permission is **Gists: Read and write**. The records are kept in one secret gist on your own GitHub account. Changes sync a few seconds after you make them, when you come back to the tab, and every 90 seconds while it is open. If two devices changed different things, both changes are kept. Records are matched by id and merged field by field. Only a field changed differently on both devices keeps the version from the device that syncs.
+- The token stays in that browser's local storage. A secret gist is unlisted, but anyone with its exact link can read it. On a shared computer, use **Disconnect this device** when you finish.
+
+**Safety nets:**
+- Export a `.json` backup now and then. The Overview reminds you after 7 days.
+- The browser keeps a snapshot of your records from the first time you open the app each day, for the last 7 days. You can restore one in **Backup & settings**.
+- Records are repaired on load if a backup was damaged. Two open tabs pick up each other's changes.
 
 ## Run locally
 
