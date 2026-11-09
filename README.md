@@ -27,7 +27,7 @@ Weekly plan with capacity budgets, assessments and Trials with weighted marks, s
 
 ## Data
 
-On GitHub Pages your records are saved in this browser's local storage. Use **Backup & settings** (the gear at the bottom of the sidebar) to export a `.json` backup, or import one on another device.
+On GitHub Pages your records are saved in this browser's local storage. Use **Backup & settings** (bottom of the sidebar) to export a `.json` backup, or import one on another device.
 
 ## Run locally
 

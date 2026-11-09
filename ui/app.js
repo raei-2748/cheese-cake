@@ -562,7 +562,7 @@ function quickAdd(where, defaults={}, short=false) {
   const id='quick-'+(quickCount++);
   return '<form class="quick" data-defaults="'+h(JSON.stringify(defaults))+'"><span class="quick-plus" aria-hidden="true">+</span>'+
     '<input id="'+id+'" name="q" autocomplete="off" aria-label="Add a task to '+h(where)+'" placeholder="'+(short?'+ Add task':'Add to '+h(where)+' · try “Chem prac fri 4pm #che !high 45m”')+'">'+
-    '<button class="button primary quick-go" type="submit">Add</button><div class="quick-preview" aria-live="polite"></div></form>';
+    (short?'':'<kbd class="quick-key" aria-hidden="true" title="Press q to add">q</kbd>')+'<button class="button primary quick-go" type="submit">Add</button><div class="quick-preview" aria-live="polite"></div></form>';
 }
 function previewChips(text) {
   if (!text.trim()) return '';
