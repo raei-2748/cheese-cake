@@ -1395,13 +1395,27 @@ const freshTimer = () => ({mode:'open',phase:'focus',running:false,elapsed:0,run
 let timer=(()=>{ try { return {...freshTimer(),...JSON.parse(localStorage.getItem(TIMER_KEY))}; } catch { return freshTimer(); } })();
 const pomo = () => data?.settings?.pomo ?? {focus:25,short:5,long:15,every:4};
 const studyGoal = () => Number(data?.settings?.studyGoal) || 120;
-const phaseSecs = p => (p==='focus'?pomo().focus:p==='short'?pomo().short:pomo().long)*60;
+// HSC exam formats (NESA): minutes of reading time, then writing time.
+const examPresets = [
+  {id:'mx1',name:'Maths Ext 1 paper',course:'mx1',reading:10,writing:120},
+  {id:'mx2',name:'Maths Ext 2 paper',course:'mx2',reading:10,writing:180},
+  {id:'phy',name:'Physics paper',course:'phy',reading:5,writing:180},
+  {id:'che',name:'Chemistry paper',course:'che',reading:5,writing:180},
+  {id:'eco',name:'Economics paper',course:'eco',reading:5,writing:180},
+  {id:'eng1',name:'English Adv Paper 1',course:'eng',reading:10,writing:90},
+  {id:'eng2',name:'English Adv Paper 2',course:'eng',reading:5,writing:120}
+];
+const examFor = id => examPresets.find(e=>e.course===id) ?? examPresets[0];
+const examCfg = () => timer.exam ?? examFor(timer.course);
+const isBreak = p => p==='short' || p==='long';
+const phaseSecs = p => (p==='reading'?examCfg().reading:p==='writing'?examCfg().writing:p==='focus'?pomo().focus:p==='short'?pomo().short:pomo().long)*60;
+const hrs = m => m%60 ? minutes(m) : (m/60)+'h';
 const elapsedSecs = () => Math.floor((timer.elapsed+(timer.running?Date.now()-timer.runFrom:0))/1000);
 const countsUp = () => timer.mode==='open' && timer.phase==='focus';
 const shownSecs = () => countsUp() ? elapsedSecs() : Math.max(0,phaseSecs(timer.phase)-elapsedSecs());
 const sessionActive = () => timer.running || timer.elapsed>0;
 const clock = s => (s>=3600?Math.floor(s/3600)+':':'')+pad2(Math.floor(s%3600/60))+':'+pad2(s%60);
-const phaseName = {focus:'Study',short:'Short break',long:'Long break'};
+const phaseName = {focus:'Study',short:'Short break',long:'Long break',reading:'Reading time',writing:'Writing time'};
 const ratings = ['Focused','OK','Distracted'];
 const sydneyTime = new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const hhmm = ms => sydneyTime.format(new Date(ms));
@@ -1409,11 +1423,11 @@ function storeTimer() { try { localStorage.setItem(TIMER_KEY,JSON.stringify(time
 function resetTimer(extra={}) { Object.assign(timer,{running:false,elapsed:0,runFrom:0,startedAt:null},extra); storeTimer(); }
 function startTimer() {
   if (timer.running) return;
-  if (timer.phase==='focus' && !timer.startedAt) timer.startedAt=Date.now();
+  if ((timer.phase==='focus'||timer.phase==='reading') && !timer.startedAt) timer.startedAt=Date.now();
   timer.runFrom=Date.now();
   timer.running=true;
   storeTimer();
-  if (timer.mode==='timed' && 'Notification' in window && Notification.permission==='default') Notification.requestPermission().catch(()=>{});
+  if (timer.mode!=='open' && 'Notification' in window && Notification.permission==='default') Notification.requestPermission().catch(()=>{});
 }
 function pauseTimer() {
   if (!timer.running) return;
@@ -1429,7 +1443,38 @@ function addSession(s) {
   if (t) t.actual=(Number(t.actual)||0)+s.minutes;
 }
 // Timed mode: a finished round goes straight into the log; you can add a note later.
+function announce(msg) {
+  notify(msg);
+  try { if ('Notification' in window && Notification.permission==='granted' && document.hidden) new Notification('Stacky',{body:msg}); } catch {}
+}
+// Exam mode: reading time rolls straight into writing time, as in the exam room.
+// Pens down logs the whole sitting and opens the past-paper form to record the mark.
+function finishExamPhase() {
+  const ex=examCfg();
+  if (timer.phase==='reading') {
+    Object.assign(timer,{phase:'writing',elapsed:0,runFrom:Date.now(),running:true,warned:[]});
+    storeTimer(); chime(); announce('Reading time is over. You may start writing.');
+    if (data) render();
+    return;
+  }
+  const end=Date.now(), mins=ex.reading+ex.writing, startMs=timer.startedAt??end-mins*60000;
+  change(()=>addSession({taskId:timer.taskId,course:timer.course,date:sydney.format(new Date(startMs)),start:new Date(startMs).toISOString(),end:new Date(end).toISOString(),minutes:mins,note:'Exam conditions · '+ex.name}));
+  resetTimer({phase:'reading',warned:[]});
+  chime(); closeFull(); announce('Pens down. '+ex.name+' is logged. Mark it, then save the result.');
+  editPaper(null,{title:ex.name+' (timed practice)',course:timer.course||ex.course,source:'HSC',minutes:ex.writing,limit:ex.writing,date:today()});
+}
+// Time checks during writing, like the supervisor's announcements.
+function examWarnings() {
+  if (timer.mode!=='exam' || timer.phase!=='writing' || !timer.running) return;
+  const left=shownSecs(), done=timer.warned||[];
+  for (const w of [30,5]) {
+    if (examCfg().writing>w && left<=w*60 && left>0 && !done.includes(w)) {
+      timer.warned=[...done,w]; storeTimer(); chime(); announce(w+' minutes of writing time left.'); return;
+    }
+  }
+}
 function finishPhase() {
+  if (timer.mode==='exam') { finishExamPhase(); return; }
   const was=timer.phase;
   if (was==='focus') {
     const mins=pomo().focus, end=Date.now(), startMs=timer.startedAt??end-mins*60000;
@@ -1438,9 +1483,7 @@ function finishPhase() {
     resetTimer({phase:timer.cycle%pomo().every===0?'long':'short'});
   } else resetTimer({phase:'focus'});
   chime();
-  const msg=was==='focus'?'Logged '+minutes(pomo().focus)+'. Time for a '+phaseName[timer.phase].toLowerCase()+'.':'Break over. Start the next round when you are ready.';
-  notify(msg);
-  try { if ('Notification' in window && Notification.permission==='granted' && document.hidden) new Notification('Stacky',{body:msg}); } catch {}
+  announce(was==='focus'?'Logged '+minutes(pomo().focus)+'. Time for a '+phaseName[timer.phase].toLowerCase()+'.':'Break over. Start the next round when you are ready.');
   if (data) render();
 }
 function chime() {
@@ -1480,7 +1523,7 @@ function sessionForm(s, title, submit, onDiscard) {
           if (t) t.actual=(Number(t.actual)||0)+mins;
         } else addSession(next);
       });
-      if (!s.id) { resetTimer({phase:'focus'}); notify('Logged '+minutes(mins)+(course(next.course)?' of '+course(next.course).short:'')+'.'); render(); }
+      if (!s.id) { resetTimer({phase:timer.mode==='exam'?'reading':'focus',warned:[]}); notify('Logged '+minutes(mins)+(course(next.course)?' of '+course(next.course).short:'')+'.'); render(); }
     },onDiscard);
 }
 // ───────────────────────── Full-screen timer ─────────────────────────
@@ -1523,25 +1566,21 @@ function renderFull() {
   if (!el) return;
   el.hidden = !fullTimer;
   if (!fullTimer) { el.innerHTML=''; return; }
-  const onBreak = timer.phase!=='focus', active = sessionActive(), secs = shownSecs();
+  const onBreak = isBreak(timer.phase), active = sessionActive(), secs = shownSecs();
   const c = course(timer.course), t = row('tasks',timer.taskId);
   const s = studyStats(), goal = studyGoal();
-  const controls = timer.running
-    ? button('Pause','timer-pause','','secondary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','primary'))
-    : active ? button('Resume','timer-start','','primary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','secondary'))
-    : onBreak ? button('Start '+phaseName[timer.phase].toLowerCase(),'timer-start','','primary')+button('Skip break','timer-skip','','text')
-    : button('Start studying','timer-start','','primary');
+  const controls = timerControls('Start studying');
   el.dataset.phase = timer.phase;
   el.classList.toggle('running', timer.running);
-  el.style.setProperty('--c', onBreak ? 'var(--sky)' : c?.colour ?? 'var(--biro)');
-  el.innerHTML = '<div class="fs-top"><span class="fs-state">'+(timer.running?'<i></i>':'')+h(onBreak?phaseName[timer.phase]:timer.running?'Studying':active?'Paused':'Ready')+'</span>'+
+  el.style.setProperty('--c', onBreak ? 'var(--sky)' : c?.colour ?? '#787774');
+  el.innerHTML = '<div class="fs-top"><span class="fs-state">'+(timer.running?'<i></i>':'')+h(timerState())+'</span>'+
       '<button type="button" class="fs-exit" data-action="timer-full-exit" aria-label="Exit full screen" title="Exit (Esc)">'+icon('close')+'</button></div>'+
     '<div class="fs-centre">'+
       (onBreak?'<p class="fs-what">Stand up, look away from the screen, drink some water.</p>'
         :'<p class="fs-what"><span class="fs-subject"><i></i>'+h(c?.short??'General')+'</span>'+(t?'<span class="fs-task">'+h(t.title)+'</span>':'')+'</p>')+
       '<div id="fs-text" class="fs-clock" role="timer" aria-live="off">'+clock(secs)+'</div>'+
       (countsUp()?'<p class="fs-sub">'+(active&&timer.startedAt?'Started '+hhmm(timer.startedAt):'Counts up until you finish')+'</p>'
-        :'<div class="fs-bar"><i id="fs-bar" style="width:'+(100*(1-secs/phaseSecs(timer.phase)))+'%"></i></div><p class="fs-sub">'+(onBreak?'Round '+((timer.cycle||0)%pomo().every||pomo().every)+' of '+pomo().every+' done':'Round '+((timer.cycle||0)%pomo().every+1)+' of '+pomo().every+' · '+pomo().focus+' min')+'</p>')+
+        :'<div class="fs-bar"><i id="fs-bar" style="width:'+(100*(1-secs/phaseSecs(timer.phase)))+'%"></i></div><p class="fs-sub">'+h(timerInfo())+'</p>')+
       '<div class="fs-buttons">'+controls+'</div>'+
     '</div>'+
     '<div class="fs-foot"><span><b>'+minutes(s.today)+'</b> of '+minutes(goal)+' today</span><span><kbd>Space</kbd> start or pause · <kbd>Esc</kbd> exit</span></div>';
@@ -1553,11 +1592,11 @@ document.addEventListener('pointermove',()=>{ if (fullTimer) idleChrome(); });
 function finishSession() {
   closeFull();   // the finish form is a dialog; leave full screen so it can show
   pauseTimer();
-  const secs=timer.phase==='focus'?elapsedSecs():0;
+  const secs=timer.phase==='writing'?examCfg().reading*60+elapsedSecs():isBreak(timer.phase)?0:elapsedSecs();
   const mins=Math.max(1,Math.round(secs/60)), startMs=timer.startedAt??Date.now()-secs*1000;
-  sessionForm({taskId:timer.taskId,course:timer.course,date:sydney.format(new Date(startMs)),start:new Date(startMs).toISOString(),minutes:mins},
+  sessionForm({taskId:timer.taskId,course:timer.course,date:sydney.format(new Date(startMs)),start:new Date(startMs).toISOString(),minutes:mins,note:timer.mode==='exam'?'Exam conditions · '+examCfg().name+' (ended early)':''},
     'Finish session · '+clock(secs),'Save to log',
-    {label:'Discard',title:'Discard this session?',body:'The timer resets and nothing is logged.',run:()=>{resetTimer({phase:'focus'});render();}});
+    {label:'Discard',title:'Discard this session?',body:'The timer resets and nothing is logged.',run:()=>{resetTimer({phase:timer.mode==='exam'?'reading':'focus',warned:[]});render();}});
   render();
 }
 const logPast = () => sessionForm({course:timer.course,date:today(),start:new Date(Date.now()-3600000).toISOString(),minutes:60},'Log a past session','Save to log');
@@ -1575,13 +1614,13 @@ function updateTimerDom() {
   const mini=$('mini-timer');
   if (mini) {
     mini.hidden=!sessionActive() || route().name==='focus';
-    const who=timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase];
+    const who=timer.mode==='exam'?phaseName[timer.phase]:timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase];
     mini.textContent=(timer.running?'● ':'❚❚ ')+who+' '+clock(secs);
     mini.dataset.phase=timer.phase;
   }
   document.title=timer.running?clock(secs)+' · '+(timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase])+' · Stacky':'Stacky';
 }
-setInterval(()=>{ if (!data) return; if (timer.running && !countsUp() && elapsedSecs()>=phaseSecs(timer.phase)) finishPhase(); else updateTimerDom(); },1000);
+setInterval(()=>{ if (!data) return; if (timer.running && !countsUp() && elapsedSecs()>=phaseSecs(timer.phase)) finishPhase(); else { examWarnings(); updateTimerDom(); } },1000);
 
 function studyStats() {
   const t0=today(), wk=monday(t0);
@@ -1617,28 +1656,44 @@ function studyLog() {
     }).join('')+'</section>';
   }).join('')+(dates.length>logDays?'<button type="button" class="button text log-more" data-action="log-more">Show older days ('+(dates.length-logDays)+')</button>':'');
 }
+// Shared by the Study page and the full-screen timer.
+function timerState() {
+  const brk=isBreak(timer.phase), active=sessionActive();
+  if (timer.mode==='exam') return timer.running ? phaseName[timer.phase] : active ? 'Paused' : 'Ready';
+  return timer.running ? (brk?'On a break':'Studying') : active ? 'Paused' : brk ? phaseName[timer.phase] : 'Ready';
+}
+function timerInfo() {
+  const brk=isBreak(timer.phase), active=sessionActive();
+  if (timer.mode==='exam') { const ex=examCfg();
+    return timer.phase==='reading' ? (active?'Read only, no writing yet · '+hrs(ex.writing)+' writing follows':ex.name+' · '+ex.reading+' min reading, '+hrs(ex.writing)+' writing')
+      : 'Writing · '+ex.name+(active&&timer.startedAt?' · started '+hhmm(timer.startedAt):''); }
+  return brk ? 'Round '+((timer.cycle||0)%pomo().every||pomo().every)+' of '+pomo().every+' done'
+    : timer.mode==='timed' ? 'Round '+((timer.cycle||0)%pomo().every+1)+' of '+pomo().every+' · '+pomo().focus+' min'
+    : active ? 'Started '+hhmm(timer.startedAt) : 'Counts up until you finish';
+}
+function timerControls(startLabel) {
+  const brk=isBreak(timer.phase), active=sessionActive(), exam=timer.mode==='exam';
+  const finish=brk?button('Skip break','timer-skip','','text'):button(exam?'End exam':'Finish','timer-finish','','secondary');
+  if (timer.running) return button('Pause','timer-pause','','primary')+finish;
+  if (active) return button('Resume','timer-start','','primary')+finish;
+  if (brk) return button('Start '+phaseName[timer.phase].toLowerCase(),'timer-start','','primary')+button('Skip break','timer-skip','','text');
+  return button(exam?(timer.phase==='reading'?'Start reading time':'Start writing'):startLabel,'timer-start','','primary');
+}
 const focusLengths = [25,45,60,90];
 function focusPage() {
-  const s=studyStats(), secs=shownSecs(), active=sessionActive(), onBreak=timer.phase!=='focus';
+  const s=studyStats(), secs=shownSecs(), active=sessionActive(), onBreak=isBreak(timer.phase);
   const open=sortTasks(data.tasks.filter(taskOpen));
   const goal=studyGoal(), pct=Math.min(100,s.today/goal*100);
   const c=course(timer.course);
-  const subjects=[['','General','#8b94a1'],...courses.map(x=>[x.id,x.short,x.colour])].map(([id,label,col])=>
+  const subjects=[['','General','#787774'],...courses.map(x=>[x.id,x.short,x.colour])].map(([id,label,col])=>
     '<button type="button" class="subj" style="--c:'+col+'" aria-pressed="'+((timer.course||'')===id)+'" data-action="study-course" data-id="'+id+'"><i></i>'+h(label)+'</button>').join('');
-  const controls = timer.running
-    ? button('Pause','timer-pause','','primary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','secondary'))
-    : active
-      ? button('Resume','timer-start','','primary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','secondary'))
-      : onBreak ? button('Start '+phaseName[timer.phase].toLowerCase(),'timer-start','','primary')+button('Skip break','timer-skip','','text')
-      : button('Start','timer-start','','primary');
-  const state = timer.running ? (onBreak?'On a break':'Studying') : active ? 'Paused' : onBreak ? phaseName[timer.phase] : 'Ready';
-  const info = onBreak ? 'Round '+((timer.cycle||0)%pomo().every||pomo().every)+' of '+pomo().every+' done'
-    : timer.mode==='timed' ? 'Round '+((timer.cycle||0)%pomo().every+1)+' of '+pomo().every
-    : active ? 'Started '+hhmm(timer.startedAt) : 'Counts up until you finish';
+  const controls = timerControls('Start'), state = timerState(), info = timerInfo();
   const lengths = timer.mode==='timed' && !active && !onBreak
-    ? '<span class="lengths" role="group" aria-label="Round length">'+[...new Set([...focusLengths,pomo().focus])].sort((a,b)=>a-b).map(m=>'<button type="button" aria-pressed="'+(pomo().focus===m)+'" data-action="focus-length" data-id="'+m+'">'+m+'</button>').join('')+'<small>min</small></span>' : '';
+    ? '<span class="lengths" role="group" aria-label="Round length">'+[...new Set([...focusLengths,pomo().focus])].sort((a,b)=>a-b).map(m=>'<button type="button" aria-pressed="'+(pomo().focus===m)+'" data-action="focus-length" data-id="'+m+'">'+m+'</button>').join('')+'<button type="button" data-action="focus-custom" title="Pick any length">Custom</button><small>min</small></span>'
+    : timer.mode==='exam' && !active
+    ? '<span class="lengths exam-pick"><label><span class="sr">Exam paper</span><select data-exam-preset>'+examPresets.map(e=>'<option value="'+e.id+'" '+(examCfg().id===e.id?'selected':'')+'>'+h(e.name)+' · '+e.reading+'+'+hrs(e.writing)+'</option>').join('')+(examCfg().id==='custom'?'<option value="custom" selected>'+h(examCfg().name)+' · '+examCfg().reading+'+'+hrs(examCfg().writing)+'</option>':'')+'</select></label><button type="button" data-action="exam-custom">Custom</button></span>' : '';
   return '<div class="list-head"><div><h1>Study</h1></div><div class="list-stats">'+button('Timer settings','settings','','text')+'</div></div>'+
-    '<section class="timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'var(--ink)')+'">'+
+    '<section class="timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'#787774')+'">'+
       (onBreak?'<p class="timer-break">Stand up, look away from the screen, drink some water.</p>'
         :'<div class="subjects" role="group" aria-label="Subject">'+subjects+'</div>'+
          '<label class="timer-task"><span class="sr">Task</span><select data-timer-task><option value="">No task, just the subject</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+'</option>').join('')+'</select></label>')+
@@ -1646,7 +1701,7 @@ function focusPage() {
       (countsUp()?'':'<div class="timer-bar"><i id="timer-bar" style="width:'+(100*(1-secs/phaseSecs(timer.phase)))+'%"></i></div>')+
       '<p class="timer-meta"><span class="timer-state">'+(timer.running?'<i></i>':'')+h(state)+'</span><span>'+h(info)+'</span></p>'+
       '<div class="timer-row"><div class="timer-buttons">'+controls+'</div>'+
-        '<div class="timer-opts"><span class="modes" role="group" aria-label="Timer type">'+[['open','Open'],['timed','Timed']].map(([k,l])=>'<button type="button" aria-pressed="'+(timer.mode===k)+'" data-action="study-mode" data-id="'+k+'">'+l+'</button>').join('')+'</span>'+lengths+
+        '<div class="timer-opts"><span class="modes" role="group" aria-label="Timer type">'+[['open','Open'],['timed','Timed'],['exam','Exam']].map(([k,l])=>'<button type="button" aria-pressed="'+(timer.mode===k)+'" data-action="study-mode" data-id="'+k+'">'+l+'</button>').join('')+'</span>'+lengths+
         '<button type="button" class="full-btn" data-action="timer-full" title="Full screen (f)" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div></div>'+
       '<p class="timer-keys"><kbd>s</kbd> start / pause &nbsp; <kbd>f</kbd> full screen</p>'+
     '</section>'+
@@ -1813,8 +1868,8 @@ function papersPage() {
           '<div class="line">'+button('Log error','paper-error',p.id)+button('Edit','edit-paper',p.id)+'</div></div>'+(p.notes?'<p class="record-detail">'+br(p.notes)+'</p>':'')+'</article>';
       }).join('')+'</div>':emptyCard('No papers logged'+(paperFilter==='all'?'':' for '+course(paperFilter).short),'Log each past paper you sit with its mark and time. Trends per course appear above once you have two.',button('+ Log paper','edit-paper'))));
 }
-function editPaper(record) {
-  const v=record??{title:'',course:paperFilter!=='all'?paperFilter:courseDefault(),source:'HSC',date:today(),mark:'',outOf:'',minutes:'',limit:'',notes:''};
+function editPaper(record, prefill={}) {
+  const v=record??{title:'',course:paperFilter!=='all'?paperFilter:courseDefault(),source:'HSC',date:today(),mark:'',outOf:'',minutes:'',limit:'',notes:'',...prefill};
   crud('papers',record,required('title','Paper',v.title)+chooseCourse(v.course)+select('source','Source',v.source,paperSources)+dateField('date','Date sat',v.date,true)+
     number('mark','Mark',v.mark,{max:1000,step:.5})+number('outOf','Out of',v.outOf,{min:1,max:1000,step:.5})+
     number('minutes','Time used (min)',v.minutes,{max:600})+number('limit','Time allowed (min)',v.limit,{max:600})+
@@ -1923,8 +1978,10 @@ function stackActions(id, el) {
     'timer-full-exit':closeFull,
     'timer-skip':()=>{resetTimer({phase:'focus'});render();},
     'focus-length':()=>{ if (sessionActive()) { notify('Finish this round to change its length.'); return; } change(()=>{ data.settings.pomo={...pomo(),focus:Number(id)}; }); },
-    'study-mode':()=>{ if (sessionActive()) { notify('Finish or discard this session to switch timer type.'); return; } resetTimer({mode:id,phase:'focus',cycle:0}); render(); },
-    'study-course':()=>{ timer.course=id; const t=row('tasks',timer.taskId); if (t&&(t.course||'')!==id) timer.taskId=null; storeTimer(); render(); },
+    'study-mode':()=>{ if (sessionActive()) { notify('Finish or discard this session to switch timer type.'); return; } if (id==='exam' && !timer.exam) timer.exam={...examFor(timer.course)}; if (id==='exam' && timer.exam) timer.course=timer.exam.course; resetTimer({mode:id,phase:id==='exam'?'reading':'focus',cycle:0,warned:[]}); render(); },
+    'focus-custom':()=>{ if (sessionActive()) { notify('Finish this round to change its length.'); return; } modal('Round length',number('mins','Minutes per round',pomo().focus,{min:5,max:240,required:true}),'Set length',v=>{ const m=Math.round(Number(v.mins)); if (!(m>=5&&m<=240)) { formError('Pick between 5 and 240 minutes.'); return false; } change(()=>{ data.settings.pomo={...pomo(),focus:m}; }); }); },
+    'exam-custom':()=>{ if (sessionActive()) { notify('Finish this exam to change it.'); return; } const ex=examCfg(); modal('Custom exam','<div class="form-grid">'+required('name','Paper',ex.id==='custom'?ex.name:'Practice paper')+number('reading','Reading time (min)',ex.reading,{min:0,max:30,required:true})+number('writing','Writing time (min)',ex.writing,{min:10,max:300,required:true})+'</div>','Use this exam',v=>{ timer.exam={id:'custom',name:v.name,course:timer.course||'',reading:Math.round(Number(v.reading)),writing:Math.round(Number(v.writing))}; resetTimer({phase:timer.exam.reading?'reading':'writing',warned:[]}); render(); }); },
+    'study-course':()=>{ timer.course=id; if (timer.mode==='exam' && !sessionActive() && timer.exam?.id!=='custom') timer.exam={...examFor(id)}; const t=row('tasks',timer.taskId); if (t&&(t.course||'')!==id) timer.taskId=null; storeTimer(); render(); },
     'edit-session':()=>{ const s=row('focus',id); if (s) editSession(s); },
     'log-past':logPast,
     'log-more':()=>{logDays+=14;render();},
@@ -1950,6 +2007,7 @@ function addMonth(value,n){ const d=date(value); d.setUTCMonth(d.getUTCMonth()+n
 function stackChange(el) {
   if (el.id==='import-file') { if (el.files[0]) importData(el.files[0]); return true; }
   if (el.id==='ics-file') { if (el.files[0]) icsImport(el.files[0]); return true; }
+  if (el.matches('[data-exam-preset]')) { if (el.value!=='custom') { const ex=examPresets.find(e=>e.id===el.value); timer.exam={...ex}; timer.course=ex.course; resetTimer({phase:'reading',warned:[]}); render(); } return true; }
   if (el.matches('[data-timer-task]')) { timer.taskId=el.value||null; const t=row('tasks',timer.taskId); if (t) timer.course=t.course||''; storeTimer(); render(); return true; }
   const t=selected&&row('tasks',selected);
   if (el.dataset.subToggle && t) { change(()=>{ t.subtasks.find(x=>x.id===el.dataset.subToggle).done=el.checked; }); return true; }
