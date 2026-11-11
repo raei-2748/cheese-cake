@@ -772,3 +772,26 @@ code,kbd{background:var(--fill-a);border:0;border-radius:4px;padding:.2em .4em;f
 
 /* Subjects table fits its column instead of running past the right edge */
 table.balance{min-width:520px;width:100%}
+
+/* ── Sidebar: drag the edge to resize, collapse from the top corner ── */
+:root{--side-def:222px}
+@media(max-width:1130px){:root{--side-def:190px}}
+@media(min-width:1280px){:root{--side-def:270px}}
+.side-collapse,.side-grip{display:none}
+@media(min-width:761px){
+  .shell{grid-template-columns:clamp(180px,var(--side-w,var(--side-def)),420px) minmax(0,1fr)}
+  .side-collapse{display:grid;place-items:center;position:absolute;top:12px;right:10px;width:24px;height:24px;padding:0;border:0;border-radius:6px;background:none;color:var(--side-title);cursor:pointer;z-index:2}
+  .side-collapse:hover{background:var(--side-hover);color:var(--ink)}
+  .side-collapse svg{width:16px;height:16px}
+  .brand{margin-right:30px}
+  .side-grip{display:block;position:absolute;top:0;bottom:0;right:0;width:7px;cursor:col-resize;z-index:3;touch-action:none}
+  .side-grip::after{content:'';position:absolute;top:0;bottom:0;right:0;width:2px;background:transparent}
+  .side-grip:hover::after,.side-grip:focus-visible::after,.side-dragging .side-grip::after{background:var(--rule)}
+  .side-grip:focus{outline:0}
+  .side-dragging,.side-dragging *{cursor:col-resize!important;user-select:none!important}
+  :root[data-side=collapsed] .shell{grid-template-columns:0 minmax(0,1fr)}
+  :root[data-side=collapsed] .sidebar{visibility:hidden;padding-left:0;padding-right:0;box-shadow:none}
+  :root[data-side=collapsed] .menu-btn{display:grid;place-items:center;border:0;background:none;width:28px;height:28px;padding:0;border-radius:6px;color:var(--muted);cursor:pointer}
+  :root[data-side=collapsed] .menu-btn:hover{background:var(--hover);color:var(--ink)}
+  :root[data-side=collapsed] .menu-btn svg{width:18px;height:18px}
+}

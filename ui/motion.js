@@ -22,3 +22,61 @@ document.addEventListener('click', event => {
   if (el.dataset.date) selector += '[data-date="' + CSS.escape(el.dataset.date) + '"]';
   setTimeout(() => document.querySelectorAll(selector).forEach(x => x.classList.add('pop')), 0);
 }, true);
+
+// Sidebar: drag its right edge to resize, collapse it, and remember both in this browser.
+const SIDE_KEY = 'stacky-side', SIDE_MIN = 180, SIDE_MAX = 420;
+const wide = matchMedia('(min-width:761px)');
+const grip = document.getElementById('side-grip'), collapseButton = document.getElementById('side-collapse');
+const menuButton = document.querySelector('.menu-btn'), sidebar = document.querySelector('.sidebar');
+const readSide = () => { try { return JSON.parse(localStorage.getItem(SIDE_KEY)) || {}; } catch { return {}; } };
+const writeSide = patch => { try { localStorage.setItem(SIDE_KEY, JSON.stringify({ ...readSide(), ...patch })); } catch {} };
+const collapsed = () => root.dataset.side === 'collapsed';
+const labelMenu = () => menuButton.setAttribute('aria-label', wide.matches && collapsed() ? 'Show sidebar' : 'Open menu');
+const setWidth = (px, keep = true) => {
+  const w = Math.round(Math.min(SIDE_MAX, Math.max(SIDE_MIN, px)));
+  root.style.setProperty('--side-w', w + 'px');
+  if (keep) writeSide({ w });
+};
+const setCollapsed = on => {
+  if (on) root.dataset.side = 'collapsed'; else delete root.dataset.side;
+  writeSide({ collapsed: on });
+  labelMenu();
+};
+collapseButton.addEventListener('click', () => setCollapsed(true));
+// On a wide screen the top-bar menu button brings the sidebar back; on a phone it still opens the drawer.
+document.addEventListener('click', event => {
+  if (!wide.matches || !event.target.closest('.menu-btn')) return;
+  event.stopPropagation();
+  setCollapsed(!collapsed());
+}, true);
+document.addEventListener('keydown', event => {
+  if (event.key === '\\' && (event.metaKey || event.ctrlKey) && wide.matches) { event.preventDefault(); setCollapsed(!collapsed()); }
+});
+grip.addEventListener('pointerdown', event => {
+  if (event.button) return;
+  event.preventDefault();
+  grip.setPointerCapture(event.pointerId);
+  root.classList.add('side-dragging');
+  const left = sidebar.getBoundingClientRect().left;
+  const move = e => setWidth(e.clientX - left, false);
+  const stop = e => {
+    grip.removeEventListener('pointermove', move);
+    grip.removeEventListener('pointerup', stop);
+    grip.removeEventListener('pointercancel', stop);
+    root.classList.remove('side-dragging');
+    setWidth(sidebar.getBoundingClientRect().width);
+  };
+  grip.addEventListener('pointermove', move);
+  grip.addEventListener('pointerup', stop);
+  grip.addEventListener('pointercancel', stop);
+});
+grip.addEventListener('dblclick', () => { root.style.removeProperty('--side-w'); writeSide({ w: null }); });
+grip.addEventListener('keydown', event => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  event.preventDefault();
+  setWidth(sidebar.getBoundingClientRect().width + (event.key === 'ArrowRight' ? 16 : -16));
+});
+// Also applied here in case the page's early inline script was blocked.
+{ const s = readSide(); if (s.w) root.style.setProperty('--side-w', s.w + 'px'); if (s.collapsed) root.dataset.side = 'collapsed'; }
+wide.addEventListener('change', labelMenu);
+labelMenu();
