@@ -147,6 +147,7 @@ async function save() {
       if (!dirty) status(syncOn() ? 'Saved · syncing…' : 'Saved in this browser');
       saving = false;
       queueSync();
+      gQueuePush();
       return;
     }
     const response = await fetch('api/state',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,data})});
@@ -573,6 +574,7 @@ function render() {
     calendar:calendarPage,matrix:matrixPage,focus:focusPage,habits:habitsPage,done:completedPage,dash:dashPage,papers:papersPage};
   main.dataset.route=r.name;
   main.innerHTML=(pages[r.name]??taskPage)(r);
+  if (r.name==='calendar') calAfterRender();
   if(r.name==='topics'&&opened.some(title=>[...main.querySelectorAll('details.module summary strong')].some(x=>x.textContent===title))) {
     main.querySelectorAll('details.module').forEach(d=>{d.open=priorityOnly||opened.includes(d.querySelector('summary strong').textContent);});
   }
@@ -730,7 +732,7 @@ function editReview() {
 
 
 // ───────────────────────── Task core ─────────────────────────
-let selected = null, showDone = false, calMode = 'month', calAnchor = today(), habitOpen = null, dragging = null, grabY = 0;
+let selected = null, showDone = false, calMode = 'week', calAnchor = today(), habitOpen = null, dragging = null, grabY = 0;
 const pad2 = n => String(n).padStart(2,'0');
 const parseCtx = () => ({ today: today(), courses, lists: data.lists });
 const doneDay = t => t.completedAt ? sydney.format(new Date(t.completedAt)) : '';
@@ -919,49 +921,454 @@ function detailPanel(t) {
 }
 
 // ───────────────────────── Calendar ─────────────────────────
-const HOUR_PX=44, DAY_START=6, DAY_END=23;
+// Week view is a time-blocking grid: drag on empty space to draw a block, drag a block
+// to move it (across days too), drag its bottom edge to change its length.
+const HOUR_PX=48, SNAP=15, DAY_MINS=24*60;
+let calScroll=null, calDrag=null, swallowClick=false;
 const calTasks = day => sortTasks(data.tasks.filter(t=>t.date===day&&t.status!=='Dropped')).sort((a,b)=>(a.time||'00').localeCompare(b.time||'00'));
 const calAssess = day => data.assessments.filter(a=>a.date===day);
-const chip = t => '<div class="cal-chip'+(t.status==='Done'?' done':'')+'" draggable="true" data-drag="'+h(t.id)+'" data-select="'+h(t.id)+'" style="--c:'+listColour(t.course||t.list)+'">'+(t.time?'<b>'+h(t.time)+'</b> ':'')+h(t.title)+'</div>';
-const assessChip = a => '<a class="cal-chip assess" href="#assess" style="--c:'+(course(a.course)?.colour??'#795922')+'">⚑ '+h(a.title)+'</a>';
-function calendarPage() {
-  const monthStart=calAnchor.slice(0,8)+'01';
-  const title=calMode==='month'?pretty(monthStart,{month:'long',year:'numeric'}):pretty(monday(calAnchor))+' – '+pretty(addDays(monday(calAnchor),6),{day:'numeric',month:'short',year:'numeric'});
-  const unscheduled=data.tasks.filter(t=>taskOpen(t)&&!t.date);
-  return '<div class="list-head"><div><h1>'+h(title)+'</h1></div><div class="list-stats">'+
-    '<div class="week-picker"><button type="button" aria-label="Previous" data-action="cal-shift" data-id="-1">‹</button>'+button('Today','cal-today','','text')+'<button type="button" aria-label="Next" data-action="cal-shift" data-id="1">›</button></div>'+
-    tabGroup('Calendar view','cal-mode',calMode,[['month','Month'],['week','Week']])+'</div></div>'+
-    '<div class="cal-wrap">'+(calMode==='month'?monthGrid(monthStart):weekGrid())+
-    '<aside class="cal-side card"><h2>No date</h2><p class="note">Drag onto a day to schedule.</p>'+(unscheduled.length?sortTasks(unscheduled).map(chip).join(''):'<p class="note">Everything has a date.</p>')+'</aside></div>';
+const toMin = t => { const [hh,mm]=String(t||'0:0').split(':').map(Number); return (hh||0)*60+(mm||0); };
+const fromMin = m => pad2(Math.floor(m/60))+':'+pad2(m%60);
+const hm = m => { const hh=Math.floor(m/60)%24, mm=m%60; return (hh%12||12)+(mm?':'+pad2(mm):'')+(hh<12?'am':'pm'); };
+const blockLen = t => Math.max(SNAP, Number(t.minutes)||30);
+const calDays = () => matchMedia('(max-width:760px)').matches ? 3 : 7;
+const calStart = () => calDays()===7 ? monday(calAnchor) : calAnchor;
+const chip = t => '<div class="cal-chip'+(t.status==='Done'?' done':'')+'" draggable="true" data-drag="'+h(t.id)+'" data-select="'+h(t.id)+'" style="--c:'+listColour(t.course||t.list)+'">'+(t.time?'<b>'+hm(toMin(t.time))+'</b>':'')+'<span>'+h(t.title||'Untitled')+'</span></div>';
+const assessChip = a => '<a class="cal-chip assess" href="#assess" style="--c:'+(course(a.course)?.colour??'#795922')+'"><b>⚑</b><span>'+h(a.title)+'</span></a>';
+const extChip = e => '<a class="cal-chip ext"'+(e.link?' href="'+h(e.link)+'" target="_blank" rel="noopener"':'')+' style="--c:'+h(e.colour)+'" title="'+h(e.title+' · '+e.calName)+'">'+(e.time?'<b>'+hm(toMin(e.time))+'</b>':'')+'<span>'+h(e.title)+'</span></a>';
+function calTitle() {
+  if (calMode==='month') return pretty(calAnchor.slice(0,8)+'01',{month:'long',year:'numeric'});
+  const s=calStart(), e=addDays(s,calDays()-1);
+  return s.slice(0,7)===e.slice(0,7) ? pretty(s,{month:'long',year:'numeric'}) : pretty(s,{month:'short'})+' – '+pretty(e,{month:'short',year:'numeric'});
 }
-function monthGrid(monthStart) {
-  const start=monday(monthStart), month=monthStart.slice(0,7), t0=today();
+function calendarPage() {
+  const unscheduled=data.tasks.filter(t=>taskOpen(t)&&!t.date);
+  const range = calMode==='month' ? [monday(calAnchor.slice(0,8)+'01'), addDays(monday(calAnchor.slice(0,8)+'01'),41)] : [calStart(), addDays(calStart(),calDays()-1)];
+  extEnsure(range[0], range[1]);
+  return '<div class="cal-head"><div class="cal-title"><h1>'+h(calTitle())+'</h1>'+extStatus()+'</div><div class="cal-tools">'+
+    '<div class="week-picker"><button type="button" aria-label="Previous" data-action="cal-shift" data-id="-1">‹</button>'+button('Today','cal-today','','text')+'<button type="button" aria-label="Next" data-action="cal-shift" data-id="1">›</button></div>'+
+    tabGroup('Calendar view','cal-mode',calMode,[['week','Week'],['month','Month']])+
+    '<button type="button" class="button text" data-action="calendars">'+icon('calendar')+'Calendars</button></div></div>'+
+    '<div class="cal-wrap">'+(calMode==='month'?monthGrid():weekGrid())+
+    '<aside class="cal-side"><h2>Unscheduled</h2><p class="note">Drag onto the grid to plan it.</p>'+(unscheduled.length?sortTasks(unscheduled).map(chip).join(''):'<p class="note quiet">Everything has a date.</p>')+'</aside></div>';
+}
+function monthGrid() {
+  const monthStart=calAnchor.slice(0,8)+'01', start=monday(monthStart), month=monthStart.slice(0,7), t0=today();
   const cells=Array.from({length:42},(_,i)=>addDays(start,i));
+  const ext=extFor(cells[0],cells[41]);
   return '<div class="month"><div class="month-head">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<span>'+d+'</span>').join('')+'</div><div class="month-grid">'+cells.map(day=>{
-    const tasks=calTasks(day), ass=calAssess(day), items=[...ass.map(assessChip),...tasks.map(chip)];
-    return '<div class="cal-cell'+(day.slice(0,7)!==month?' other':'')+(day===t0?' today':'')+'" data-drop-date="'+day+'"><div class="cal-top"><button type="button" class="cal-num" data-action="cal-open-day" data-id="'+day+'" aria-label="Open week of '+h(pretty(day))+'">'+Number(day.slice(8))+'</button><button type="button" class="cal-add" data-action="cal-add" data-id="'+day+'" aria-label="Add task on '+h(pretty(day))+'">+</button></div>'+
-      items.slice(0,4).join('')+(items.length>4?'<button type="button" class="cal-more" data-action="cal-open-day" data-id="'+day+'">+'+(items.length-4)+' more</button>':'')+'</div>';
+    const items=[...calAssess(day).map(assessChip),...ext.filter(e=>e.date<=day&&e.endDate>=day).map(extChip),...calTasks(day).map(chip)];
+    return '<div class="cal-cell'+(day.slice(0,7)!==month?' other':'')+(day===t0?' today':'')+'" data-drop-date="'+day+'"><div class="cal-top"><button type="button" class="cal-num" data-action="cal-open-day" data-id="'+day+'" aria-label="Open the week of '+h(pretty(day))+'">'+Number(day.slice(8))+'</button><button type="button" class="cal-add" data-action="cal-add" data-id="'+day+'" aria-label="Add a task on '+h(pretty(day))+'">+</button></div>'+
+      items.slice(0,4).join('')+(items.length>4?'<button type="button" class="cal-more" data-action="cal-open-day" data-id="'+day+'">'+(items.length-4)+' more</button>':'')+'</div>';
   }).join('')+'</div></div>';
 }
 function weekGrid() {
-  const start=monday(calAnchor), days=Array.from({length:7},(_,i)=>addDays(start,i)), t0=today();
-  const hours=Array.from({length:DAY_END-DAY_START},(_,i)=>DAY_START+i);
+  const n=calDays(), start=calStart(), days=Array.from({length:n},(_,i)=>addDays(start,i)), t0=today();
+  const ext=extFor(days[0],days[n-1]);
   const now=new Date(), nowMins=Number(new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',hour:'numeric',hourCycle:'h23'}).format(now))*60+now.getMinutes();
-  return '<div class="wk"><div class="wk-head"><span></span>'+days.map(d=>'<button type="button" class="wk-day'+(d===t0?' today':'')+'" data-action="cal-add" data-id="'+d+'"><small>'+pretty(d,{weekday:'short'})+'</small><strong>'+Number(d.slice(8))+'</strong></button>').join('')+'</div>'+
-    '<div class="wk-allday"><span class="wk-gutter">All day</span>'+days.map(d=>'<div class="wk-allcell" data-drop-date="'+d+'" data-drop-allday="1">'+calAssess(d).map(assessChip).join('')+calTasks(d).filter(t=>!t.time).map(chip).join('')+'</div>').join('')+'</div>'+
-    '<div class="wk-body" style="--hour:'+HOUR_PX+'px"><div class="wk-gutter">'+hours.map(x=>'<span>'+(x%12||12)+(x<12?'am':'pm')+'</span>').join('')+'</div>'+
+  return '<div class="wk" style="--days:'+n+';--hour:'+HOUR_PX+'px">'+
+    '<div class="wk-head"><span class="wk-gutter"></span>'+days.map(d=>'<div class="wk-day'+(d===t0?' today':'')+(d<t0?' past':'')+'"><small>'+pretty(d,{weekday:'short'})+'</small><strong>'+Number(d.slice(8))+'</strong></div>').join('')+'</div>'+
+    '<div class="wk-allday"><span class="wk-gutter">all day</span>'+days.map(d=>'<div class="wk-allcell" data-drop-date="'+d+'" data-drop-allday="1">'+calAssess(d).map(assessChip).join('')+ext.filter(e=>e.allDay&&e.date<=d&&e.endDate>=d).map(extChip).join('')+calTasks(d).filter(t=>!t.time).map(chip).join('')+'</div>').join('')+'</div>'+
+    '<div class="wk-scroll"><div class="wk-body"><div class="wk-gutter">'+Array.from({length:23},(_,i)=>'<span style="top:'+((i+1)*HOUR_PX)+'px">'+hm((i+1)*60)+'</span>').join('')+'</div>'+
     days.map(d=>{
-      const timed=calTasks(d).filter(t=>t.time);
-      const lanes=[]; const placed=timed.map(t=>{
-        const [hh,mm]=t.time.split(':').map(Number), s=hh*60+mm, e=s+Math.max(t.minutes||30,20);
-        let lane=lanes.findIndex(end=>end<=s); if(lane<0){lane=lanes.length;lanes.push(e);} else lanes[lane]=e;
-        return {t,s,e,lane};
-      });
-      const n=Math.max(1,lanes.length);
-      return '<div class="wk-col'+(d===t0?' today':'')+'" data-drop-date="'+d+'" data-drop-col="1" style="height:'+hours.length*HOUR_PX+'px">'+
-        (d===t0&&nowMins>DAY_START*60&&nowMins<DAY_END*60?'<i class="now-line" style="top:'+((nowMins-DAY_START*60)/60*HOUR_PX)+'px"></i>':'')+
-        placed.map(({t,s,e,lane})=>'<div class="wk-event'+(t.status==='Done'?' done':'')+'" draggable="true" data-drag="'+h(t.id)+'" data-select="'+h(t.id)+'" style="--c:'+listColour(t.course||t.list)+';top:'+Math.max(0,(s-DAY_START*60)/60*HOUR_PX)+'px;height:'+Math.max(20,(e-s)/60*HOUR_PX-2)+'px;left:calc('+(lane*100/n)+'% + 2px);width:calc('+(100/n)+'% - 4px)"><b>'+h(t.time)+'</b> '+h(t.title)+'</div>').join('')+'</div>';
-    }).join('')+'</div></div>';
+      const items=[...calTasks(d).filter(t=>t.time).map(t=>({t,s:toMin(t.time),e:Math.min(DAY_MINS,toMin(t.time)+blockLen(t))})),
+                   ...ext.filter(e=>!e.allDay&&e.date===d).map(x=>({x,s:toMin(x.time),e:Math.min(DAY_MINS,toMin(x.time)+Math.max(SNAP,x.minutes))}))].sort((a,b)=>a.s-b.s||b.e-a.e);
+      // Overlapping blocks share the column side by side.
+      const lanes=[]; let group=[], groupEnd=-1; const groups=[];
+      items.forEach(it=>{ if (it.s>=groupEnd && group.length) { groups.push(group); group=[]; lanes.length=0; }
+        let lane=lanes.findIndex(end=>end<=it.s); if (lane<0) { lane=lanes.length; lanes.push(it.e); } else lanes[lane]=it.e;
+        it.lane=lane; group.push(it); groupEnd=Math.max(groupEnd,it.e); });
+      if (group.length) groups.push(group);
+      groups.forEach(g=>{ const k=Math.max(...g.map(it=>it.lane))+1; g.forEach(it=>it.lanes=k); });
+      return '<div class="wk-col'+(d===t0?' today':'')+(d<t0?' past':'')+'" data-day="'+d+'" data-drop-date="'+d+'" data-drop-col="1">'+
+        (d===t0?'<i class="now-line" style="top:'+(nowMins/60*HOUR_PX)+'px"></i>':'')+
+        items.map(it=>{
+          const top=it.s/60*HOUR_PX, height=Math.max(18,(it.e-it.s)/60*HOUR_PX-2), pos='top:'+top+'px;height:'+height+'px;left:calc('+(it.lane*100/it.lanes)+'% + 1px);width:calc('+(100/it.lanes)+'% - 3px)';
+          const short=it.e-it.s<=30?' short':'';
+          if (it.x) return '<a class="wk-event ext'+short+'"'+(it.x.link?' href="'+h(it.x.link)+'" target="_blank" rel="noopener"':'')+' style="--c:'+h(it.x.colour)+';'+pos+'" title="'+h(it.x.title+' · '+it.x.calName)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span></a>';
+          const t=it.t;
+          return '<div class="wk-event'+(t.status==='Done'?' done':'')+(t.id===selected?' picked':'')+short+'" data-task="'+h(t.id)+'" data-select="'+h(t.id)+'" style="--c:'+listColour(t.course||t.list)+';'+pos+'"><b>'+h(t.title||'Untitled')+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span><i class="wk-resize" aria-hidden="true"></i></div>';
+        }).join('')+'</div>';
+    }).join('')+'</div></div></div>';
+}
+function calAfterRender() {
+  const sc=main.querySelector('.wk-scroll');
+  if (!sc) return;
+  sc.scrollTop = calScroll ?? 7*HOUR_PX;
+  sc.addEventListener('scroll',()=>{ calScroll=sc.scrollTop; },{passive:true});
+}
+// Drawing, moving and resizing blocks with the mouse, pen or a finger.
+const minuteAt = (col,y) => Math.max(0,Math.min(DAY_MINS,(y-col.getBoundingClientRect().top)/HOUR_PX*60));
+const snapMin = m => Math.round(m/SNAP)*SNAP;
+function paintBlock(el,s,e) {
+  el.style.top=(s/60*HOUR_PX)+'px'; el.style.height=Math.max(18,(e-s)/60*HOUR_PX-2)+'px';
+  const label=el.querySelector('span'); if (label) label.textContent=hm(s)+' – '+hm(e);
+}
+document.addEventListener('pointerdown',event=>{
+  if (!data || event.button!==0 || calDrag) return;
+  const col=event.target.closest('.wk-col');
+  if (!col || event.target.closest('.wk-new,a.wk-event')) return;
+  const block=event.target.closest('.wk-event[data-task]');
+  const touch=event.pointerType!=='mouse';
+  if (block) {
+    if (touch && !event.target.closest('.wk-resize')) return;   // on touch a block is tapped to open it; the edge still resizes
+    const t=row('tasks',block.dataset.task); if (!t) return;
+    const s=toMin(t.time);
+    calDrag={mode:event.target.closest('.wk-resize')?'resize':'move',el:block,t,x:event.clientX,y:event.clientY,s,len:blockLen(t),day:t.date,grab:minuteAt(col,event.clientY)-s,moved:false};
+    event.preventDefault();
+    return;
+  }
+  const a=Math.floor(minuteAt(col,event.clientY)/SNAP)*SNAP;
+  calDrag={mode:'create',col,x:event.clientX,y:event.clientY,a,b:a+60,touch,moved:false};
+  if (!touch) event.preventDefault();
+});
+document.addEventListener('pointermove',event=>{
+  const d=calDrag; if (!d) return;
+  if (!d.moved && Math.hypot(event.clientX-d.x,event.clientY-d.y)<5) return;
+  if (d.mode==='create' && d.touch) { calDrag=null; return; }   // a finger drag on empty space scrolls
+  if (!d.moved) {
+    d.moved=true;
+    if (d.mode==='create') { d.ghost=document.createElement('div'); d.ghost.className='wk-event wk-ghost'; d.ghost.innerHTML='<b>New block</b><span></span>'; d.col.append(d.ghost); }
+    else d.el.classList.add('lifted');
+    document.documentElement.classList.add('cal-dragging');
+  }
+  if (d.mode==='create') {
+    const m=snapMin(minuteAt(d.col,event.clientY));
+    if (m>=d.a) { d.s=d.a; d.e=Math.max(d.a+SNAP,m); } else { d.s=m; d.e=d.a+SNAP; }
+    paintBlock(d.ghost,d.s,d.e);
+  } else if (d.mode==='move') {
+    const over=document.elementFromPoint(event.clientX,event.clientY)?.closest('.wk-col');
+    if (over && over!==d.el.parentElement) { over.append(d.el); d.el.style.left='1px'; d.el.style.width='calc(100% - 3px)'; }
+    const col=d.el.parentElement;
+    d.day=col.dataset.day;
+    d.ns=Math.max(0,Math.min(DAY_MINS-d.len,snapMin(minuteAt(col,event.clientY)-d.grab)));
+    paintBlock(d.el,d.ns,d.ns+d.len);
+  } else {
+    const col=d.el.parentElement;
+    d.nlen=Math.max(SNAP,Math.min(DAY_MINS-d.s,snapMin(minuteAt(col,event.clientY))-d.s));
+    paintBlock(d.el,d.s,d.s+d.nlen);
+  }
+});
+document.addEventListener('pointerup',event=>{
+  const d=calDrag; if (!d) return;
+  calDrag=null;
+  document.documentElement.classList.remove('cal-dragging');
+  if (d.mode==='create') {
+    if (!d.moved) { if (event.target.closest('.wk-col')!==d.col) return; d.s=d.a; d.e=Math.min(DAY_MINS,d.a+60); d.ghost=document.createElement('div'); d.ghost.className='wk-event wk-ghost'; d.ghost.innerHTML='<b></b><span></span>'; d.col.append(d.ghost); paintBlock(d.ghost,d.s,d.e); }
+    nameBlock(d);
+    return;
+  }
+  if (!d.moved) return;
+  swallowClick=true; setTimeout(()=>{ swallowClick=false; },0);   // only the click that ends this drag
+  if (d.mode==='move') change(()=>{ d.t.date=d.day; d.t.time=fromMin(d.ns); });
+  else change(()=>{ d.t.minutes=d.nlen; });
+});
+document.addEventListener('pointercancel',()=>{ if (calDrag) { calDrag=null; document.documentElement.classList.remove('cal-dragging'); render(); } });
+document.addEventListener('click',event=>{ if (swallowClick) { swallowClick=false; event.stopPropagation(); event.preventDefault(); } },true);
+// A drawn block asks what it is for. Quick-add words work here too: "Chem prac #che !high".
+function nameBlock(d) {
+  const g=d.ghost;
+  g.classList.add('naming');
+  g.innerHTML='<input class="wk-new" placeholder="What are you working on?" aria-label="Name this block" autocomplete="off"><span>'+hm(d.s)+' – '+hm(d.e)+'</span>';
+  const input=g.querySelector('input');
+  let done=false;
+  const finish=keep=>{
+    if (done) return; done=true;
+    const text=input.value.trim();
+    if (keep && text) createFromQuick(text,{date:d.col.dataset.day,time:fromMin(d.s),minutes:d.e-d.s});
+    else g.remove();
+  };
+  input.addEventListener('keydown',e=>{ if (e.key==='Enter') { e.preventDefault(); finish(true); } if (e.key==='Escape') { e.preventDefault(); e.stopPropagation(); finish(false); } });
+  input.addEventListener('blur',()=>setTimeout(()=>finish(true),0));
+  input.focus();
+}
+document.addEventListener('keydown',event=>{ if (event.key==='Escape' && calDrag) { calDrag=null; document.documentElement.classList.remove('cal-dragging'); render(); } });
+
+// ───────────────────────── Connected calendars ─────────────────────────
+// Google Calendar: two-way. Your Google events show in Stacky, and Stacky's timed blocks
+// are kept as events in one Google calendar you choose (moved or renamed there, they
+// update here too). iCloud and other calendars are read from an .ics link or file.
+// The settings sync with your records; the Google sign-in stays on each device.
+const TZ='Australia/Sydney', EXT_KEY='stacky-ext-cache:v1', GTOKEN_KEY='stacky-gtoken';
+const G_SCOPE='https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events';
+const ICS_COLOURS=['#8e6bbf','#d9730d','#0f7b6c','#c4554d','#2e78c7','#a5793c'];
+const calCfg = () => {
+  const c=data.settings.calendars ??= {};
+  c.google ??= {clientId:'',show:{},pushTo:'primary',push:true,list:[]};
+  c.ics ??= [];
+  return c;
+};
+let extCache=(()=>{ try { return JSON.parse(localStorage.getItem(EXT_KEY))||{}; } catch { return {}; } })();   // {google:{from,to,at,events}, ics:{id:{at,vevents,error}}}
+const storeExt = () => { try { localStorage.setItem(EXT_KEY,JSON.stringify(extCache)); } catch {} };
+let gToken=(()=>{ try { const x=JSON.parse(sessionStorage.getItem(GTOKEN_KEY)); return x&&x.exp>Date.now()?x:null; } catch { return null; } })();
+let gClient=null, gScript=null, gBusy=false, gError='', gPushTimer, gPushing=false, gPushAgain=false;
+const gOn = () => !!calCfg().google.clientId;
+const gReady = () => !!(gToken && gToken.exp>Date.now());
+
+// Sydney wall-clock date and time for an instant.
+const sydParts = new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+function sydWall(ms) {
+  const p=Object.fromEntries(sydParts.formatToParts(new Date(ms)).map(x=>[x.type,x.value]));
+  return {date:p.year+'-'+p.month+'-'+p.day,time:p.hour+':'+p.minute};
+}
+// The instant for a wall-clock time in a named zone (falls back to Sydney for unknown names).
+function zoneToMs(y,mo,d,hh,mm,zone) {
+  const guess=Date.UTC(y,mo-1,d,hh,mm);
+  let tz=TZ; try { new Intl.DateTimeFormat('en',{timeZone:zone}); tz=zone||TZ; } catch {}
+  const f=new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+  const off=ms=>{ const p=Object.fromEntries(f.formatToParts(new Date(ms)).map(x=>[x.type,x.value])); return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute)-ms; };
+  let t=guess-off(guess); t=guess-off(t); return t;
+}
+
+// ── Events shown on the calendar ──
+function extFor(from,to) {
+  const out=[], cfg=calCfg();
+  if (gOn()) for (const e of extCache.google?.events||[]) if (cfg.google.show[e.cal]!==false && e.date<=to && e.endDate>=from) out.push(e);
+  for (const c of cfg.ics) {
+    const vevents=c.vevents||extCache.ics?.[c.id]?.vevents||[];
+    for (const v of vevents) for (const occ of expandEvent(v,from,to)) out.push({...occ,colour:c.colour,calName:c.name,link:''});
+  }
+  return out;
+}
+function extStatus() {
+  const cfg=calCfg(), bits=[];
+  if (gOn()) bits.push(gReady()?'<span class="ext-pill ok" title="Connected to Google Calendar">Google</span>':'<button type="button" class="ext-pill warn" data-action="g-connect" title="Sign in again to sync">Reconnect Google</button>');
+  if (cfg.ics.length) bits.push('<span class="ext-pill ok">'+cfg.ics.length+' iCal</span>');
+  if (gBusy) bits.push('<span class="ext-pill">Syncing…</span>');
+  return bits.length?'<div class="ext-status">'+bits.join('')+'</div>':'';
+}
+let extWant=null;
+function extEnsure(from,to) {
+  const cfg=calCfg(), now=Date.now();
+  if (gOn()) gPreload();
+  const g=extCache.google;
+  if (gOn() && gReady() && !gBusy && (!g || g.from>from || g.to<to || now-g.at>5*60e3)) { extWant=[from,to]; setTimeout(()=>gPull(from,to),0); }
+  for (const c of cfg.ics) if (c.url && !gBusyIcs.has(c.id)) { const x=extCache.ics?.[c.id]; if (!x || now-x.at>30*60e3) setTimeout(()=>icsFetch(c),0); }
+}
+
+// ── Google ──
+function gPreload() {
+  if (gScript || !gOn()) return gScript;
+  gScript=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true; s.onload=res; s.onerror=()=>{ gScript=null; rej(new Error('Google sign-in could not load. Check your connection.')); }; document.head.append(s); });
+  gScript.catch(()=>{});
+  return gScript;
+}
+function gConnect() {   // must run from a click, so the Google window is allowed to open
+  if (!gOn()) { calendarsModal(); return; }
+  if (!window.google?.accounts?.oauth2) { gPreload()?.then(()=>notify('Google is ready. Press Connect again.')).catch(e=>notify(e.message)); return; }
+  gClient ??= google.accounts.oauth2.initTokenClient({client_id:calCfg().google.clientId,scope:G_SCOPE,callback:r=>{
+    if (r.error) { gError='Google did not connect ('+r.error+').'; notify(gError); render(); return; }
+    gToken={t:r.access_token,exp:Date.now()+(Number(r.expires_in)-60)*1000};
+    try { sessionStorage.setItem(GTOKEN_KEY,JSON.stringify(gToken)); } catch {}
+    gError=''; notify('Connected to Google Calendar.');
+    gPull(extWant?.[0]??addDays(today(),-14), extWant?.[1]??addDays(today(),60), true).then(()=>gQueuePush(300));
+  }});
+  gClient.requestAccessToken({prompt:gToken?'':undefined});
+}
+async function gApi(path,options={}) {
+  if (!gReady()) throw new Error('Not signed in to Google.');
+  const r=await fetch('https://www.googleapis.com/calendar/v3'+path,{...options,headers:{Authorization:'Bearer '+gToken.t,...(options.body?{'Content-Type':'application/json'}:{})}});
+  if (r.status===401) { gToken=null; try { sessionStorage.removeItem(GTOKEN_KEY); } catch {} if (data) render(); throw new Error('Google sign-in expired. Press Reconnect Google.'); }
+  if (r.status===204) return null;
+  const body=await r.json().catch(()=>null);
+  if (!r.ok) throw new Error('Google Calendar: '+(body?.error?.message||r.status));
+  return body;
+}
+const gTime = d => encodeURIComponent(new Date(zoneToMs(+d.slice(0,4),+d.slice(5,7),+d.slice(8,10),0,0,TZ)).toISOString());
+async function gPull(from,to,force=false) {
+  if (!gReady() || (gBusy && !force)) return;
+  gBusy=true;
+  try {
+    const cfg=calCfg().google;
+    const list=(await gApi('/users/me/calendarList?minAccessRole=reader&maxResults=250')).items||[];
+    const fresh=list.map(c=>({id:c.id,name:c.summaryOverride||c.summary,colour:c.backgroundColor||'#4285f4',primary:!!c.primary,writable:['owner','writer'].includes(c.accessRole)}));
+    if (JSON.stringify(fresh)!==JSON.stringify(cfg.list)) { cfg.list=fresh; list.forEach(c=>{ if (cfg.show[c.id]==null) cfg.show[c.id]=c.selected!==false; }); dirty=true; queueSave(); }
+    const lo=addDays(from,-7), hi=addDays(to,35), events=[];
+    for (const c of fresh) {
+      if (cfg.show[c.id]===false) continue;
+      let page='';
+      do {
+        const r=await gApi('/calendars/'+encodeURIComponent(c.id)+'/events?singleEvents=true&orderBy=startTime&maxResults=2500&timeZone='+encodeURIComponent(TZ)+'&timeMin='+gTime(lo)+'&timeMax='+gTime(hi)+(page?'&pageToken='+page:''));
+        for (const e of r.items||[]) {
+          if (e.status==='cancelled' || e.extendedProperties?.private?.stacky) continue;   // Stacky's own blocks are shown as tasks
+          const base={id:c.id+'|'+e.id,cal:c.id,calName:c.name,colour:c.colour,title:e.summary||'(No title)',link:e.htmlLink||''};
+          if (e.start?.date) events.push({...base,allDay:true,date:e.start.date,endDate:addDays(e.end?.date||e.start.date,-1),time:'',minutes:0});
+          else if (e.start?.dateTime) { const s=sydWall(Date.parse(e.start.dateTime)), mins=Math.round((Date.parse(e.end.dateTime)-Date.parse(e.start.dateTime))/60000); events.push({...base,allDay:false,date:s.date,endDate:s.date,time:s.time,minutes:mins}); }
+        }
+        page=r.nextPageToken;
+      } while (page);
+    }
+    extCache.google={from:lo,to:hi,at:Date.now(),events}; storeExt();
+    gError='';
+  } catch (e) { gError=e.message; extCache.google={...(extCache.google||{events:[]}),from:extCache.google?.from??from,to:extCache.google?.to??to,at:Date.now()}; }
+  gBusy=false;
+  if (data && route().name==='calendar') render();
+}
+// Stacky blocks → Google. Each event carries the task id and a signature of what was sent,
+// so a block edited in Google is copied back to the task, and one edited here is updated there.
+const taskSig = t => [t.title||'Untitled',t.date,t.time,blockLen(t)].join('|');
+function eventSig(e) {
+  if (!e.start?.dateTime || !e.end?.dateTime) return null;
+  const s=sydWall(Date.parse(e.start.dateTime));
+  return [e.summary||'Untitled',s.date,s.time,Math.max(SNAP,Math.round((Date.parse(e.end.dateTime)-Date.parse(e.start.dateTime))/60000))].join('|');
+}
+function eventBody(t,sig) {
+  const s=toMin(t.time), e=s+blockLen(t), endDate=addDays(t.date,Math.floor(e/DAY_MINS));
+  return JSON.stringify({summary:t.title||'Untitled',description:'Planned in Stacky'+(course(t.course)?' · '+course(t.course).name:''),
+    start:{dateTime:t.date+'T'+t.time+':00',timeZone:TZ},end:{dateTime:endDate+'T'+fromMin(e%DAY_MINS)+':00',timeZone:TZ},
+    extendedProperties:{private:{stacky:'1',stackyId:t.id,stackySig:sig}}});
+}
+function gQueuePush(delay=2500) { if (!gOn() || !calCfg().google.push) return; clearTimeout(gPushTimer); gPushTimer=setTimeout(gPush,delay); }
+async function gPush() {
+  if (!gReady() || !data) return;
+  if (gPushing) { gPushAgain=true; return; }
+  gPushing=true;
+  const cfg=calCfg().google, cal=encodeURIComponent(cfg.pushTo||'primary');
+  try {
+    const from=addDays(today(),-60), to=addDays(today(),400), ours=new Map();
+    let page='';
+    do {
+      const r=await gApi('/calendars/'+cal+'/events?privateExtendedProperty=stacky%3D1&singleEvents=true&maxResults=2500&timeMin='+gTime(from)+'&timeMax='+gTime(to)+(page?'&pageToken='+page:''));
+      (r.items||[]).forEach(e=>{ if (e.status!=='cancelled') ours.set(e.extendedProperties.private.stackyId,e); });
+      page=r.nextPageToken;
+    } while (page);
+    const fromGoogle=[];
+    for (const t of data.tasks.filter(t=>t.date&&t.time&&t.status!=='Dropped'&&t.date>=from&&t.date<=to)) {
+      const sig=taskSig(t), ev=ours.get(t.id); ours.delete(t.id);
+      if (!ev) { await gApi('/calendars/'+cal+'/events',{method:'POST',body:eventBody(t,sig)}); continue; }
+      const now=eventSig(ev), sent=ev.extendedProperties.private.stackySig;
+      if (now && now!==sent && now!==sig) fromGoogle.push([t,ev]);                         // changed in Google: copy it back
+      else if (sig!==sent || now!==sig) await gApi('/calendars/'+cal+'/events/'+encodeURIComponent(ev.id),{method:'PATCH',body:eventBody(t,sig)});
+    }
+    for (const ev of ours.values()) await gApi('/calendars/'+cal+'/events/'+encodeURIComponent(ev.id),{method:'DELETE'});   // deleted or unscheduled here
+    if (fromGoogle.length) {
+      change(()=>fromGoogle.forEach(([t,ev])=>{ const s=sydWall(Date.parse(ev.start.dateTime)); t.title=ev.summary||t.title; t.date=s.date; t.time=s.time; t.minutes=Math.round((Date.parse(ev.end.dateTime)-Date.parse(ev.start.dateTime))/60000); }));
+      notify(fromGoogle.length===1?'Updated a block you changed in Google Calendar.':'Updated '+fromGoogle.length+' blocks you changed in Google Calendar.');
+      gPushAgain=true;   // record the new signatures in Google
+    }
+    gError='';
+  } catch (e) { gError=e.message; }
+  gPushing=false;
+  if (gPushAgain) { gPushAgain=false; gQueuePush(800); }
+}
+
+// ── iCal (.ics) ──
+function parseICS(text) {
+  const lines=text.replace(/\r?\n[ \t]/g,'').split(/\r?\n/), out=[], overrides=[];
+  let ev=null;
+  const val=(raw,params)=>{
+    const m=raw.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/);
+    if (!m) return null;
+    if (!m[4] || /VALUE=DATE(?!-)/.test(params)) return {date:m[1]+'-'+m[2]+'-'+m[3],time:''};
+    if (m[7]) return sydWall(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]));
+    const tz=(params.match(/TZID=("?)([^;:"]+)\1/)||[])[2];
+    return tz && !/Sydney|Melbourne|Canberra|Hobart|Australia\/ACT|Australia\/NSW/i.test(tz) ? sydWall(zoneToMs(+m[1],+m[2],+m[3],+m[4],+m[5],tz)) : {date:m[1]+'-'+m[2]+'-'+m[3],time:m[4]+':'+m[5]};
+  };
+  for (const line of lines) {
+    if (line==='BEGIN:VEVENT') { ev={exdates:[]}; continue; }
+    if (line==='END:VEVENT') { if (ev?.start) (ev.recur?overrides:out).push(ev); ev=null; continue; }
+    if (!ev) continue;
+    const i=line.indexOf(':'); if (i<0) continue;
+    const head=line.slice(0,i), raw=line.slice(i+1), name=head.split(';')[0].toUpperCase(), params=head.slice(name.length);
+    if (name==='SUMMARY') ev.title=raw.replace(/\\n/gi,' ').replace(/\\([,;\\])/g,'$1');
+    else if (name==='UID') ev.uid=raw;
+    else if (name==='DTSTART') ev.start=val(raw,params);
+    else if (name==='DTEND') ev.end=val(raw,params);
+    else if (name==='DURATION') { const m=raw.match(/P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/); if (m) ev.dur=((+m[1]||0)*7*1440)+((+m[2]||0)*1440)+((+m[3]||0)*60)+(+m[4]||0); }
+    else if (name==='RRULE') ev.rrule=Object.fromEntries(raw.split(';').map(x=>x.split('=')));
+    else if (name==='EXDATE') raw.split(',').forEach(x=>{ const v=val(x,params); if (v) ev.exdates.push(v.date+(v.time?'T'+v.time:'')); });
+    else if (name==='RECURRENCE-ID') { const v=val(raw,params); if (v) ev.recur=v.date+(v.time?'T'+v.time:''); }
+    else if (name==='STATUS' && raw==='CANCELLED') ev.cancelled=true;
+  }
+  for (const o of overrides) { const master=out.find(e=>e.uid===o.uid); if (master) master.exdates.push(o.recur); if (!o.cancelled) out.push({...o,recur:undefined}); }
+  const keepFrom=addDays(today(),-60);
+  return out.filter(e=>!e.cancelled).map(e=>{
+    const allDay=!e.start.time;
+    let minutes=e.dur ?? (e.end ? (allDay ? 0 : Math.round((Date.parse(e.end.date+'T'+(e.end.time||'00:00')+'Z')-Date.parse(e.start.date+'T'+e.start.time+'Z'))/60000)) : (allDay?0:60));
+    const days=allDay ? Math.max(1,e.end ? Math.round((Date.parse(e.end.date)-Date.parse(e.start.date))/864e5) : 1) : 1;
+    const r=e.rrule&&{freq:e.rrule.FREQ,interval:+e.rrule.INTERVAL||1,count:+e.rrule.COUNT||0,until:e.rrule.UNTIL?(val(e.rrule.UNTIL,'')?.date||''):'',byday:e.rrule.BYDAY?e.rrule.BYDAY.split(',').map(x=>x.slice(-2)):null};
+    return {title:e.title||'(No title)',date:e.start.date,time:e.start.time,minutes,days,allDay,rrule:r||null,exdates:e.exdates};
+  }).filter(e=>e.rrule ? !(e.rrule.until && e.rrule.until<keepFrom) : addDays(e.date,e.days)>=keepFrom);
+}
+const DOW=['SU','MO','TU','WE','TH','FR','SA'];
+function expandEvent(v,from,to) {
+  const occ=d=>({id:v.title+'|'+d+'|'+v.time,title:v.title,allDay:v.allDay,date:d,endDate:addDays(d,v.days-1),time:v.time,minutes:v.minutes});
+  const skip=d=>v.exdates?.includes(d+(v.time?'T'+v.time:''));
+  if (!v.rrule) return v.date<=to && addDays(v.date,v.days-1)>=from ? [occ(v.date)] : [];
+  const r=v.rrule, out=[]; let n=0;
+  const take=d=>{ if (d<v.date) return true; if (r.until && d>r.until) return false; n++; if (r.count && n>r.count) return false; if (d>to) return false; if (addDays(d,v.days-1)>=from && !skip(d)) out.push(occ(d)); return true; };
+  if (r.freq==='DAILY') { for (let d=v.date,i=0;i<3000&&take(d);i++) d=addDays(d,r.interval); }
+  else if (r.freq==='WEEKLY') {
+    const days=(r.byday||[DOW[date(v.date).getUTCDay()]]).map(x=>(DOW.indexOf(x)+6)%7).sort((a,b)=>a-b);
+    outer: for (let wk=monday(v.date),i=0;i<600;i++,wk=addDays(wk,7*r.interval)) for (const k of days) if (!take(addDays(wk,k))) break outer;
+  }
+  else if (r.freq==='MONTHLY') { for (let i=0;i<240;i++) { const d=addMonth(v.date,i*r.interval); if (d.slice(8)!==v.date.slice(8)) continue; if (!take(d)) break; } }
+  else if (r.freq==='YEARLY') { for (let i=0;i<60;i++) { const d=(+v.date.slice(0,4)+i*r.interval)+v.date.slice(4); if (!take(d)) break; } }
+  else if (v.date<=to && v.date>=from) out.push(occ(v.date));
+  return out;
+}
+const gBusyIcs=new Set();
+async function icsFetch(c,loud=false) {
+  gBusyIcs.add(c.id);
+  try {
+    const r=await fetch(c.url.replace(/^webcal:/i,'https:'),{cache:'no-store'});
+    if (!r.ok) throw new Error('The calendar link answered '+r.status+'.');
+    const vevents=parseICS(await r.text());
+    (extCache.ics??={})[c.id]={at:Date.now(),vevents}; storeExt();
+    if (loud) notify('Loaded '+vevents.length+' events from '+c.name+'.');
+  } catch (e) {
+    (extCache.ics??={})[c.id]={...(extCache.ics?.[c.id]||{vevents:[]}),at:Date.now(),error:'Could not read this link from the browser. Import the .ics file instead, or add the calendar to Google Calendar and it will show here through Google.'};
+    storeExt();
+    if (loud) notify(extCache.ics[c.id].error);
+  }
+  gBusyIcs.delete(c.id);
+  if (data && route().name==='calendar') render();
+}
+async function icsImport(file) {
+  const text=await file.text();
+  if (!/BEGIN:VCALENDAR/.test(text)) { notify('That file is not a calendar (.ics) file.'); return; }
+  const vevents=parseICS(text), cfg=calCfg();
+  if (JSON.stringify(vevents).length>400000) { notify('That calendar is too large to keep in sync. Export a shorter range, or add it to Google Calendar instead.'); return; }
+  const name=file.name.replace(/\.ics$/i,'')||'Imported calendar';
+  change(()=>cfg.ics.push({id:uid(),name,colour:ICS_COLOURS[cfg.ics.length%ICS_COLOURS.length],vevents}));
+  notify('Imported '+vevents.length+' events from '+name+'.');
+  if (dialog.open) calendarsModal();
+}
+
+// ── Settings ──
+function calendarsModal() {
+  const cfg=calCfg(), g=cfg.google, origin=location.origin;
+  const googleBlock = !g.clientId
+    ? '<p class="note full">Stacky talks to Google Calendar straight from your browser. Google needs a free “client ID” for that, made once in your own Google account (about 5 minutes):</p>'+
+      '<ol class="steps full"><li>Open <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud → New project</a>, name it “Stacky”, and create it.</li>'+
+      '<li>Open <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener">Google Calendar API</a> and press <strong>Enable</strong>.</li>'+
+      '<li>Open <a href="https://console.cloud.google.com/auth/overview" target="_blank" rel="noopener">Google Auth Platform</a> → <strong>Get started</strong>. App name “Stacky”, your email, audience <strong>External</strong>. Then under <strong>Audience → Test users</strong>, add your own Gmail.</li>'+
+      '<li>Open <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noopener">Clients → Create client</a>: type <strong>Web application</strong>, and under <strong>Authorised JavaScript origins</strong> add <code>'+h(origin)+'</code>. Create, then copy the Client ID.</li></ol>'+
+      field('gclient','Google client ID','',{full:true,placeholder:'1234…apps.googleusercontent.com'})
+    : '<div class="field full"><span>Google Calendar</span><div class="line wrap">'+(gReady()?'<small class="note">Connected on this device.</small>':button('Connect Google','g-connect','','primary'))+button('Disconnect','g-forget','','text')+'</div>'+(gError?'<small class="form-error">'+h(gError)+'</small>':'')+'</div>'+
+      (g.list.length?'<fieldset class="field full cal-pick"><legend>Show these calendars</legend>'+g.list.map(c=>'<label><input type="checkbox" name="show:'+h(c.id)+'" value="1" '+(g.show[c.id]!==false?'checked':'')+'><i style="background:'+h(c.colour)+'"></i>'+h(c.name)+'</label>').join('')+'</fieldset>'+
+        select('pushTo','Put Stacky blocks in',g.pushTo||'primary',g.list.filter(c=>c.writable).map(c=>[c.primary?'primary':c.id,c.name+(c.primary?' (main)':'')]))+
+        '<label class="field toggle-field"><span>Send blocks to Google</span><input type="checkbox" name="push" value="1" '+(g.push?'checked':'')+'></label>':'<p class="note full">Connect to choose which calendars show here.</p>');
+  const icsBlock='<p class="note full"><strong>iCloud:</strong> the most reliable way is to add your iCloud calendar to Google Calendar (on iPhone: Calendar → Calendars → ⓘ → Public Calendar → Share link; then in Google Calendar: Other calendars → From URL). It then shows here through Google and stays up to date. You can also paste the link below, or import an .ics file.</p>'+
+    (cfg.ics.length?'<div class="field full"><span>Added</span>'+cfg.ics.map(c=>'<div class="ics-row"><i style="background:'+h(c.colour)+'"></i><span>'+h(c.name)+(c.url?'':' · file')+((extCache.ics?.[c.id]?.error&&c.url)?' · <em>could not load</em>':'')+'</span>'+button('Remove','ics-remove',c.id,'text')+'</div>').join('')+'</div>':'')+
+    field('icsUrl','iCloud or other calendar link','',{full:true,placeholder:'webcal://p01-caldav.icloud.com/published/…'})+
+    '<div class="field full"><span>Or import a file</span><label class="button secondary file-btn">Choose .ics file<input type="file" id="ics-file" accept=".ics,text/calendar" hidden></label></div>';
+  modal('Calendars','<div class="form-grid">'+googleBlock+'<div class="full rule"></div>'+icsBlock+'</div>','Save',v=>{
+    const id=(v.gclient||'').trim();
+    if (!g.clientId && id && !/\.apps\.googleusercontent\.com$/.test(id)) { formError('That does not look like a Google client ID. It ends in .apps.googleusercontent.com.'); return false; }
+    const url=(v.icsUrl||'').trim();
+    if (url && !/^(webcal|https?):\/\//i.test(url)) { formError('The calendar link should start with webcal:// or https://.'); return false; }
+    let added=null;
+    change(()=>{
+      if (!g.clientId && id) g.clientId=id;
+      if (g.list.length) { g.list.forEach(c=>{ g.show[c.id]=v['show:'+c.id]==='1'; }); g.pushTo=v.pushTo||'primary'; g.push=v.push==='1'; }
+      if (url) { added={id:uid(),name:url.includes('icloud')?'iCloud':'Calendar link',colour:ICS_COLOURS[cfg.ics.length%ICS_COLOURS.length],url}; cfg.ics.push(added); }
+    });
+    if (extCache.google) extCache.google.at=0;
+    if (added) icsFetch(added,true);
+    if (id && !g.list.length) { gPreload(); notify('Saved. Press Connect Google to sign in.'); }
+    gQueuePush(500);
+  });
 }
 
 // ───────────────────────── Eisenhower matrix ─────────────────────────
@@ -1495,8 +1902,12 @@ function stackActions(id, el) {
     'open-topics':()=>{courseId=id;location.hash='#topics';},
     'edit-list':()=>editList(customList(id)),
     'delete-list':()=>modal('Delete this list?','<p>Its tasks stay and move to the Inbox (or their subject).</p>','Delete list',()=>{change(()=>{data.lists=data.lists.filter(l=>l.id!==id);data.tasks.forEach(t=>{if(t.list===id)t.list='';});});location.hash='#inbox';}),
-    'cal-shift':()=>{calAnchor=calMode==='month'?addMonth(calAnchor.slice(0,8)+'01',Number(id)):addDays(calAnchor,7*Number(id));render();},
-    'cal-today':()=>{calAnchor=today();render();},
+    'cal-shift':()=>{calAnchor=calMode==='month'?addMonth(calAnchor.slice(0,8)+'01',Number(id)):addDays(calAnchor,calDays()*Number(id));render();},
+    'cal-today':()=>{calAnchor=today();calScroll=null;render();},
+    'calendars':calendarsModal,
+    'g-connect':gConnect,
+    'g-forget':()=>{ const c=calCfg(); if (gToken && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(gToken.t,()=>{}); gToken=null; gClient=null; try { sessionStorage.removeItem(GTOKEN_KEY); } catch {} extCache.google=null; storeExt(); change(()=>{ c.google={clientId:'',show:{},pushTo:'primary',push:true,list:[]}; }); calendarsModal(); notify('Google Calendar disconnected. Blocks already sent stay in Google.'); },
+    'ics-remove':()=>{ const c=calCfg(); change(()=>{ c.ics=c.ics.filter(x=>x.id!==id); }); if (extCache.ics) delete extCache.ics[id]; storeExt(); calendarsModal(); },
     'cal-mode':()=>{calMode=id;render();},
     'cal-open-day':()=>{calMode='week';calAnchor=id;render();},
     'cal-add':()=>modal('Add task · '+pretty(id,{weekday:'long',day:'numeric',month:'short'}),field('q','Task','',{full:true,required:true,placeholder:'e.g. Physics depth study 4pm 1h #phy'}),'Add',v=>{ createFromQuick(v.q,{date:id}); }),
@@ -1533,6 +1944,7 @@ function stackActions(id, el) {
 function addMonth(value,n){ const d=date(value); d.setUTCMonth(d.getUTCMonth()+n); return iso(d); }
 function stackChange(el) {
   if (el.id==='import-file') { if (el.files[0]) importData(el.files[0]); return true; }
+  if (el.id==='ics-file') { if (el.files[0]) icsImport(el.files[0]); return true; }
   if (el.matches('[data-timer-task]')) { timer.taskId=el.value||null; const t=row('tasks',timer.taskId); if (t) timer.course=t.course||''; storeTimer(); render(); return true; }
   const t=selected&&row('tasks',selected);
   if (el.dataset.subToggle && t) { change(()=>{ t.subtasks.find(x=>x.id===el.dataset.subToggle).done=el.checked; }); return true; }

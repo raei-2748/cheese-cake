@@ -80,3 +80,17 @@ grip.addEventListener('keydown', event => {
 { const s = readSide(); if (s.w) root.style.setProperty('--side-w', s.w + 'px'); if (s.collapsed) root.dataset.side = 'collapsed'; }
 wide.addEventListener('change', labelMenu);
 labelMenu();
+
+// Highlighter micro-animation: whatever you just clicked gets "drawn on" with the marker.
+// The app re-renders after most clicks, so the stroke is drawn on whatever is highlighted
+// in the next ~half second (the new current page, the chosen pill, today's date…).
+let markTimer;
+document.addEventListener('click', event => {
+  if (!event.target.closest('#nav a, [aria-pressed], .tabs button, .subj, .modes button, .lengths button, .pri-pick button, .cal-num, .wk-day, [data-action=toggle-task]')) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.classList.remove('hl-draw');
+  void root.offsetWidth;   // restart the animation if you click again quickly
+  root.classList.add('hl-draw');
+  clearTimeout(markTimer);
+  markTimer = setTimeout(() => root.classList.remove('hl-draw'), 520);
+}, true);

@@ -991,3 +991,153 @@ table.balance tr.flag th{box-shadow:inset 2px 0 var(--red)}
 :root[data-theme=dark] .page-head h1,:root[data-theme=dark] .list-head h1{background-size:100% .14em}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]) .page-head h1,:root:not([data-theme=light]) .list-head h1{background-size:100% .14em}}
 .brand-mark{box-shadow:0 0 0 1px var(--line-a)}
+
+/* ── Highlighter micro-animation on click ── */
+@keyframes hl-draw{from{background-size:0% 70%}to{background-size:100% 70%}}
+@keyframes hl-fill{from{background-size:0% 100%}to{background-size:100% 100%}}
+@keyframes hl-pop{0%{transform:scale(.6)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.hl-draw #nav a[aria-current] span,.hl-draw .cal-cell.today .cal-num,.hl-draw .wk-day.today strong{animation:hl-draw .34s cubic-bezier(.25,.8,.25,1) both}
+/* pills: the tint sweeps in from the left like a marker pass */
+.subj[aria-pressed=true],.modes button[aria-pressed=true],.lengths button[aria-pressed=true],.tabs button.selected,.tabs button[aria-pressed=true],.prop .pri-pick button[aria-pressed=true]{
+  background-image:linear-gradient(var(--hl-soft),var(--hl-soft));background-repeat:no-repeat;background-size:100% 100%;background-color:transparent!important}
+.hl-draw .subj[aria-pressed=true],.hl-draw .modes button[aria-pressed=true],.hl-draw .lengths button[aria-pressed=true],.hl-draw .tabs button.selected,.hl-draw .tabs button[aria-pressed=true],.hl-draw .prop .pri-pick button[aria-pressed=true]{animation:hl-fill .3s cubic-bezier(.25,.8,.25,1) both}
+.hl-draw .check.on{animation:hl-pop .28s ease-out both}
+@media(prefers-reduced-motion:reduce){.hl-draw *{animation:none!important}}
+
+/* ═════════════ Calendar: a calm time-blocking grid ═════════════ */
+.panes main[data-route=calendar]{width:min(100%,1440px);padding:28px 28px 40px}
+.cal-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.cal-title{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.cal-title h1{font-size:32px;line-height:40px;font-weight:700;margin:0;display:inline;background:linear-gradient(100deg,transparent .1em,var(--hl) .1em,var(--hl) calc(100% - .15em),transparent) 0 100%/100% .18em no-repeat}
+.cal-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cal-tools .tabs{margin:0}
+.cal-tools .button.text{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.cal-tools .button.text svg{width:16px;height:16px}
+.week-picker{display:inline-flex;align-items:center;gap:2px}
+.week-picker>button:not(.button){width:28px;height:28px;border:0;border-radius:6px;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer}
+.week-picker>button:not(.button):hover{background:var(--hover);color:var(--ink)}
+.ext-status{display:flex;gap:6px}
+.ext-pill{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:11px;border:0;font-size:12px;color:var(--muted);background:var(--fill-a)}
+.ext-pill.ok::before{content:'';width:6px;height:6px;border-radius:50%;background:#2fa36b}
+.ext-pill.warn{background:var(--hl-soft);color:var(--ink);cursor:pointer}
+.cal-wrap{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;align-items:start}
+.cal-side{position:sticky;top:60px;padding:4px 0}
+.cal-side h2{font-size:14px;font-weight:600;margin:0 0 2px}
+.cal-side .note{font-size:12.5px;color:var(--faint);margin:0 0 10px}
+.cal-side .cal-chip{margin-bottom:4px}
+
+/* week grid */
+.wk{border:0;border-radius:0;background:none;--gut:52px}
+.wk-head,.wk-allday,.wk-body{display:grid!important;grid-template-columns:var(--gut) repeat(var(--days),minmax(0,1fr))!important}
+.wk-head{position:sticky;top:44px;z-index:3;background:var(--bg);padding-bottom:6px}
+.wk-day{display:flex;align-items:baseline;justify-content:center;gap:6px;padding:4px 0;border:0;background:none;color:var(--muted);font:inherit}
+.wk-day small{font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.wk-day strong{font-size:20px;font-weight:600;color:var(--ink)}
+.wk-day.past strong{color:var(--faint)}
+.wk-day.today small{color:var(--ink);font-weight:600}
+.wk-allday{border-top:1px solid var(--line-a);border-bottom:1px solid var(--line-a)}
+.wk-allday .wk-gutter{font-size:11px;color:var(--faint);padding:6px 8px 0 0;text-align:right}
+.wk-allcell{min-height:30px;padding:3px 2px;border-left:1px solid var(--line-a);display:grid;gap:2px;align-content:start}
+.wk-scroll{max-height:calc(100dvh - 210px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.wk-body{position:relative;height:calc(24 * var(--hour))}
+.wk-body>.wk-gutter{position:relative;height:100%}
+.wk-body>.wk-gutter span{position:absolute;right:8px;transform:translateY(-50%);font-size:11px;color:var(--faint);white-space:nowrap}
+.wk-col{position:relative;height:100%!important;border-left:1px solid var(--line-a);cursor:crosshair;
+  background-image:linear-gradient(to bottom,var(--line-a) 1px,transparent 1px),linear-gradient(to bottom,transparent calc(var(--hour)/2),color-mix(in srgb,var(--line-a) 45%,transparent) calc(var(--hour)/2),color-mix(in srgb,var(--line-a) 45%,transparent) calc(var(--hour)/2 + 1px),transparent calc(var(--hour)/2 + 1px));
+  background-size:100% var(--hour);background-color:transparent!important}
+.wk-col.past{background-color:color-mix(in srgb,var(--fill-a) 40%,transparent)!important}
+.wk-col.today{background-color:color-mix(in srgb,var(--hl-faint) 55%,transparent)!important}
+.wk-col.drag-over{background-color:var(--hl-faint)!important}
+.now-line{position:absolute;left:-1px;right:0;height:2px;background:#e5484d;z-index:2;pointer-events:none}
+.now-line::before{content:'';position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:#e5484d}
+
+/* blocks: tinted with the subject colour, a solid edge, title first */
+.wk-event{position:absolute;z-index:1;display:flex;flex-direction:column;gap:1px;overflow:hidden;padding:3px 7px 3px 8px;border:0;border-radius:6px;
+  background:color-mix(in srgb,var(--c,#888) 16%,var(--bg));box-shadow:inset 3px 0 var(--c,#888);color:var(--ink);font-size:12px;line-height:15px;cursor:grab;text-decoration:none;
+  transition:box-shadow .12s,transform .12s}
+.wk-event b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-event span{color:var(--muted);font-size:11px;white-space:nowrap}
+.wk-event.short{flex-direction:row;align-items:center;gap:6px;padding-top:0;padding-bottom:0}
+.wk-event:hover{box-shadow:inset 3px 0 var(--c,#888),0 1px 4px rgba(15,15,15,.12)}
+.wk-event.picked{box-shadow:inset 3px 0 var(--c,#888),0 0 0 2px var(--hl-deep)}
+.wk-event.done b{text-decoration:line-through;color:var(--muted)}
+.wk-event.lifted{z-index:5;opacity:.92;cursor:grabbing;box-shadow:inset 3px 0 var(--c,#888),0 6px 18px rgba(15,15,15,.18);transform:scale(1.01)}
+.wk-event.ext{cursor:pointer;background:color-mix(in srgb,var(--c,#888) 9%,var(--bg));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c,#888) 35%,transparent)}
+.wk-event.ext b{font-weight:500}
+.wk-resize{position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
+.wk-resize::after{content:'';position:absolute;left:50%;bottom:2px;width:18px;height:2px;margin-left:-9px;border-radius:1px;background:var(--c,#888);opacity:0;transition:opacity .12s}
+.wk-event:hover .wk-resize::after{opacity:.6}
+.wk-ghost{left:1px;width:calc(100% - 3px);z-index:6;background:var(--hl-soft);box-shadow:inset 3px 0 var(--hl-deep),0 4px 14px rgba(15,15,15,.12);cursor:default;--c:var(--hl-deep)}
+.wk-ghost.naming{min-height:44px}
+.wk-new{width:100%;border:0;background:transparent;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink);outline:0;padding:0}
+.wk-new::placeholder{color:var(--hl-ink);font-weight:500}
+.cal-dragging,.cal-dragging *{user-select:none!important;cursor:grabbing!important}
+.cal-dragging .wk-event:not(.lifted){pointer-events:none}
+
+/* chips used in month cells, all-day row and the side list */
+.cal-chip{display:flex;align-items:center;gap:5px;min-width:0;padding:2px 6px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:12px;line-height:16px;text-decoration:none;cursor:pointer}
+.cal-chip::before{content:'';flex:none;width:6px;height:6px;border-radius:50%;background:var(--c,#888)}
+.cal-chip b{flex:none;font-weight:500;color:var(--muted)}
+.cal-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-chip:hover{background:var(--hover)}
+.cal-chip.done span{text-decoration:line-through;color:var(--faint)}
+.cal-chip.assess{background:color-mix(in srgb,var(--c) 14%,var(--bg))}.cal-chip.assess::before{display:none}
+.cal-chip.ext::before{border-radius:2px}
+.wk-allcell .cal-chip{background:color-mix(in srgb,var(--c,#888) 14%,var(--bg))}
+.cal-side .cal-chip{padding:5px 8px;background:var(--fill-a);cursor:grab}
+
+/* month grid */
+.month{border:0}
+.month-head{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));padding-bottom:6px}
+.month-head span{font-size:12px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;padding:0 8px}
+.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line-a);border-left:1px solid var(--line-a)}
+.cal-cell{min-height:118px;padding:4px;border-right:1px solid var(--line-a);border-bottom:1px solid var(--line-a);background:none!important;display:grid;gap:1px;align-content:start}
+.cal-cell.other{background:color-mix(in srgb,var(--fill-a) 50%,transparent)!important}
+.cal-cell.other .cal-num{color:var(--faint)}
+.cal-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.cal-num{border:0;background:none;font:inherit;font-size:13px;font-weight:500;color:var(--ink);padding:2px 4px;cursor:pointer;border-radius:4px}
+.cal-add{opacity:0;width:22px;height:22px;border:0;border-radius:5px;background:none;color:var(--muted);cursor:pointer}
+.cal-cell:hover .cal-add{opacity:1}.cal-add:hover{background:var(--hover)}
+.cal-more{border:0;background:none;font-size:11.5px;color:var(--muted);text-align:left;padding:1px 6px;cursor:pointer}
+.cal-cell.drag-over{background:var(--hl-faint)!important}
+
+/* calendars dialog */
+.cal-pick{display:grid;gap:4px;border:0;padding:0;margin:0}
+.cal-pick legend{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:4px}
+.cal-pick label{display:flex;align-items:center;gap:8px;font-size:14px}
+.cal-pick i,.ics-row i{width:10px;height:10px;border-radius:3px;flex:none}
+.ics-row{display:flex;align-items:center;gap:8px;font-size:14px}.ics-row span{flex:1}
+.toggle-field{display:flex!important;align-items:center;gap:10px;flex-direction:row!important}
+.form-grid .rule{height:1px;background:var(--line-a);margin:6px 0}
+.steps code,.note code{font-size:12px}
+@media(max-width:1100px){.cal-wrap{grid-template-columns:1fr}.cal-side{position:static}}
+@media(max-width:760px){
+  .panes main[data-route=calendar]{padding:16px 10px 40px}
+  .cal-title h1{font-size:26px}
+  .wk{--gut:38px}
+  .wk-head{top:50px}
+  .wk-scroll{max-height:none}
+  .cal-cell{min-height:76px}
+  .cal-cell .cal-chip span{display:none}
+  .cal-cell .cal-chip b{display:none}
+}
+.wk-body{max-height:none!important;overflow:visible!important}
+.wk{overflow:visible!important}
+.cal-side{border:0!important;background:none!important;box-shadow:none!important}
+.wk-event:not(.short) b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+/* day headings: weekday above the date, so they never collide when the grid is narrow */
+.wk-day{flex-direction:column;align-items:center;gap:0;line-height:1.15}
+.wk-day small{font-size:11px}
+/* with a task open, the grid gets the room and the unscheduled list steps aside */
+.panes.with-detail main[data-route=calendar] .cal-wrap{grid-template-columns:1fr}
+.panes.with-detail main[data-route=calendar] .cal-side{display:none}
+.panes.with-detail main[data-route=calendar]{padding-left:20px;padding-right:20px}
+@media(max-width:760px){
+  .wk{--gut:42px}
+  .wk-scroll{max-height:calc(100dvh - 300px)}
+  .wk-body>.wk-gutter span{right:5px;font-size:10px}
+  .wk-allday .wk-gutter{font-size:10px;padding-right:4px;line-height:1.1}
+  .cal-tools{width:100%;justify-content:space-between}
+}
+.hl-draw #nav a[aria-current] span,.hl-draw .cal-cell.today .cal-num,.hl-draw .wk-day.today strong{animation:hl-draw .34s cubic-bezier(.25,.8,.25,1) both!important}
+@media(prefers-reduced-motion:reduce){.hl-draw #nav a[aria-current] span{animation:none!important}}
