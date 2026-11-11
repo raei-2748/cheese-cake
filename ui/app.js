@@ -359,7 +359,7 @@ const subject = id => id && course(id) ? '<span class="subject" style="--subject
 const emptyCard = (title, description, action='') => '<div class="empty"><strong>'+h(title)+'</strong><p>'+h(description)+'</p>'+action+'</div>';
 const pageHead = (eyebrow,title,copy,action='') => '<div class="page-head"><div>'+(eyebrow?'<div class="eyebrow">'+h(eyebrow)+'</div>':'')+'<h1>'+h(title)+'</h1>'+(copy?'<p>'+h(copy)+'</p>':'')+'</div><div class="head-action">'+action+'</div></div>';
 const section = (title, sub, body, action='') => '<section class="card"><div class="card-head"><div><h2>'+h(title)+'</h2>'+(sub?'<p>'+h(sub)+'</p>':'')+'</div>'+action+'</div>'+body+'</section>';
-const metric = (label,value,detail,tone='') => '<div class="metric '+tone+'"><span>'+h(label)+'</span><strong>'+h(value)+'</strong><small>'+h(detail)+'</small></div>';
+const metric = (label,value,detail,tone='') => '<div class="metric '+tone+(value==='—'?' unset':'')+'"><span>'+h(label)+'</span><strong>'+h(value==='—'?'Not set':value)+'</strong><small>'+h(detail)+'</small></div>';
 const tabGroup = (label,action,selected,items) => '<div class="tabs" role="group" aria-label="'+h(label)+'">'+items.map(item=>{const [id,name]=Array.isArray(item)?item:[item,item];return '<button type="button" aria-pressed="'+(id===selected)+'" class="'+(id===selected?'selected':'')+'" data-action="'+action+'" data-id="'+h(id)+'">'+h(name)+'</button>';}).join('')+'</div>';
 const weekLabel = () => pretty(week)+' – '+pretty(addDays(week,6),{day:'numeric',month:'short',year:'numeric'});
 const weekPicker = () => '<div class="week-picker"><button type="button" aria-label="Previous week" data-action="shift-week" data-id="-7">‹</button><strong>'+h(weekLabel())+'</strong><button type="button" aria-label="Next week" data-action="shift-week" data-id="7">›</button>'+button('Current week','current-week','','text')+button('Jump to date','jump-week','','text')+'</div>';
@@ -789,7 +789,7 @@ let quickCount = 0;
 function quickAdd(where, defaults={}, short=false) {
   const id='quick-'+(quickCount++);
   return '<form class="quick" data-defaults="'+h(JSON.stringify(defaults))+'"><span class="quick-plus" aria-hidden="true">+</span>'+
-    '<input id="'+id+'" name="q" autocomplete="off" aria-label="Add a task to '+h(where)+'" placeholder="'+(short?'+ Add task':'Add to '+h(where)+' · try “Chem prac fri 4pm #che !high 45m”')+'">'+
+    '<input id="'+id+'" name="q" autocomplete="off" aria-label="Add a task to '+h(where)+'" placeholder="'+(short?'Add a task':'Add to '+h(where)+' · try “Chem prac fri 4pm #che !high 45m”')+'">'+
     (short?'':'<kbd class="quick-key" aria-hidden="true" title="Press q to add">q</kbd>')+'<button class="button primary quick-go" type="submit">Add</button><div class="quick-preview" aria-live="polite"></div></form>';
 }
 function previewChips(text) {
@@ -1327,28 +1327,29 @@ function dashPage() {
       countdown('HSC exams',set.hscStart,'Set the first exam date')+
       metric('Studied this week',minutes(s.week),(s.streak?s.streak+' day streak · ':'')+'goal '+minutes(goal*7),s.week>=goal*7?'accent':'')+
     '</div>'+
-    '<div class="dash-grid">'+
+    '<div class="dash-today">'+
       section('Today',todays.length?todays.length+' open'+(overdue.length?' · '+overdue.length+' overdue':''):'',
-        (todays.length?todays.slice(0,6).map(t=>stackRow(t,true)).join('')+(todays.length>6?'<a class="subtle-link more-link" href="#today">'+(todays.length-6)+' more →</a>':''):emptyCard('Nothing due today','Add a task below.'))+quickAdd('Today',{date:t0},true),
-        '<a class="subtle-link" href="#today">Today →</a>')+
-      section('Due for review',due.length?String(due.length):'',
-        due.length?reviewList(due.slice(0,6))+(due.length>6?'<a class="subtle-link more-link" href="#topics">'+(due.length-6)+' more →</a>':''):emptyCard('No reviews due','Press Review on a syllabus topic after you study it.','<a class="button secondary" href="#topics">Open syllabus</a>'),
+        (todays.length?todays.slice(0,6).map(t=>stackRow(t,true)).join('')+(todays.length>6?'<a class="subtle-link more-link" href="#today">'+(todays.length-6)+' more →</a>':''):emptyCard('Nothing due today',''))+quickAdd('Today',{date:t0},true),
+        '<a class="subtle-link" href="#today">Open →</a>')+
+    '</div><div class="dash-grid">'+
+      section('Reviews',due.length?String(due.length):'',
+        due.length?reviewList(due.slice(0,6))+(due.length>6?'<a class="subtle-link more-link" href="#topics">'+(due.length-6)+' more →</a>':''):emptyCard('No reviews due','Press Review on a syllabus topic after you study it.'),
         '<a class="subtle-link" href="#topics">Syllabus →</a>')+
-      section('Retests and feedback','',
+      section('Retests & feedback','',
         (retestsDue.length||newFeedback.length?'<div class="focus-list">'+
           retestsDue.slice(0,5).map(e=>'<div class="focus-row"><div><div class="line">'+subject(e.course)+badge(e.retest<t0?'Overdue':'Retest','gold')+'</div><strong>'+h(e.title)+'</strong><small>'+h(dueLabel({date:e.retest}))+'</small></div>'+button('Record','retest',e.id,'text')+'</div>').join('')+
           newFeedback.slice(0,3).map(f=>'<div class="focus-row"><div><div class="line">'+subject(f.course)+badge('Feedback')+'</div><strong>'+h(f.title)+'</strong><small>'+h(f.next||'No change planned yet')+'</small></div>'+button('Plan','plan-feedback',f.id,'text')+'</div>').join('')+'</div>'
           :emptyCard('Nothing waiting','Logged errors and new feedback show here.')),
         '<a class="subtle-link" href="#practice">Errors →</a>')+
     '</div>'+
-    section('Subjects','Flagged when a course had no study in 7 days but has an assessment within 3 weeks or reviews due.',
-      '<div class="table-scroll"><table class="balance"><thead><tr><th>Course</th><th>Last 7 days</th><th>Last 28 days</th><th>Syllabus practised</th><th>Reviews due</th><th>Open errors</th><th>Past papers</th><th>Next assessment</th></tr></thead><tbody>'+
+    section('Subjects','',
+      '<div class="table-scroll"><table class="balance"><thead><tr><th>Course</th><th title="Study in the last 7 days">7 days</th><th title="Study in the last 28 days">28 days</th><th title="Syllabus topics practised">Syllabus</th><th title="Reviews due">Reviews</th><th title="Open errors">Errors</th><th title="Past papers">Papers</th><th>Next task</th></tr></thead><tbody>'+
       rows.map(r=>'<tr'+(r.flag?' class="flag"':'')+'><th scope="row"><a href="#list/'+r.c.id+'">'+subject(r.c.id)+'</a>'+(r.flag?' '+badge('Needs time','alert'):'')+'</th>'+
         '<td>'+(r.week?minutes(r.week):'—')+'</td>'+
-        '<td><div class="mini-bar"><i style="width:'+(r.month/maxMonth*100)+'%;background:'+r.c.colour+'"></i></div>'+(r.month?minutes(r.month):'—')+'</td>'+
-        '<td>'+r.covered+' / '+r.topics+' <small>('+Math.round(r.covered/Math.max(1,r.topics)*100)+'%)</small></td>'+
-        '<td>'+(r.due?'<b class="due">'+r.due+'</b>':'0')+'</td>'+
-        '<td>'+r.errors+'</td>'+
+        '<td>'+(r.month?'<span class="cell-bar"><span>'+minutes(r.month)+'</span><span class="mini-bar"><i style="width:'+(r.month/maxMonth*100)+'%;background:'+r.c.colour+'"></i></span></span>':'—')+'</td>'+
+        '<td>'+r.covered+'<small> / '+r.topics+'</small></td>'+
+        '<td>'+(r.due?'<b class="due">'+r.due+'</b>':'—')+'</td>'+
+        '<td>'+(r.errors||'—')+'</td>'+
         '<td>'+(r.papers?r.papers+' · avg '+percent(r.avg):'—')+'</td>'+
         '<td>'+(r.next?h(r.next.title)+' <small>'+(daysFrom(r.next.date,t0)===0?'today':'in '+daysFrom(r.next.date,t0)+'d')+'</small>':'—')+'</td></tr>').join('')+
       '</tbody></table></div>');

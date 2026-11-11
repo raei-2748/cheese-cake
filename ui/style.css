@@ -828,3 +828,56 @@ table.balance{min-width:520px;width:100%}
 .log-empty{border:0;border-top:1px solid var(--line-a);border-radius:0;text-align:left;padding:12px 2px;margin-top:0;font-size:14px}
 .log-empty strong{display:inline;font-weight:500;margin:0 6px 0 0}.log-empty p{display:inline}
 @media(max-width:760px){.timer{padding:16px 16px 14px}.timer-clock{font-size:clamp(56px,20vw,88px)}}
+
+/* ── Polish pass (11 Nov 2026) ── */
+/* sidebar: no permanent scrollbar; footer rows match the nav rows */
+#nav{scrollbar-width:none}#nav::-webkit-scrollbar{display:none}
+.rail-bottom{gap:1px;padding-top:8px;border-top:1px solid var(--line-a)}
+.rail-link{display:flex;align-items:center;gap:9px;height:30px;text-align:left;color:var(--side-ink);background:none;border:0;cursor:pointer}
+.rail-link svg{width:18px;height:18px;padding:1px;flex:none;color:var(--side-icon)}
+/* section heads: one line, title left, link right, no rule under them */
+.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:0;padding-bottom:0;margin-bottom:6px}
+.card-head h2{white-space:nowrap}
+.card-head p:empty{display:none}
+/* empty states: one quiet line */
+.empty{padding:6px 2px;color:var(--faint);font-size:14px;line-height:20px}
+.empty strong{display:inline;font-weight:400;color:var(--muted)}
+.empty p:empty{display:none}.empty p{margin:2px 0 0;font-size:13px;color:var(--faint)}
+/* stat cards: an unset value is quiet, not a big dash */
+.metric{display:flex;flex-direction:column;gap:2px;min-height:104px}
+.metric strong{line-height:1.2;margin-top:4px}
+.metric small{margin-top:auto;color:var(--faint)}
+.metric.unset strong{font-size:16px;font-weight:500;color:var(--faint);letter-spacing:normal;line-height:36px}
+/* overview layout: Today full width, two sections side by side under it */
+.dash-today{margin-bottom:8px}
+.dash-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 40px}
+.dash-today .card,.dash-grid .card{margin-bottom:32px}
+.dash-grid+.card{margin-top:0}
+@media(max-width:760px){.dash-grid{grid-template-columns:1fr;gap:0}}
+/* quick add: the Add button only shows once you start typing */
+.quick{gap:6px}
+.quick-plus{font-size:18px;line-height:1;width:20px;text-align:center}
+.quick input{background:transparent;border:0;outline:0;color:var(--ink)}
+.quick input::placeholder{color:var(--faint)}
+.quick:not(:focus-within) .quick-go{visibility:hidden}
+.quick-go{height:24px;min-height:0!important;padding:0 10px!important;font-size:13px!important;border-radius:6px!important}
+/* subjects table */
+table.balance{font-size:14px}
+table.balance th,table.balance td{white-space:nowrap;vertical-align:middle}
+table.balance thead th{height:32px}
+table.balance td small{color:var(--faint)}
+.cell-bar{display:inline-flex;align-items:center;gap:8px}
+.cell-bar .mini-bar{width:44px;height:4px;margin:0;background:var(--line-a)}
+table.balance tr.flag{background:transparent}
+table.balance tr.flag th{box-shadow:inset 2px 0 var(--red)}
+/* header buttons line up with the title's baseline area */
+.list-head{align-items:flex-end}
+.list-stats{gap:6px}
+/* task rows: Notion database rows, 14px title, quiet 12px properties */
+.srow{align-items:center;gap:10px;min-height:40px}
+.srow-title{font-size:14px;line-height:20px;font-weight:400;color:var(--ink)}
+.srow-meta{font-size:12px;line-height:16px;gap:8px}
+.srow-meta .dot-label{font-size:12px;font-weight:400;color:var(--muted)}
+.srow-due{font-size:13px;line-height:18px;color:var(--muted);text-align:right}
+.srow-due small{display:block;font-size:12px;color:var(--faint)}
+.srow .check{border-radius:4px;border-width:1.5px}

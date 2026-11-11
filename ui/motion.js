@@ -5,7 +5,7 @@ const root = document.documentElement;
 const themeButton = document.getElementById('theme-toggle');
 const order = ['auto', 'light', 'dark'];
 const currentTheme = () => root.dataset.theme || 'auto';
-const showTheme = () => { themeButton.textContent = 'Theme: ' + currentTheme(); };
+const showTheme = () => { (themeButton.querySelector('span') || themeButton).textContent = 'Theme: ' + currentTheme(); };
 themeButton.addEventListener('click', () => {
   const next = order[(order.indexOf(currentTheme()) + 1) % order.length];
   if (next === 'auto') delete root.dataset.theme; else root.dataset.theme = next;
