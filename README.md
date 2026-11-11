@@ -38,7 +38,7 @@ A TickTick-style study system for the HSC, built around Year 12 school assessmen
 
 On GitHub Pages your records are saved in this browser's local storage.
 
-**Sync across devices:** open **Backup & settings → Set up sync** on each device (laptop, iPad, phone) and paste a GitHub fine-grained token whose only permission is **Gists: Read and write**. The records are kept in one secret gist on your own GitHub account. Changes sync a few seconds after you make them, when you come back to the tab, and every 90 seconds while it is open. If two devices changed different things, both changes are kept. Records are matched by id and merged field by field. Only a field changed differently on both devices keeps the version from the device that syncs.
+**Sync across devices:** open **Backup & settings → Set up sync** on each device (laptop, iPad, phone) and paste a GitHub fine-grained token whose only permission is **Gists: Read and write**. The records are kept in one secret gist on your own GitHub account. Changes are sent about a second after you make them. Changes from your other devices arrive within about 10 seconds while the tab is open, and straight away when you come back to it. If two devices changed different things, both changes are kept. Records are matched by id and merged field by field. Only a field changed differently on both devices keeps the version from the device that syncs.
 - The token stays in that browser's local storage. A secret gist is unlisted, but anyone with its exact link can read it. On a shared computer, use **Disconnect this device** when you finish.
 
 **Safety nets:**

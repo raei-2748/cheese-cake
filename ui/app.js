@@ -239,8 +239,24 @@ async function gh(path, options={}) {
   if (!response.ok) throw new Error('GitHub sync failed ('+response.status+'). It will retry.');
   return response.json();
 }
+// The last copy this tab saw on GitHub. Asking again with its ETag gets a tiny
+// "not modified" reply when nothing changed, so checking often costs almost nothing.
+let seen = null;   // {gistId, etag, rev, json}
 async function readRemote() {
-  const gist = await gh('/gists/'+syncCfg.gistId);
+  const known = seen && seen.gistId===syncCfg.gistId ? seen : null;
+  const response = await fetch('https://api.github.com/gists/'+syncCfg.gistId,{cache:'no-store',headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+syncCfg.token,'X-GitHub-Api-Version':'2022-11-28',...(known?{'If-None-Match':known.etag}:{})}});
+  if (response.status===304 && known) return {unchanged:true, rev:known.rev, json:known.json};
+  if (response.status===401) throw new Error('GitHub rejected the sync token. It may have expired. Reconnect in Backup & settings.');
+  if (response.status===404) throw new Error('The sync gist was not found. Reconnect in Backup & settings.');
+  if (response.status===403) throw new Error('GitHub refused access. Check the token has Gists read and write permission.');
+  if (!response.ok) throw new Error('GitHub sync failed ('+response.status+'). It will retry.');
+  const etag = response.headers.get('ETag');
+  const gist = await response.json();
+  const parsed = await parseRemote(gist);
+  seen = etag && parsed ? {gistId:syncCfg.gistId, etag, rev:parsed.rev||0, json:JSON.stringify(parsed.data)} : null;
+  return parsed;
+}
+async function parseRemote(gist) {
   const file = gist.files?.[GIST_FILE];
   if (!file) return null;
   const text = file.truncated ? await (await fetch(file.raw_url,{cache:'no-store'})).text() : file.content;
@@ -251,7 +267,7 @@ const writeRemote = (rev) => gh('/gists/'+syncCfg.gistId,{method:'PATCH',body:JS
 function readBase() { try { return JSON.parse(localStorage.getItem(BASE_KEY)); } catch { return null; } }
 function writeBase() { try { localStorage.setItem(BASE_KEY, JSON.stringify(data)); } catch {} }
 const hasRecords = d => !!(d.tasks.length||d.assessments.length||d.focus.length||d.papers.length||d.habits.length||Object.keys(d.topics).length);
-function queueSync(delay=2500) { if (!localMode || !syncOn()) return; clearTimeout(syncTimer); syncTimer=setTimeout(syncNow,delay); }
+function queueSync(delay=700) { if (!localMode || !syncOn()) return; clearTimeout(syncTimer); syncTimer=setTimeout(syncNow,delay); }
 async function syncNow() {
   if (!localMode || !syncOn() || !data) return;
   if (syncing) { syncAgain=true; return; }
@@ -264,6 +280,17 @@ async function syncNow() {
     const remote = await readRemote();
     if (dialog.open || dirty || saving) { syncing=false; queueSync(4000); return; }
     let rev = remote?.rev || 0;
+    if (remote?.unchanged && rev===syncCfg.rev && !syncCfg.force) {
+      // Nothing new on GitHub. Send this device's changes if it has any.
+      if (JSON.stringify(data)!==remote.json) { rev += 1; seen = null; await writeRemote(rev); syncCfg.rev = rev; writeBase(); }
+      syncCfg.lastSync = new Date().toISOString(); storeSync();
+      lastSyncError = '';
+      status('Synced '+hhmm(Date.now()));
+      syncing=false;
+      if (syncAgain) { syncAgain=false; queueSync(300); }
+      return;
+    }
+    if (remote?.unchanged) { seen = null; syncing=false; return syncNow(); }   // another tab moved on: read the full copy
     if (remote && rev!==syncCfg.rev && !syncCfg.force) {
       const base = readBase();
       const local = data;
@@ -272,7 +299,7 @@ async function syncNow() {
       try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); } catch {}
       if (!same(local,data)) { if (selected && !row('tasks',selected)) selected=null; render(); }
     }
-    if (!remote || !same(data,remote.data)) { rev += 1; await writeRemote(rev); }
+    if (!remote || !same(data,remote.data)) { rev += 1; seen = null; await writeRemote(rev); }
     syncCfg.rev = rev; syncCfg.lastSync = new Date().toISOString(); delete syncCfg.force; storeSync(); writeBase();
     lastSyncError = '';
     status('Synced '+hhmm(Date.now()));
@@ -303,7 +330,7 @@ function syncModal() {
     ? '<div class="form-grid"><div class="field full"><span>Status</span><small class="note">'+(syncCfg.device?'This device: '+h(syncCfg.device)+'. ':'')+(syncCfg.lastSync?'Last synced '+h(pretty(sydney.format(new Date(syncCfg.lastSync)),{day:'numeric',month:'short'}))+' at '+h(hhmm(Date.parse(syncCfg.lastSync)))+'.':'Not synced yet.')+'</small>'+
       (lastSyncError?'<small class="form-error">'+h(lastSyncError)+'</small>':'')+
       '<div class="line wrap">'+button('Sync now','sync-now','','primary')+'<a class="button secondary" href="https://gist.github.com/'+h(syncCfg.gistId)+'" target="_blank" rel="noopener">Open gist ↗</a>'+button('Disconnect this device','sync-off','','danger')+'</div></div>'+
-      '<p class="note full">Changes sync a few seconds after you make them, and whenever you come back to this tab. Your records stay in this browser if you disconnect.</p></div>'
+      '<p class="note full">Changes are sent about a second after you make them. Changes from your other devices arrive within about 10 seconds while this tab is open. Your records stay in this browser if you disconnect.</p></div>'
     : '<div class="form-grid"><p class="note full">Your records are kept in a private gist on your own GitHub account. Every device you connect reads and writes the same copy. If two devices change different things, both changes are kept.</p>'+
       '<ol class="steps full"><li>On GitHub, open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Settings → Developer settings → Fine-grained tokens → Generate</a>.</li><li>Under <strong>Account permissions</strong>, set <strong>Gists</strong> to <em>Read and write</em>. Leave everything else off. Pick an expiry date after the HSC.</li><li>Copy the token, paste it below, and connect. Do the same on each device, using the same token or a new one.</li></ol>'+
       field('token','GitHub token','',{type:'password',full:true,required:true,placeholder:'github_pat_…'})+
@@ -324,7 +351,7 @@ function syncModal() {
 }
 addEventListener('online',()=>queueSync(300));
 document.addEventListener('visibilitychange',()=>{ if (document.visibilityState==='visible') queueSync(300); else if (dirty) save(); });
-setInterval(()=>{ if (document.visibilityState==='visible') syncNow(); },90000);
+setInterval(()=>{ if (document.visibilityState==='visible' && syncOn() && !lastSyncError) syncNow(); },10000);
 
 const button = (label, action, id='', tone='secondary') => '<button type="button" class="button '+tone+'" data-action="'+action+'" data-id="'+h(id)+'">'+h(label)+'</button>';
 const badge = (label, tone='neutral') => '<span class="badge '+tone+'">'+h(label)+'</span>';
