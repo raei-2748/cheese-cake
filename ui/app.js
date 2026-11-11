@@ -57,7 +57,7 @@ const minutes = m => m < 60 ? m+'m' : Math.floor(m/60)+'h'+(m%60?' '+m%60+'m':''
 const percent = n => Number(n.toFixed(1))+'%';
 const defaultWeek = () => ({ energy:'Steady', reserve:15, capacity:[75,75,75,75,45,120,90], review:null });
 const empty = () => ({version:1, weeks:{}, tasks:[], commitments:[], assessments:[], topics:{}, customTopics:[], errors:[], feedback:[], lists:[], habits:[], habitLog:{}, focus:[], papers:[], settings:{pomo:{focus:25,short:5,long:15,every:4},studyGoal:120,trialStart:'',hscStart:'',lastExport:''}});
-// Fill in fields added by HSC Stack so older records keep working, and repair
+// Fill in fields added by Stacky so older records keep working, and repair
 // any collection that a damaged or hand-edited backup left as the wrong type.
 function normalise(d) {
   const base = empty();
@@ -197,7 +197,7 @@ async function open() {
 // When two devices both changed things, a three-way merge keeps both sets of
 // edits: records are matched by id and merged field by field, and only a field
 // changed differently on both sides falls back to this device's version.
-const SYNC_KEY = 'hsc-stack:sync:v1', BASE_KEY = 'hsc-stack:sync-base:v1', GIST_FILE = 'hsc-stack.json', GIST_DESC = 'HSC Stack sync (private study records)';
+const SYNC_KEY = 'hsc-stack:sync:v1', BASE_KEY = 'hsc-stack:sync-base:v1', GIST_FILE = 'hsc-stack.json', GIST_DESC = 'Stacky sync (private study records)';  // file and storage keys keep the old name so existing data still matches
 let syncCfg = (()=>{ try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || {}; } catch { return {}; } })();
 let syncing = false, syncAgain = false, syncTimer, lastSyncError = '';
 const syncOn = () => !!(syncCfg.token && syncCfg.gistId);
@@ -287,7 +287,7 @@ async function syncNow() {
 async function connectSync(token, device) {
   syncCfg = {token, device};
   const mine = await gh('/gists?per_page=100');
-  const found = mine.find(g=>g.files?.[GIST_FILE] && g.description===GIST_DESC);
+  const found = mine.find(g=>g.files?.[GIST_FILE] && [GIST_DESC,'HSC Stack sync (private study records)'].includes(g.description));
   if (found) syncCfg.gistId = found.id;
   else {
     const made = await gh('/gists',{method:'POST',body:JSON.stringify({description:GIST_DESC,public:false,files:{[GIST_FILE]:{content:JSON.stringify({rev:1,savedAt:new Date().toISOString(),device,data})}}})});
@@ -692,7 +692,7 @@ function editReview() {
 }
 
 
-// ───────────────────────── HSC Stack: task core ─────────────────────────
+// ───────────────────────── Task core ─────────────────────────
 let selected = null, showDone = false, calMode = 'month', calAnchor = today(), habitOpen = null, dragging = null, grabY = 0;
 const pad2 = n => String(n).padStart(2,'0');
 const parseCtx = () => ({ today: today(), courses, lists: data.lists });
@@ -985,7 +985,7 @@ function finishPhase() {
   chime();
   const msg=was==='focus'?'Logged '+minutes(pomo().focus)+'. Time for a '+phaseName[timer.phase].toLowerCase()+'.':'Break over. Start the next round when you are ready.';
   notify(msg);
-  try { if ('Notification' in window && Notification.permission==='granted' && document.hidden) new Notification('HSC Stack',{body:msg}); } catch {}
+  try { if ('Notification' in window && Notification.permission==='granted' && document.hidden) new Notification('Stacky',{body:msg}); } catch {}
   if (data) render();
 }
 function chime() {
@@ -1124,7 +1124,7 @@ function updateTimerDom() {
     mini.textContent=(timer.running?'● ':'❚❚ ')+who+' '+clock(secs);
     mini.dataset.phase=timer.phase;
   }
-  document.title=timer.running?clock(secs)+' · '+(timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase])+' · HSC Stack':'HSC Stack';
+  document.title=timer.running?clock(secs)+' · '+(timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase])+' · Stacky':'Stacky';
 }
 setInterval(()=>{ if (!data) return; if (timer.running && !countsUp() && elapsedSecs()>=phaseSecs(timer.phase)) finishPhase(); else updateTimerDom(); },1000);
 
@@ -1407,7 +1407,7 @@ function settingsModal() {
     (localMode?'<div class="field full"><span>Sync across devices</span><div class="line wrap">'+button(syncOn()?'Sync settings':'Set up sync','sync-setup','',syncOn()?'secondary':'primary')+'<small class="note">'+(syncOn()?'On'+(syncCfg.device?' · '+h(syncCfg.device):'')+(syncCfg.lastSync?' · last synced '+h(hhmm(Date.parse(syncCfg.lastSync))):''):'Off. Records stay in this browser only.')+'</small></div></div>':'')+
     '<div class="field full"><span>Backup</span><div class="line wrap">'+button('Export backup (.json)','export')+'<label class="button secondary file-btn">Import backup<input type="file" id="import-file" accept="application/json,.json" hidden></label></div>'+
     '<small class="note">'+(localMode?(data.settings.lastExport?'Last exported '+h(pretty(data.settings.lastExport,{day:'numeric',month:'short',year:'numeric'}))+'. ':'')+'Export a backup now and then even with sync on, and keep it somewhere safe.':'Your records sync through your account.')+'</small></div>'+
-    (localMode&&Object.keys(snapshots()).length?'<div class="field full"><span>Daily snapshots</span><small class="note">This browser keeps your records as they were when you first opened HSC Stack each day, for the last 7 days.</small><div class="line wrap">'+Object.keys(snapshots()).sort().reverse().map(d=>button('Restore '+pretty(d,{weekday:'short',day:'numeric',month:'short'}),'restore-snap',d,'text')).join('')+'</div></div>':'')+
+    (localMode&&Object.keys(snapshots()).length?'<div class="field full"><span>Daily snapshots</span><small class="note">This browser keeps your records as they were when you first opened Stacky each day, for the last 7 days.</small><div class="line wrap">'+Object.keys(snapshots()).sort().reverse().map(d=>button('Restore '+pretty(d,{weekday:'short',day:'numeric',month:'short'}),'restore-snap',d,'text')).join('')+'</div></div>':'')+
     '<div class="field full"><span>Shortcuts</span><small class="note"><kbd>s</kbd> start or pause studying · <kbd>q</kbd> quick add · <kbd>/</kbd> search · <kbd>Esc</kbd> close details</small></div></div>',
     'Save settings',v=>change(()=>{ data.settings.pomo={focus:+v.focus,short:+v.short,long:+v.long,every:+v.every}; data.settings.studyGoal=+v.goal; data.settings.trialStart=v.trialStart; data.settings.hscStart=v.hscStart; }));
 }
@@ -1425,15 +1425,15 @@ function exportData() {
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='hsc-stack-backup-'+today()+'.json';
+  a.download='stacky-backup-'+today()+'.json';
   document.body.append(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 async function importData(file) {
   let parsed;
   try { parsed=JSON.parse(await file.text()); } catch { notify('That file is not valid JSON.'); return; }
-  if (!parsed || parsed.version!==1 || !Array.isArray(parsed.tasks)) { notify('That file is not an HSC Stack backup.'); return; }
-  modal('Replace your records?','<p>This replaces everything in HSC Stack with the backup from the file ('+parsed.tasks.length+' tasks)'+(syncOn()?' on every synced device':'')+'. Export first if you want to keep what is here now.</p>','Replace',()=>{ change(()=>{ data=normalise(parsed); }); forceNextSync(); notify('Backup imported.'); });
+  if (!parsed || parsed.version!==1 || !Array.isArray(parsed.tasks)) { notify('That file is not a Stacky backup.'); return; }
+  modal('Replace your records?','<p>This replaces everything in Stacky with the backup from the file ('+parsed.tasks.length+' tasks)'+(syncOn()?' on every synced device':'')+'. Export first if you want to keep what is here now.</p>','Replace',()=>{ change(()=>{ data=normalise(parsed); }); forceNextSync(); notify('Backup imported.'); });
 }
 
 // ───────────────────────── Actions and input wiring ─────────────────────────

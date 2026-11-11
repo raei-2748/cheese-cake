@@ -1,4 +1,4 @@
-# HSC Stack · 2027
+# Stacky
 
 A TickTick-style study system for the HSC, built around Year 12 school assessments and Trials. Live at **https://raei-2748.github.io/cheese-cake/**.
 
