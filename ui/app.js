@@ -535,6 +535,7 @@ function render() {
   const opened=[...main.querySelectorAll('details.module[open] summary strong')].map(x=>x.textContent);
   const pages={week:weekly,assess:assessments,topics:topicsPage,practice,feedback,review:reviews,
     calendar:calendarPage,matrix:matrixPage,focus:focusPage,habits:habitsPage,done:completedPage,dash:dashPage,papers:papersPage};
+  main.dataset.route=r.name;
   main.innerHTML=(pages[r.name]??taskPage)(r);
   if(r.name==='topics'&&opened.some(title=>[...main.querySelectorAll('details.module summary strong')].some(x=>x.textContent===title))) {
     main.querySelectorAll('details.module').forEach(d=>{d.open=priorityOnly||opened.includes(d.querySelector('summary strong').textContent);});
