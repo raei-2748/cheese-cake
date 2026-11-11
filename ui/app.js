@@ -1,5 +1,5 @@
-import { courses, templates } from './data.js';
-import { parseQuickAdd, nextRepeat, repeatLabels } from './parse.js';
+import { courses, templates } from './data.js?v=__V__';
+import { parseQuickAdd, nextRepeat, repeatLabels } from './parse.js?v=__V__';
 
 const smart = [['today','Today','sun'],['next7','Next 7 days','week7'],['inbox','Inbox','inbox'],['all','All tasks','list'],['done','Completed','done']];
 const tools = [['calendar','Calendar','grid'],['matrix','Matrix','matrix'],['habits','Habits','repeat']];
@@ -330,7 +330,7 @@ const button = (label, action, id='', tone='secondary') => '<button type="button
 const badge = (label, tone='neutral') => '<span class="badge '+tone+'">'+h(label)+'</span>';
 const subject = id => id && course(id) ? '<span class="subject" style="--subject:'+course(id).colour+'"><i></i>'+h(course(id).short)+'</span>' : '<span class="subject general"><i></i>General</span>';
 const emptyCard = (title, description, action='') => '<div class="empty"><strong>'+h(title)+'</strong><p>'+h(description)+'</p>'+action+'</div>';
-const pageHead = (eyebrow,title,copy,action='') => '<div class="page-head"><div>'+(eyebrow?'<div class="eyebrow">'+h(eyebrow)+'</div>':'')+'<h1>'+h(title)+'</h1><p>'+h(copy)+'</p></div><div class="head-action">'+action+'</div></div>';
+const pageHead = (eyebrow,title,copy,action='') => '<div class="page-head"><div>'+(eyebrow?'<div class="eyebrow">'+h(eyebrow)+'</div>':'')+'<h1>'+h(title)+'</h1>'+(copy?'<p>'+h(copy)+'</p>':'')+'</div><div class="head-action">'+action+'</div></div>';
 const section = (title, sub, body, action='') => '<section class="card"><div class="card-head"><div><h2>'+h(title)+'</h2>'+(sub?'<p>'+h(sub)+'</p>':'')+'</div>'+action+'</div>'+body+'</section>';
 const metric = (label,value,detail,tone='') => '<div class="metric '+tone+'"><span>'+h(label)+'</span><strong>'+h(value)+'</strong><small>'+h(detail)+'</small></div>';
 const tabGroup = (label,action,selected,items) => '<div class="tabs" role="group" aria-label="'+h(label)+'">'+items.map(item=>{const [id,name]=Array.isArray(item)?item:[item,item];return '<button type="button" aria-pressed="'+(id===selected)+'" class="'+(id===selected?'selected':'')+'" data-action="'+action+'" data-id="'+h(id)+'">'+h(name)+'</button>';}).join('')+'</div>';
@@ -366,7 +366,7 @@ function nextActions() {
       detail:(a.weight!==''?a.weight+'% of course · ':'')+(a.date<today()?'Overdue · ':'Due ')+pretty(a.date), action:button('Plan prep','prep-assessment',a.id,'text')})),
     ...repairs.map(e=>({meta:subject(e.course)+' '+badge('Retest','gold'),title:e.title,detail:(e.retest<today()?'Overdue · ':'Due ')+pretty(e.retest),action:button('Plan retest','plan-retest',e.id,'text')}))
   ].map(x=>'<div class="focus-row"><div><div class="line">'+x.meta+'</div><strong>'+h(x.title)+'</strong><small>'+h(x.detail)+'</small></div>'+x.action+'</div>').join('')+'</div>'
-    : emptyCard('Start with the next school task','Add the due date and weighting from your school assessment notice. It will show here until you sit or submit it.',button('+ Add assessment','edit-assessment'));
+    : emptyCard('No assessments yet','Add one from your school assessment notice.',button('+ Add assessment','edit-assessment'));
 }
 
 function taskRow(t) {
@@ -378,17 +378,17 @@ function weekly() {
   const totals = plan.reduce((a,d)=>({available:a.available+d.available, remaining:a.remaining+d.remaining, completed:a.completed+d.completed}),{available:0,remaining:0,completed:0});
   const headroom = totals.available-totals.remaining-totals.completed;
   const moved = carry();
-  return pageHead('','Weekly plan','Make room for the school work that carries marks, then fit revision into the time you have.',button('+ Study block','edit-task','','primary'))+
+  return pageHead('','Weekly plan','',button('+ Study block','edit-task','','primary'))+
     '<div class="toolbar">'+weekPicker()+'<div class="line">'+button('+ Commitment','edit-commitment')+button('Set capacity','edit-capacity')+'</div></div>'+
     '<div class="metrics">'+metric('Usable time',minutes(totals.available),weekData().energy+' energy · '+weekData().reserve+'% buffer')+
       metric('Work left',minutes(totals.remaining),weekTasks().filter(taskOpen).length+' open blocks')+
       metric('Completed',minutes(totals.completed),weekTasks().filter(taskDone).length+' finished blocks')+
       metric(headroom<0?'Over budget':'Unallocated',minutes(Math.abs(headroom)),plan.filter(d=>d.remaining+d.completed>d.available).length+' days over capacity',headroom<0?'alert':'accent')+'</div>'+
-    '<div class="overview-grid">'+section('Protect school marks','Upcoming assessments and due retests',nextActions(),'<a class="subtle-link" href="#assess">Assessments →</a>')+
-    section('Adjust the week','Energy changes the usable budget',tabGroup('Energy','energy',weekData().energy,['Low','Steady','High'])+
+    '<div class="overview-grid">'+section('Coming up','',nextActions(),'<a class="subtle-link" href="#assess">Assessments →</a>')+
+    section('Energy this week','',tabGroup('Energy','energy',weekData().energy,['Low','Steady','High'])+
     '<p class="note">Low uses 65% of free time, Steady 85%, and High 100%. Your buffer is applied after commitments and the energy adjustment.</p>'+
     (moved.length?'<div class="carry"><strong>'+moved.length+' unfinished from earlier weeks</strong>'+button('Triage carry-over','show-carry','','text')+'</div>':'<div class="carry"><strong>Carry-over is clear</strong><span>Earlier unfinished blocks show here.</span></div>'))+'</div>'+
-    section('Week at a glance','Day budgets use estimated minutes for open work and actual minutes where logged.', '<div class="day-grid">'+plan.map(({day,available,commitments,tasks,remaining,completed})=>{
+    section('Week at a glance','', '<div class="day-grid">'+plan.map(({day,available,commitments,tasks,remaining,completed})=>{
       const used=remaining+completed;
       return '<article class="day '+(day===today()?'today ':'')+(used>available?'over':'')+'"><div class="day-heading"><div><strong>'+pretty(day,{weekday:'short'})+'</strong><small>'+pretty(day)+'</small></div><button type="button" aria-label="Add block on '+h(pretty(day))+'" data-action="task-day" data-id="'+day+'">+</button></div><div class="load"><span>'+minutes(used)+' / '+minutes(available)+'</span><div class="bar"><i style="width:'+Math.min(100,available ? used/available*100 : used?100:0)+'%"></i></div></div>'+
       commitments.map(c=>'<button type="button" class="commit" data-action="edit-commitment" data-id="'+h(c.id)+'">'+h(c.title)+' <span>'+minutes(c.minutes)+'</span></button>').join('')+
@@ -414,14 +414,14 @@ function assessments() {
     const points = marked.reduce((sum,a)=>sum+a.mark/a.outOf*a.weight,0);
     return '<tr><th scope="row">'+subject(c.id)+'</th><td>'+percent(loggedWeight)+(loggedWeight>100?' '+badge('Check weights','alert'):'')+'</td><td>'+percent(covered)+'</td><td>'+(covered?percent(points/covered*100):'—')+'</td><td>'+(covered?Number(points.toFixed(2))+' / 100':'—')+'</td></tr>';
   }).join('');
-  return pageHead('','Assessments & Trials','Use your school notices for dates, task weightings and assessed content.',button('+ Assessment','edit-assessment','','primary'))+
-    section('Assessment register','Upcoming work and returned marks',tabGroup('Assessment type','assessment-filter',assessmentFilter,['All','Assessment','Trial'])+
+  return pageHead('','Assessments & Trials','',button('+ Assessment','edit-assessment','','primary'))+
+    section('Register','',tabGroup('Assessment type','assessment-filter',assessmentFilter,['All','Assessment','Trial'])+
     (shown.length?'<div class="record-list">'+shown.map(a=>{
       const steps=a.kind==='Trial'?trialSteps:assessmentSteps;
       return '<article class="record"><div class="record-head"><div><div class="line">'+subject(a.course)+badge(a.kind,a.kind==='Trial'?'gold':'neutral')+badge(a.status,a.status==='Returned'?'green':'neutral')+'</div><h3>'+h(a.title)+'</h3><p>'+(a.date?h(pretty(a.date,{day:'numeric',month:'short',year:'numeric'})):'Date pending')+' · '+(a.weight!==''?h(a.weight)+'% weighting':'Weight pending')+' · '+(hasMark(a)?h(a.mark)+' / '+h(a.outOf)+' ('+percent(a.mark/a.outOf*100)+')':'Mark pending')+'</p></div><div class="line">'+button('Plan prep','prep-assessment',a.id)+button('Edit','edit-assessment',a.id)+'</div></div>'+
       (a.scope?'<p class="record-detail">'+br(a.scope)+'</p>':'')+'<div class="check-strip">'+steps.map((step,i)=>'<label><input type="checkbox" data-assess="'+h(a.id)+'" data-step="'+i+'" '+(a.checks?.[i]?'checked':'')+'> '+h(step)+'</label>').join('')+'</div></article>';
     }).join('')+'</div>':emptyCard('No '+(assessmentFilter==='Trial'?'Trials':'assessments')+' logged','Dates, marks and school weightings are ready for you to enter.',button('+ Add '+(assessmentFilter==='Trial'?'Trial':'assessment'),assessmentFilter==='Trial'?'new-trial':'edit-assessment'))))+
-    section('Weighted marks by course','Each task contributes its score fraction × its school weighting. Marked average uses only tasks with both a score and weighting.', '<div class="table-scroll"><table><thead><tr><th>Course</th><th>Weight logged</th><th>Weight marked</th><th>Marked average</th><th>Points earned</th></tr></thead><tbody>'+marks+'</tbody></table></div>');
+    section('Marks by course','The average counts only tasks that have both a mark and a weighting.', '<div class="table-scroll"><table><thead><tr><th>Course</th><th>Weight logged</th><th>Weight marked</th><th>Marked average</th><th>Points earned</th></tr></thead><tbody>'+marks+'</tbody></table></div>');
 }
 function topicsFor(c) {
   return c.modules.flatMap(([module,...topics],i)=>topics.map((title,j)=>({id:c.id+'-'+i+'-'+j,title,module,course:c.id})))
@@ -466,9 +466,9 @@ function topicsPage() {
     .sort((a,b)=>priorities.indexOf(topicState(b.id).priority)-priorities.indexOf(topicState(a.id).priority));
   const courseTabs=tabGroup('Course','course',courseId,courses.map(c=>[c.id,c.short]));
   const due=dueTopics();
-  return pageHead('','Syllabus & priorities','Track evidence at topic level and turn the weakest areas into specific study blocks.',button('+ Custom topic','new-topic','','primary'))+
-    (due.length?section('Due for review',due.length+' topic'+(due.length===1?'':'s')+' across all courses. Recall from memory, then rate it to set the next gap.',reviewList(due.slice(0,12))):'')+
-    section('Revision priorities','Urgent topics first, then high-priority topics across all courses.',flagged.length?'<div class="focus-list">'+flagged.map(t=>'<div class="focus-row"><div><div class="line">'+subject(t.course)+badge(topicState(t.id).priority,topicState(t.id).priority==='Urgent'?'alert':'gold')+'</div><strong>'+h(t.title)+'</strong><small>'+h(t.module)+'</small></div>'+button('Plan practice','plan-topic',t.id,'text')+'</div>').join('')+'</div>':emptyCard('Your priority list is clear','Open a topic and set its priority when marked work, feedback or a deadline gives you a reason.'))+
+  return pageHead('','Syllabus & priorities','',button('+ Custom topic','new-topic','','primary'))+
+    (due.length?section('Due for review',String(due.length),reviewList(due.slice(0,12))):'')+
+    section('Priorities','',flagged.length?'<div class="focus-list">'+flagged.map(t=>'<div class="focus-row"><div><div class="line">'+subject(t.course)+badge(topicState(t.id).priority,topicState(t.id).priority==='Urgent'?'alert':'gold')+'</div><strong>'+h(t.title)+'</strong><small>'+h(t.module)+'</small></div>'+button('Plan practice','plan-topic',t.id,'text')+'</div>').join('')+'</div>':emptyCard('Nothing flagged','Set a topic to High or Urgent with its Update button.'))+
     section(c.name,'Year 12 · '+c.year+' syllabus · '+all.filter(t=>topicState(t.id).stage==='Retested').length+' of '+all.length+' topics retested',courseTabs+
     '<div class="topic-tools"><label><input type="checkbox" id="priority-only" '+(priorityOnly?'checked':'')+'> Priorities only</label><a class="subtle-link" href="'+h(c.url)+'" target="_blank" rel="noopener">Official NESA syllabus ↗</a></div>'+
     '<p class="note">Module titles follow NESA. The smaller checklist items are starter revision prompts. Add class-specific texts, dot points or skills as custom topics.</p>'+
@@ -492,15 +492,15 @@ function errorRow(e) {
 function practice() {
   const items=dated(data.errors.filter(e=>practiceFilter==='All'||(practiceFilter==='Passed'?e.stage==='Passed':e.stage!=='Passed')),'retest');
   const sessions=dated(data.tasks.filter(t=>Object.hasOwn(templates,t.kind))).reverse();
-  return pageHead('','Practice & repair','Retrieve from memory, practise under time, then use fresh questions to check whether a repair worked.',button('+ Log error','edit-error','','primary'))+
+  return pageHead('','Practice & repair','',button('+ Log error','edit-error','','primary'))+
     '<div class="template-grid">'+Object.entries(templates).map(([key,t])=>'<section class="card template"><span class="template-icon">'+icon(key==='Active retrieval'?'bolt':key==='Timed practice'?'calendar':'check')+'</span><h2>'+h(key)+'</h2><p>'+br(t.text)+'</p>'+button('Use template · '+t.minutes+'m','template',key)+'</section>').join('')+'</div>'+
-    section('Error log','Capture the cause, then move from repair to a fresh retest with evidence.',tabGroup('Error status','practice-filter',practiceFilter,['Open','Passed','All'])+
+    section('Error log','',tabGroup('Error status','practice-filter',practiceFilter,['Open','Passed','All'])+
     (items.length?'<div class="record-list">'+items.map(errorRow).join('')+'</div>':emptyCard('No '+practiceFilter.toLowerCase()+' errors here','When a question costs you marks, log the specific error and set a date to test the fix.')))+
-    section('Practice history','Open a session to log actual time, score and what to change next.',sessions.length?'<div class="record-list">'+sessions.map(t=>'<article class="record compact"><div><div class="line">'+subject(t.course)+badge(t.status,t.status==='Done'?'green':'neutral')+'</div><h3>'+h(t.title)+'</h3><p>'+h(pretty(t.date))+' · '+h(t.kind)+(t.result?' · '+h(t.result):'')+'</p></div>'+button('Open session','edit-task',t.id)+'</article>').join('')+'</div>':emptyCard('No practice sessions yet','Use a template to create a block in the weekly plan.'));
+    section('Practice history','',sessions.length?'<div class="record-list">'+sessions.map(t=>'<article class="record compact"><div><div class="line">'+subject(t.course)+badge(t.status,t.status==='Done'?'green':'neutral')+'</div><h3>'+h(t.title)+'</h3><p>'+h(pretty(t.date))+' · '+h(t.kind)+(t.result?' · '+h(t.result):'')+'</p></div>'+button('Open session','edit-task',t.id)+'</article>').join('')+'</div>':emptyCard('No practice sessions yet','Start one from a template above.'));
 }
 function feedback() {
-  return pageHead('','Teacher feedback','Capture what your teacher said, the criterion it affects, and a specific change to test.',button('+ Feedback note','edit-feedback','','primary'))+
-    section('Feedback notes','Convert the feedback that could save marks into a scheduled action.',data.feedback.length?'<div class="record-list">'+dated(data.feedback).reverse().map(f=>'<article class="record"><div class="record-head"><div><div class="line">'+subject(f.course)+badge(f.status,f.status==='Applied'?'green':'neutral')+'</div><h3>'+h(f.title)+'</h3><p>'+h(pretty(f.date))+(f.context?' · '+h(f.context):'')+'</p></div><div class="line">'+button('Plan action','plan-feedback',f.id)+button('Edit','edit-feedback',f.id)+'</div></div><p class="record-detail">'+br(f.note)+'</p>'+(f.next?'<p class="record-detail"><strong>Next change</strong> '+br(f.next)+'</p>':'')+(f.evidence?'<p class="record-detail"><strong>Evidence</strong> '+br(f.evidence)+'</p>':'')+'</article>').join('')+'</div>':emptyCard('No feedback recorded yet','Use the next returned task or teacher conversation to log one change you can test.'));
+  return pageHead('','Teacher feedback','',button('+ Feedback note','edit-feedback','','primary'))+
+    section('Feedback','',data.feedback.length?'<div class="record-list">'+dated(data.feedback).reverse().map(f=>'<article class="record"><div class="record-head"><div><div class="line">'+subject(f.course)+badge(f.status,f.status==='Applied'?'green':'neutral')+'</div><h3>'+h(f.title)+'</h3><p>'+h(pretty(f.date))+(f.context?' · '+h(f.context):'')+'</p></div><div class="line">'+button('Plan action','plan-feedback',f.id)+button('Edit','edit-feedback',f.id)+'</div></div><p class="record-detail">'+br(f.note)+'</p>'+(f.next?'<p class="record-detail"><strong>Next change</strong> '+br(f.next)+'</p>':'')+(f.evidence?'<p class="record-detail"><strong>Evidence</strong> '+br(f.evidence)+'</p>':'')+'</article>').join('')+'</div>':emptyCard('No feedback yet','Log it when a marked task comes back.'));
 }
 function reviews() {
   const tasks=weekTasks();
@@ -508,15 +508,15 @@ function reviews() {
   const open=tasks.filter(taskOpen);
   const review=weekData().review;
   const history=Object.entries(data.weeks).filter(([key,w])=>key!==week&&w.review).sort(([a],[b])=>b.localeCompare(a));
-  return pageHead('','Weekly reviews','Use evidence from the week to decide what to protect, repair and carry forward.',button(review?'Edit review':'+ Write review','edit-review','','primary'))+
+  return pageHead('','Weekly reviews','',button(review?'Edit review':'+ Write review','edit-review','','primary'))+
     '<div class="toolbar">'+weekPicker()+'</div><div class="metrics">'+
     metric('Blocks finished',done.length,open.length+' still open')+
     metric('Time completed',minutes(done.reduce((n,t)=>n+(t.actual!==''?Number(t.actual):t.minutes),0)),'Actual time where logged')+
     metric('Retests passed',data.errors.flatMap(e=>e.attempts||[]).filter(a=>monday(a.date)===week&&a.outcome==='Passed').length,'Fresh attempts this week')+
     metric('Assessments due',data.assessments.filter(a=>a.date&&monday(a.date)===week).length,'School tasks and Trials')+'</div>'+
-    section('This week’s review',weekLabel(),review?'<div class="review-notes">'+[['Marks protected',review.win],['What cost marks or time',review.gap],['Adjustment for next week',review.adjust]].map(([label,value])=>'<div><h3>'+h(label)+'</h3><p>'+br(value||'—')+'</p></div>').join('')+'</div>':emptyCard('Ready when you finish the week','Save what moved your marks, what slipped and one realistic change for next week.'))+
-    (open.length?section('Unfinished blocks','Move a block or shrink the remaining work before carrying it forward.','<div class="record-list">'+open.map(t=>'<div class="record compact"><div><strong>'+h(t.title)+'</strong><p>'+h(pretty(t.date))+' · '+minutes(t.minutes)+'</p></div>'+button('Triage','carry-task',t.id)+'</div>').join('')+'</div>'):'')+
-    section('Past reviews','Reopen a week to see its notes and completed work.',history.length?'<div class="record-list">'+history.map(([key,w])=>'<div class="record compact"><div><strong>'+h(pretty(key,{day:'numeric',month:'short',year:'numeric'}))+'</strong><p>'+h(w.review.adjust||w.review.win)+'</p></div>'+button('Open week','open-week',key)+'</div>').join('')+'</div>':emptyCard('No earlier reviews','Saved reviews build a history across the year.'));
+    section('This week’s review',weekLabel(),review?'<div class="review-notes">'+[['Marks protected',review.win],['What cost marks or time',review.gap],['Adjustment for next week',review.adjust]].map(([label,value])=>'<div><h3>'+h(label)+'</h3><p>'+br(value||'—')+'</p></div>').join('')+'</div>':emptyCard('Not written yet','Write it at the end of the week.'))+
+    (open.length?section('Unfinished','','<div class="record-list">'+open.map(t=>'<div class="record compact"><div><strong>'+h(t.title)+'</strong><p>'+h(pretty(t.date))+' · '+minutes(t.minutes)+'</p></div>'+button('Triage','carry-task',t.id)+'</div>').join('')+'</div>'):'')+
+    section('Past reviews','',history.length?'<div class="record-list">'+history.map(([key,w])=>'<div class="record compact"><div><strong>'+h(pretty(key,{day:'numeric',month:'short',year:'numeric'}))+'</strong><p>'+h(w.review.adjust||w.review.win)+'</p></div>'+button('Open week','open-week',key)+'</div>').join('')+'</div>':emptyCard('No earlier reviews','Saved reviews are listed here.'));
 }
 function routeLabel(r) {
   if (r.name==='list') return course(r.arg)?.name ?? data.lists.find(l=>l.id===r.arg)?.name ?? 'List';
@@ -546,6 +546,7 @@ function render() {
   document.querySelector('.panes').classList.toggle('with-detail',!!selected);
   if (r.name!=='search' && document.activeElement!==$('search')) $('search').value='';
   if (focusKey) document.querySelector(focusKey)?.focus();
+  renderFull();
   updateTimerDom();
 }
 document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();main.focus();});
@@ -767,13 +768,13 @@ function previewChips(text) {
   if (!text.trim()) return '';
   const p=parseQuickAdd(text,parseCtx());
   const chips=[];
-  if (p.date) chips.push(['date','📅 '+pretty(p.date,{weekday:'short',day:'numeric',month:'short'})]);
-  if (p.time) chips.push(['time','🕓 '+p.time]);
+  if (p.date) chips.push(['date',pretty(p.date,{weekday:'short',day:'numeric',month:'short'})]);
+  if (p.time) chips.push(['time',p.time]);
   if (p.course) chips.push(['course',course(p.course).short]);
-  if (p.list) chips.push(['list','▸ '+customList(p.list).name]);
+  if (p.list) chips.push(['list',customList(p.list).name]);
   if (p.priority) chips.push(['priority','! '+PRI[p.priority][1]]);
-  if (p.minutes) chips.push(['duration','⏱ '+minutes(p.minutes)]);
-  if (p.repeat) chips.push(['repeat','↻ '+repeatLabels[p.repeat]]);
+  if (p.minutes) chips.push(['duration',minutes(p.minutes)]);
+  if (p.repeat) chips.push(['repeat',repeatLabels[p.repeat]]);
   p.tags.forEach(g=>chips.push(['tag','#'+g]));
   return chips.length ? '<span class="pv-title">'+h(p.title)+'</span>'+chips.map(([k,v])=>'<span class="pv pv-'+k+'">'+h(v)+'</span>').join('') : '';
 }
@@ -1027,7 +1028,75 @@ function sessionForm(s, title, submit, onDiscard) {
       if (!s.id) { resetTimer({phase:'focus'}); notify('Logged '+minutes(mins)+(course(next.course)?' of '+course(next.course).short:'')+'.'); render(); }
     },onDiscard);
 }
+// ───────────────────────── Full-screen timer ─────────────────────────
+// An overlay outside <main>, so re-renders of the page underneath never touch it.
+// It asks the browser for real full screen where allowed (not on iPhone Safari,
+// where the overlay simply fills the window) and keeps the screen awake.
+let fullTimer = false, wakeLock = null, chromeHidden = false, chromeTimer;
+const fsEl = () => $('fs-timer');
+async function keepAwake() {
+  try { if ('wakeLock' in navigator && !wakeLock && document.visibilityState==='visible') { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{ wakeLock=null; }); } } catch {}
+}
+function openFull() {
+  fullTimer = true; chromeHidden = false;
+  renderFull();
+  const el = fsEl();
+  if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen({navigationUI:'hide'}).catch(()=>{});
+  else if (el.webkitRequestFullscreen) { try { el.webkitRequestFullscreen(); } catch {} }
+  keepAwake();
+  el.focus();
+  idleChrome();
+}
+function closeFull() {
+  if (!fullTimer) return;
+  fullTimer = false;
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  else if (document.webkitFullscreenElement) { try { document.webkitExitFullscreen(); } catch {} }
+  try { wakeLock?.release(); } catch {}
+  wakeLock = null;
+  clearTimeout(chromeTimer);
+  renderFull();
+}
+// Controls fade after a few seconds of no movement while the timer runs.
+function idleChrome() {
+  clearTimeout(chromeTimer);
+  if (chromeHidden) { chromeHidden=false; fsEl().classList.remove('calm'); }
+  chromeTimer = setTimeout(()=>{ if (fullTimer && timer.running) { chromeHidden=true; fsEl().classList.add('calm'); } },4000);
+}
+function renderFull() {
+  const el = fsEl();
+  if (!el) return;
+  el.hidden = !fullTimer;
+  if (!fullTimer) { el.innerHTML=''; return; }
+  const onBreak = timer.phase!=='focus', active = sessionActive(), secs = shownSecs();
+  const c = course(timer.course), t = row('tasks',timer.taskId);
+  const s = studyStats(), goal = studyGoal();
+  const controls = timer.running
+    ? button('Pause','timer-pause','','secondary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','primary'))
+    : active ? button('Resume','timer-start','','primary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','secondary'))
+    : onBreak ? button('Start '+phaseName[timer.phase].toLowerCase(),'timer-start','','primary')+button('Skip break','timer-skip','','text')
+    : button('Start studying','timer-start','','primary');
+  el.dataset.phase = timer.phase;
+  el.classList.toggle('running', timer.running);
+  el.style.setProperty('--c', onBreak ? 'var(--sky)' : c?.colour ?? 'var(--biro)');
+  el.innerHTML = '<div class="fs-top"><span class="fs-state">'+(timer.running?'<i></i>':'')+h(onBreak?phaseName[timer.phase]:timer.running?'Studying':active?'Paused':'Ready')+'</span>'+
+      '<button type="button" class="fs-exit" data-action="timer-full-exit" aria-label="Exit full screen" title="Exit (Esc)">'+icon('close')+'</button></div>'+
+    '<div class="fs-centre">'+
+      (onBreak?'<p class="fs-what">Stand up, look away from the screen, drink some water.</p>'
+        :'<p class="fs-what"><span class="fs-subject"><i></i>'+h(c?.short??'General')+'</span>'+(t?'<span class="fs-task">'+h(t.title)+'</span>':'')+'</p>')+
+      '<div id="fs-text" class="fs-clock" role="timer" aria-live="off">'+clock(secs)+'</div>'+
+      (countsUp()?'<p class="fs-sub">'+(active&&timer.startedAt?'Started '+hhmm(timer.startedAt):'Counts up until you finish')+'</p>'
+        :'<div class="fs-bar"><i id="fs-bar" style="width:'+(100*(1-secs/phaseSecs(timer.phase)))+'%"></i></div><p class="fs-sub">'+(onBreak?'Round '+((timer.cycle||0)%pomo().every||pomo().every)+' of '+pomo().every+' done':'Round '+((timer.cycle||0)%pomo().every+1)+' of '+pomo().every+' · '+pomo().focus+' min')+'</p>')+
+      '<div class="fs-buttons">'+controls+'</div>'+
+    '</div>'+
+    '<div class="fs-foot"><span><b>'+minutes(s.today)+'</b> of '+minutes(goal)+' today</span><span><kbd>Space</kbd> start or pause · <kbd>Esc</kbd> exit</span></div>';
+}
+document.addEventListener('fullscreenchange',()=>{ if (!document.fullscreenElement && fullTimer) closeFull(); });
+document.addEventListener('visibilitychange',()=>{ if (fullTimer && document.visibilityState==='visible') keepAwake(); });
+document.addEventListener('pointermove',()=>{ if (fullTimer) idleChrome(); });
+
 function finishSession() {
+  closeFull();   // the finish form is a dialog; leave full screen so it can show
   pauseTimer();
   const secs=timer.phase==='focus'?elapsedSecs():0;
   const mins=Math.max(1,Math.round(secs/60)), startMs=timer.startedAt??Date.now()-secs*1000;
@@ -1046,9 +1115,11 @@ function updateTimerDom() {
   const secs=shownSecs();
   const text=$('timer-text'); if (text) text.textContent=clock(secs);
   const bar=$('timer-bar'); if (bar) bar.style.width=(countsUp()?0:100*(1-secs/phaseSecs(timer.phase)))+'%';
+  const fsText=$('fs-text'); if (fsText) fsText.textContent=clock(secs);
+  const fsBar=$('fs-bar'); if (fsBar) fsBar.style.width=(100*(1-secs/phaseSecs(timer.phase)))+'%';
   const mini=$('mini-timer');
   if (mini) {
-    mini.hidden=!sessionActive();
+    mini.hidden=!sessionActive() || route().name==='focus';
     const who=timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase];
     mini.textContent=(timer.running?'● ':'❚❚ ')+who+' '+clock(secs);
     mini.dataset.phase=timer.phase;
@@ -1091,41 +1162,46 @@ function studyLog() {
     }).join('')+'</section>';
   }).join('')+(dates.length>logDays?'<button type="button" class="button text log-more" data-action="log-more">Show older days ('+(dates.length-logDays)+')</button>':'');
 }
+const focusLengths = [25,45,60,90];
 function focusPage() {
   const s=studyStats(), secs=shownSecs(), active=sessionActive(), onBreak=timer.phase!=='focus';
   const open=sortTasks(data.tasks.filter(taskOpen));
   const goal=studyGoal(), pct=Math.min(100,s.today/goal*100);
-  const chips=[['','General','#8b94a1'],...courses.map(c=>[c.id,c.short,c.colour])].map(([id,label,col])=>
-    '<button type="button" class="subj-chip" style="--c:'+col+'" aria-pressed="'+((timer.course||'')===id)+'" data-action="study-course" data-id="'+id+'"><i></i>'+h(label)+'</button>').join('');
+  const c=course(timer.course);
+  const subjects=[['','General','#8b94a1'],...courses.map(x=>[x.id,x.short,x.colour])].map(([id,label,col])=>
+    '<button type="button" class="subj" style="--c:'+col+'" aria-pressed="'+((timer.course||'')===id)+'" data-action="study-course" data-id="'+id+'"><i></i>'+h(label)+'</button>').join('');
   const controls = timer.running
-    ? button('Pause','timer-pause','','secondary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','primary'))
+    ? button('Pause','timer-pause','','primary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','secondary'))
     : active
       ? button('Resume','timer-start','','primary')+(onBreak?button('Skip break','timer-skip','','text'):button('Finish','timer-finish','','secondary'))
       : onBreak ? button('Start '+phaseName[timer.phase].toLowerCase(),'timer-start','','primary')+button('Skip break','timer-skip','','text')
-      : button('Start studying','timer-start','','primary');
+      : button('Start','timer-start','','primary');
+  const state = timer.running ? (onBreak?'On a break':'Studying') : active ? 'Paused' : onBreak ? phaseName[timer.phase] : 'Ready';
+  const info = onBreak ? 'Round '+((timer.cycle||0)%pomo().every||pomo().every)+' of '+pomo().every+' done'
+    : timer.mode==='timed' ? 'Round '+((timer.cycle||0)%pomo().every+1)+' of '+pomo().every
+    : active ? 'Started '+hhmm(timer.startedAt) : 'Counts up until you finish';
+  const lengths = timer.mode==='timed' && !active && !onBreak
+    ? '<span class="lengths" role="group" aria-label="Round length">'+[...new Set([...focusLengths,pomo().focus])].sort((a,b)=>a-b).map(m=>'<button type="button" aria-pressed="'+(pomo().focus===m)+'" data-action="focus-length" data-id="'+m+'">'+m+'</button>').join('')+'<small>min</small></span>' : '';
   return '<div class="list-head"><div><h1>Study</h1></div><div class="list-stats">'+button('Timer settings','settings','','text')+'</div></div>'+
-    '<div class="study-top">'+
-    '<section class="card session'+(timer.running?' running':'')+(onBreak?' break':'')+'">'+
-      '<div class="session-mode">'+tabGroup('Timer type','study-mode',timer.mode,[['open','Open'],['timed','Timed · '+pomo().focus+'m']])+
-        '<span class="session-state">'+(timer.running?'<i></i>'+(onBreak?'On a break':'Studying'):active?'Paused':onBreak?'Break':'Ready')+'</span></div>'+
-      (onBreak?'':'<div class="subj-chips" role="group" aria-label="Subject">'+chips+'</div>'+
-        '<label class="session-task"><span>Task</span><select data-timer-task><option value="">No task, just the subject</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+'</option>').join('')+'</select></label>')+
-      '<div class="session-clock"><span id="timer-text" class="timer-text" role="timer" aria-live="off">'+clock(secs)+'</span>'+
-        '<small>'+(onBreak?phaseName[timer.phase]+' · round '+((timer.cycle||0)%pomo().every||pomo().every)+' of '+pomo().every+' done'
-          :timer.mode==='timed'?'Round '+((timer.cycle||0)%pomo().every+1)+' of '+pomo().every+' · counts down from '+pomo().focus+'m'
-          :active?'Started '+hhmm(timer.startedAt):'Counts up until you finish')+'</small>'+
-        (countsUp()?'':'<div class="session-bar"><i id="timer-bar" style="width:'+(100*(1-secs/phaseSecs(timer.phase)))+'%"></i></div>')+'</div>'+
-      '<div class="session-buttons">'+controls+'</div>'+
-      '<p class="session-hint"><kbd>s</kbd> start or pause</p>'+
+    '<section class="timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'var(--ink)')+'">'+
+      (onBreak?'<p class="timer-break">Stand up, look away from the screen, drink some water.</p>'
+        :'<div class="subjects" role="group" aria-label="Subject">'+subjects+'</div>'+
+         '<label class="timer-task"><span class="sr">Task</span><select data-timer-task><option value="">No task, just the subject</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+'</option>').join('')+'</select></label>')+
+      '<div id="timer-text" class="timer-clock" role="timer" aria-live="off">'+clock(secs)+'</div>'+
+      (countsUp()?'':'<div class="timer-bar"><i id="timer-bar" style="width:'+(100*(1-secs/phaseSecs(timer.phase)))+'%"></i></div>')+
+      '<p class="timer-meta"><span class="timer-state">'+(timer.running?'<i></i>':'')+h(state)+'</span><span>'+h(info)+'</span></p>'+
+      '<div class="timer-row"><div class="timer-buttons">'+controls+'</div>'+
+        '<div class="timer-opts"><span class="modes" role="group" aria-label="Timer type">'+[['open','Open'],['timed','Timed']].map(([k,l])=>'<button type="button" aria-pressed="'+(timer.mode===k)+'" data-action="study-mode" data-id="'+k+'">'+l+'</button>').join('')+'</span>'+lengths+
+        '<button type="button" class="full-btn" data-action="timer-full" title="Full screen (f)" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div></div>'+
+      '<p class="timer-keys"><kbd>s</kbd> start / pause &nbsp; <kbd>f</kbd> full screen</p>'+
     '</section>'+
-    '<div class="study-side">'+
-      '<section class="card goal"><div class="goal-head"><div><span>Today</span><strong>'+minutes(s.today)+'</strong></div><div class="goal-of">of '+minutes(goal)+' goal'+(s.today>=goal?' · done':'')+'</div></div>'+
-        '<div class="goal-bar"><i style="width:'+pct+'%"></i></div>'+
-        '<div class="goal-facts"><span><b>'+s.streak+'</b> day streak</span><span><b>'+minutes(s.week)+'</b> this week</span><span><b>'+s.todayCount+'</b> session'+(s.todayCount===1?'':'s')+' today</span></div></section>'+
+    '<div class="today-line"><div><span>Today</span><strong>'+minutes(s.today)+'</strong><small>of '+minutes(goal)+(s.today>=goal?', goal met':'')+'</small></div><div class="goal-bar"><i style="width:'+pct+'%"></i></div>'+
+      '<p><span><b>'+s.streak+'</b> day streak</span><span><b>'+minutes(s.week)+'</b> this week</span><span><b>'+s.todayCount+'</b> session'+(s.todayCount===1?'':'s')+' today</span></p></div>'+
+    '<div class="study-grid">'+
       section('This week','','<div class="bars">'+s.days.map(([d,m])=>'<div class="bar-col'+(d===today()?' today':'')+(m>=goal?' hit':'')+'"><i style="height:'+(m/s.dmax*100)+'%"></i><span>'+pretty(d,{weekday:'narrow'})+'</span><small>'+(m?minutes(m):'')+'</small></div>').join('')+'</div>')+
-      (s.bySubject.length?section('By subject','This week',s.bySubject.map(([c,m])=>'<div class="hbar"><span>'+h(c.short)+'</span><div><i style="width:'+(m/s.max*100)+'%;background:'+c.colour+'"></i></div><b>'+minutes(m)+'</b></div>').join('')):'')+
-    '</div></div>'+
-    '<section class="study-log"><div class="log-head"><h2>Study log</h2>'+button('+ Log a past session','log-past','','secondary')+'</div>'+studyLog()+'</section>';
+      section('By subject','This week',s.bySubject.length?s.bySubject.map(([x,m])=>'<div class="hbar"><span>'+h(x.short)+'</span><div><i style="width:'+(m/s.max*100)+'%;background:'+x.colour+'"></i></div><b>'+minutes(m)+'</b></div>').join(''):'<p class="note">Nothing logged this week yet.</p>')+
+    '</div>'+
+    '<section class="study-log"><div class="log-head"><h2>Log</h2>'+button('+ Log a past session','log-past','','text')+'</div>'+studyLog()+'</section>';
 }
 
 // ───────────────────────── Habits ─────────────────────────
@@ -1155,7 +1231,7 @@ function habitsPage() {
       data.habits.map(hb=>'<div class="habit-row"><button type="button" class="habit-name" data-action="habit-open" data-id="'+h(hb.id)+'">'+(course(hb.course)?'<i class="dot" style="--c:'+course(hb.course).colour+'"></i>':'')+'<strong>'+h(hb.name)+'</strong><small>'+(hb.days&&hb.days.includes(false)?dayNames.filter((_,i)=>hb.days[i]).join(' '):'Every day')+' · '+habitRate(hb)+'% last 30 days</small></button>'+
         days.map(d=>scheduled(hb,d)?'<button type="button" class="hcheck'+(habitDone(hb,d)?' on':'')+'" data-action="habit-toggle" data-id="'+h(hb.id)+'" data-date="'+d+'" aria-pressed="'+habitDone(hb,d)+'" aria-label="'+h(hb.name)+' on '+h(pretty(d))+'">'+(habitDone(hb,d)?'✓':'')+'</button>':'<span class="hrest" title="Rest day">·</span>').join('')+
         '<span class="streak"><b>'+streak(hb)+'</b> day'+(streak(hb)===1?'':'s')+'</span></div>'+(habitOpen===hb.id?habitDetail(hb):'')).join('')+'</div>'
-      :'<div class="zero"><strong>Build the routines that hold your marks up</strong><p>Tick a habit off each day and keep the streak going. Start with one of these:</p><div class="line wrap">'+habitSuggestions.map(([n,c])=>button('+ '+n,'habit-suggest',n+'|'+c)).join('')+'</div></div>');
+      :'<div class="zero"><strong>No habits yet</strong><p>Start with one of these, or add your own.</p><div class="line wrap">'+habitSuggestions.map(([n,c])=>button('+ '+n,'habit-suggest',n+'|'+c)).join('')+'</div></div>');
 }
 function habitDetail(hb) {
   const end=addDays(monday(today()),6), start=addDays(end,-7*16+1);
@@ -1215,7 +1291,7 @@ function dashPage() {
   const rows=subjectBalance(), maxMonth=Math.max(1,...rows.map(r=>r.month));
   const hasRecords=data.tasks.length||data.assessments.length||data.focus.length||data.papers.length;
   const staleBackup=localMode&&hasRecords&&(!set.lastExport||daysFrom(t0,set.lastExport)>=7);
-  return '<div class="list-head"><div><div class="eyebrow">'+h(pretty(t0,{weekday:'long',day:'numeric',month:'long'}))+'</div><h1>Overview</h1></div><div class="list-stats">'+button('Set exam dates','settings','','text')+button('▶ Study','go-study','','primary')+'</div></div>'+
+  return '<div class="list-head"><div><div class="eyebrow">'+h(pretty(t0,{weekday:'long',day:'numeric',month:'long'}))+'</div><h1>Overview</h1></div><div class="list-stats">'+button('Exam dates','settings','','text')+button('Start studying','go-study','','primary')+'</div></div>'+
     (staleBackup?'<div class="banner"><div><strong>'+(set.lastExport?'Last backup was '+daysFrom(t0,set.lastExport)+' days ago':'You have not exported a backup yet')+'</strong><span>Your records live only in this browser. Clearing site data or losing the device would lose them.</span></div>'+button('Export backup','export','','primary')+'</div>':'')+
     '<div class="metrics">'+
       (next?metric('Next assessment',daysFrom(next.date,t0)===0?'Today':daysFrom(next.date,t0)+'d',next.title+(next.weight!==''?' · '+next.weight+'%':''),daysFrom(next.date,t0)<=7?'alert':''):metric('Next assessment','—','None logged'))+
@@ -1224,20 +1300,20 @@ function dashPage() {
       metric('Studied this week',minutes(s.week),(s.streak?s.streak+' day streak · ':'')+'goal '+minutes(goal*7),s.week>=goal*7?'accent':'')+
     '</div>'+
     '<div class="dash-grid">'+
-      section('Today',todays.length?todays.length+' open'+(overdue.length?' · '+overdue.length+' overdue':''):'Nothing due',
-        (todays.length?todays.slice(0,6).map(t=>stackRow(t,true)).join('')+(todays.length>6?'<a class="subtle-link more-link" href="#today">'+(todays.length-6)+' more →</a>':''):emptyCard('Clear for today','Add a task, or pick a topic that is due for review.'))+quickAdd('Today',{date:t0},true),
+      section('Today',todays.length?todays.length+' open'+(overdue.length?' · '+overdue.length+' overdue':''):'',
+        (todays.length?todays.slice(0,6).map(t=>stackRow(t,true)).join('')+(todays.length>6?'<a class="subtle-link more-link" href="#today">'+(todays.length-6)+' more →</a>':''):emptyCard('Nothing due today','Add a task below.'))+quickAdd('Today',{date:t0},true),
         '<a class="subtle-link" href="#today">Today →</a>')+
-      section('Due for review',due.length?due.length+' topic'+(due.length===1?'':'s')+' ready to recall':'Spaced review keeps topics from fading',
-        due.length?reviewList(due.slice(0,6))+(due.length>6?'<a class="subtle-link more-link" href="#topics">'+(due.length-6)+' more →</a>':''):emptyCard('No reviews due','Press Review on any syllabus topic after you study it. It comes back here when it is due.','<a class="button secondary" href="#topics">Open syllabus</a>'),
+      section('Due for review',due.length?String(due.length):'',
+        due.length?reviewList(due.slice(0,6))+(due.length>6?'<a class="subtle-link more-link" href="#topics">'+(due.length-6)+' more →</a>':''):emptyCard('No reviews due','Press Review on a syllabus topic after you study it.','<a class="button secondary" href="#topics">Open syllabus</a>'),
         '<a class="subtle-link" href="#topics">Syllabus →</a>')+
-      section('Fix before it costs marks',retestsDue.length+newFeedback.length?'Retests due this week and feedback not yet acted on':'Nothing waiting',
+      section('Retests and feedback','',
         (retestsDue.length||newFeedback.length?'<div class="focus-list">'+
           retestsDue.slice(0,5).map(e=>'<div class="focus-row"><div><div class="line">'+subject(e.course)+badge(e.retest<t0?'Overdue':'Retest','gold')+'</div><strong>'+h(e.title)+'</strong><small>'+h(dueLabel({date:e.retest}))+'</small></div>'+button('Record','retest',e.id,'text')+'</div>').join('')+
           newFeedback.slice(0,3).map(f=>'<div class="focus-row"><div><div class="line">'+subject(f.course)+badge('Feedback')+'</div><strong>'+h(f.title)+'</strong><small>'+h(f.next||'No change planned yet')+'</small></div>'+button('Plan','plan-feedback',f.id,'text')+'</div>').join('')+'</div>'
-          :emptyCard('All clear','Errors you log and teacher feedback you record show here when they need action.')),
+          :emptyCard('Nothing waiting','Logged errors and new feedback show here.')),
         '<a class="subtle-link" href="#practice">Errors →</a>')+
     '</div>'+
-    section('Subject balance','Study time, syllabus coverage and practice by course. A course is flagged when it got no study this week but has an assessment within 3 weeks or reviews due.',
+    section('Subjects','Flagged when a course had no study in 7 days but has an assessment within 3 weeks or reviews due.',
       '<div class="table-scroll"><table class="balance"><thead><tr><th>Course</th><th>Last 7 days</th><th>Last 28 days</th><th>Syllabus practised</th><th>Reviews due</th><th>Open errors</th><th>Past papers</th><th>Next assessment</th></tr></thead><tbody>'+
       rows.map(r=>'<tr'+(r.flag?' class="flag"':'')+'><th scope="row"><a href="#list/'+r.c.id+'">'+subject(r.c.id)+'</a>'+(r.flag?' '+badge('Needs time','alert'):'')+'</th>'+
         '<td>'+(r.week?minutes(r.week):'—')+'</td>'+
@@ -1271,9 +1347,9 @@ function papersPage() {
     return '<section class="card paper-card" style="--c:'+c.colour+'"><div class="line">'+subject(c.id)+'<span class="note">'+list.length+' marked</span></div><div class="paper-nums"><div><span>Latest</span><strong>'+percent(last)+'</strong></div><div><span>Average</span><strong>'+percent(avg)+'</strong></div><div><span>Best</span><strong>'+percent(Math.max(...pcts))+'</strong></div></div>'+spark(pcts.slice(-12))+
       (trend!=null?'<small class="trend '+(trend>=0?'up':'down')+'">'+(trend>=0?'▲ ':'▼ ')+Math.abs(trend).toFixed(1)+' points, last 3 vs previous 3</small>':'<small class="trend">Trend shows after 4 marked papers</small>')+'</section>';
   }).join('');
-  return pageHead('','Past papers','Sit full papers under exam conditions, mark them honestly, and turn every lost mark into an error to repair.',button('+ Log paper','edit-paper','','primary'))+
+  return pageHead('','Past papers','',button('+ Log paper','edit-paper','','primary'))+
     (cards?'<div class="paper-grid">'+cards+'</div>':'')+
-    section('Paper log','Newest first. Time used is compared with the time allowed.',
+    section('Log','',
       tabGroup('Course','paper-filter',paperFilter,[['all','All'],...courses.map(c=>[c.id,c.short])])+
       (shown.length?'<div class="record-list">'+shown.map(p=>{
         const pct=paperPct(p), over=p.minutes&&p.limit&&Number(p.minutes)>Number(p.limit);
@@ -1381,7 +1457,10 @@ function stackActions(id, el) {
     'timer-start':()=>{startTimer();render();},
     'timer-pause':()=>{pauseTimer();render();},
     'timer-finish':finishSession,
+    'timer-full':openFull,
+    'timer-full-exit':closeFull,
     'timer-skip':()=>{resetTimer({phase:'focus'});render();},
+    'focus-length':()=>{ if (sessionActive()) { notify('Finish this round to change its length.'); return; } change(()=>{ data.settings.pomo={...pomo(),focus:Number(id)}; }); },
     'study-mode':()=>{ if (sessionActive()) { notify('Finish or discard this session to switch timer type.'); return; } resetTimer({mode:id,phase:'focus',cycle:0}); render(); },
     'study-course':()=>{ timer.course=id; const t=row('tasks',timer.taskId); if (t&&(t.course||'')!==id) timer.taskId=null; storeTimer(); render(); },
     'edit-session':()=>{ const s=row('focus',id); if (s) editSession(s); },
@@ -1457,6 +1536,14 @@ document.addEventListener('keydown',event=>{
     return;
   }
   if (el.classList?.contains('detail-title') && event.key==='Enter') { event.preventDefault(); el.blur(); return; }
+  if (fullTimer && !dialog.open) {
+    if (event.key==='Escape') { event.preventDefault(); closeFull(); return; }
+    if (event.key===' ' || event.key==='s') { event.preventDefault(); idleChrome(); toggleTimer(); return; }
+    if (event.key==='f') { event.preventDefault(); closeFull(); return; }
+    idleChrome();
+    return;
+  }
+  if (event.key==='f' && data && !el.closest('input,textarea,select,[contenteditable]') && !event.metaKey && !event.ctrlKey && !event.altKey && !dialog.open) { event.preventDefault(); openFull(); return; }
   if (event.key==='Escape' && !dialog.open) {
     if (document.body.classList.contains('nav-open')) { document.body.classList.remove('nav-open'); return; }
     if (selected) { selected=null; render(); return; }

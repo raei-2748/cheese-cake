@@ -23,6 +23,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Stamp file URLs with the commit so browsers fetch the new version after each deploy
+      - run: sed -i "s/__V__/${GITHUB_SHA::7}/g" ui/index.html ui/app.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ui

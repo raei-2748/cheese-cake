@@ -30,7 +30,9 @@ A TickTick-style study system for the HSC, built around Year 12 school assessmen
 - **Syllabus & spaced review:** press **Review** on any syllabus topic after recalling it from memory, then rate it Again / Hard / Good / Easy. The next review is set from that rating, from 1 day up to 60. Topics that are due show on the Overview and at the top of the syllabus page.
 - **Past papers:** log each paper with its mark, time used and time allowed, and where you lost marks. Each course shows its latest, average and best score with a trend line. **Log error** turns a lost mark into an error-log entry with a retest date.
 
-**Keyboard:** `s` start or pause studying · `q` quick add · `/` search · `Esc` close details.
+**Full-screen timer:** press **Full screen** on the Study page (or `f`). It shows a large clock with the subject, task and round, keeps the screen awake, and fades the controls after a few seconds while the timer runs. `Space` starts or pauses, `Esc` exits. On iPhone it fills the browser window, because Safari there does not allow true full screen.
+
+**Keyboard:** `s` start or pause studying · `f` full-screen timer · `q` quick add · `/` search · `Esc` close details.
 
 ## Data and sync
 

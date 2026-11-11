@@ -14,18 +14,6 @@ themeButton.addEventListener('click', () => {
 });
 showTheme();
 
-// Page-change animations run only on navigation, not on every re-render.
-let routeTimer;
-const enterRoute = () => {
-  root.classList.remove('route-in');
-  void root.offsetWidth;
-  root.classList.add('route-in');
-  clearTimeout(routeTimer);
-  routeTimer = setTimeout(() => root.classList.remove('route-in'), 700);
-};
-addEventListener('hashchange', enterRoute);
-enterRoute();
-
 // Ticking a task or habit pops the new checkmark once.
 document.addEventListener('click', event => {
   const el = event.target.closest('[data-action=toggle-task],[data-action=habit-toggle]');
