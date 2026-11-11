@@ -77,7 +77,8 @@ function normalise(d) {
   }
   for (const k of Object.keys(base)) if (Array.isArray(out[k])) out[k]=out[k].filter(x=>x && typeof x==='object');
   out.tasks.forEach(t=>{ if (!t.id) t.id=uid(); if (typeof t.title!=='string') t.title=String(t.title??'Untitled'); });
-  out.tasks = (out.tasks||[]).map(t=>({priority:0, tags:[], subtasks:[], time:'', repeat:'', list:'', completedAt:null, ...t, minutes:Number(t.minutes)||0}));
+  out.tasks = (out.tasks||[]).map(t=>({priority:0, tags:[], subtasks:[], time:'', repeat:'', list:'', completedAt:null, ...t, minutes:Number(t.minutes)||0, actual:(t.actual==null||Number.isNaN(Number(t.actual)))?'':t.actual}));
+  out.focus = out.focus.filter(f=>Number.isFinite(Number(f.minutes))).map(f=>({...f,minutes:Number(f.minutes)}));
   return out;
 }
 let data, revision, saving = false, dirty = false, conflict = false, saveTimer, toastTimer;
@@ -379,6 +380,8 @@ const retests = () => data.errors.filter(e=>e.stage!=='Passed' && e.retest && e.
 const carry = () => data.tasks.filter(t=>t.date && t.date<week && !['Done','Dropped'].includes(t.status));
 const taskDone = t => t.status==='Done';
 const taskOpen = t => !['Done','Dropped'].includes(t.status);
+// Minutes a finished task took: the logged actual time if there is one, else the estimate.
+const spentMins = t => { const a=Number(t.actual); return t.actual!==''&&t.actual!=null&&Number.isFinite(a) ? a : (Number(t.minutes)||0); };
 function capacity() {
   const setup = weekData();
   const factor = {Low:0.65,Steady:0.85,High:1}[setup.energy];
@@ -390,7 +393,7 @@ function capacity() {
     const available = Math.floor(net*factor*(1-setup.reserve/100)/5)*5;
     const tasks = weekTasks().filter(t=>t.date===day);
     const remaining = tasks.filter(taskOpen).reduce((sum,t)=>sum+t.minutes,0);
-    const completed = tasks.filter(taskDone).reduce((sum,t)=>sum+(t.actual!=='' ? Number(t.actual) : t.minutes),0);
+    const completed = tasks.filter(taskDone).reduce((sum,t)=>sum+spentMins(t),0);
     return {day,available,commitments,tasks,remaining,completed};
   });
 }
@@ -548,7 +551,7 @@ function reviews() {
   return pageHead('','Weekly reviews','',button(review?'Edit review':'+ Write review','edit-review','','primary'))+
     '<div class="toolbar">'+weekPicker()+'</div><div class="metrics">'+
     metric('Blocks finished',done.length,open.length+' still open')+
-    metric('Time completed',minutes(done.reduce((n,t)=>n+(t.actual!==''?Number(t.actual):t.minutes),0)),'Actual time where logged')+
+    metric('Time completed',minutes(done.reduce((n,t)=>n+spentMins(t),0)),'Actual time where logged')+
     metric('Retests passed',data.errors.flatMap(e=>e.attempts||[]).filter(a=>monday(a.date)===week&&a.outcome==='Passed').length,'Fresh attempts this week')+
     metric('Assessments due',data.assessments.filter(a=>a.date&&monday(a.date)===week).length,'School tasks and Trials')+'</div>'+
     section('This week’s review',weekLabel(),review?'<div class="review-notes">'+[['Marks protected',review.win],['What cost marks or time',review.gap],['Adjustment for next week',review.adjust]].map(([label,value])=>'<div><h3>'+h(label)+'</h3><p>'+br(value||'—')+'</p></div>').join('')+'</div>':emptyCard('Not written yet','Write it at the end of the week.'))+
@@ -1751,11 +1754,11 @@ function dashPage() {
       countdown('HSC exams',set.hscStart,'Set the first exam date')+
       metric('Studied this week',minutes(s.week),(s.streak?s.streak+' day streak · ':'')+'goal '+minutes(goal*7),s.week>=goal*7?'accent':'')+
     '</div>'+
-    '<div class="dash-today">'+
+    '<div class="dash-board"><div class="dash-col">'+
       section('Today',todays.length?todays.length+' open'+(overdue.length?' · '+overdue.length+' overdue':''):'',
         (todays.length?todays.slice(0,6).map(t=>stackRow(t,true)).join('')+(todays.length>6?'<a class="subtle-link more-link" href="#today">'+(todays.length-6)+' more →</a>':''):emptyCard('Nothing due today',''))+quickAdd('Today',{date:t0},true),
         '<a class="subtle-link" href="#today">Open →</a>')+
-    '</div><div class="dash-grid">'+
+    '</div><div class="dash-col">'+
       section('Reviews',due.length?String(due.length):'',
         due.length?reviewList(due.slice(0,6))+(due.length>6?'<a class="subtle-link more-link" href="#topics">'+(due.length-6)+' more →</a>':''):emptyCard('No reviews due','Press Review on a syllabus topic after you study it.'),
         '<a class="subtle-link" href="#topics">Syllabus →</a>')+
@@ -1765,7 +1768,7 @@ function dashPage() {
           newFeedback.slice(0,3).map(f=>'<div class="focus-row"><div><div class="line">'+subject(f.course)+badge('Feedback')+'</div><strong>'+h(f.title)+'</strong><small>'+h(f.next||'No change planned yet')+'</small></div>'+button('Plan','plan-feedback',f.id,'text')+'</div>').join('')+'</div>'
           :emptyCard('Nothing waiting','Logged errors and new feedback show here.')),
         '<a class="subtle-link" href="#practice">Errors →</a>')+
-    '</div>'+
+    '</div></div>'+
     section('Subjects','',
       '<div class="table-scroll"><table class="balance"><thead><tr><th>Course</th><th title="Study in the last 7 days">7 days</th><th title="Study in the last 28 days">28 days</th><th title="Syllabus topics practised">Syllabus</th><th title="Reviews due">Reviews</th><th title="Open errors">Errors</th><th title="Past papers">Papers</th><th>Next task</th></tr></thead><tbody>'+
       rows.map(r=>'<tr'+(r.flag?' class="flag"':'')+'><th scope="row"><a href="#list/'+r.c.id+'">'+subject(r.c.id)+'</a>'+(r.flag?' '+badge('Needs time','alert'):'')+'</th>'+
@@ -1823,12 +1826,13 @@ function editPaper(record) {
 }
 
 // ───────────────────────── Sidebar ─────────────────────────
+let navClosed = (()=>{ try { return new Set(JSON.parse(localStorage.getItem('stacky:nav-closed'))||[]); } catch { return new Set(); } })();
 function navHtml(r) {
   const count=fn=>data.tasks.filter(t=>taskOpen(t)&&fn(t)).length;
   const t0=today();
   const cur=(name,arg='')=>r.name===name&&r.arg===arg;
   const link=(href,label,glyph,current,n)=>'<a href="#'+href+'" '+(current?'aria-current="page"':'')+'>'+glyph+'<span>'+h(label)+'</span>'+(n?'<b>'+n+'</b>':'')+'</a>';
-  const sec=(title,body,extra='')=>'<div class="nav-sec"><div class="nav-title"><span>'+title+'</span>'+extra+'</div>'+body+'</div>';
+  const sec=(title,body,extra='')=>{ const shut=navClosed.has(title); return '<div class="nav-sec'+(shut?' closed':'')+'"><div class="nav-title"><button type="button" class="nav-toggle" data-action="nav-toggle" data-id="'+h(title)+'" aria-expanded="'+!shut+'"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 3l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>'+title+'</span></button>'+extra+'</div><div class="nav-body">'+body+'</div></div>'; };
   const counts={today:count(t=>t.date&&t.date<=t0),next7:count(t=>t.date&&t.date<=addDays(t0,6)),inbox:count(t=>!t.course&&!t.list),all:count(()=>true)};
   const tags=allTags();
   const studied=data.focus.filter(f=>f.date===t0).reduce((n,f)=>n+f.minutes,0);
@@ -1837,8 +1841,8 @@ function navHtml(r) {
     sec('Subjects',courses.map(c=>link('list/'+c.id,c.short,'<i class="dot" style="--c:'+c.colour+'"></i>',cur('list',c.id),count(t=>t.course===c.id))).join(''))+
     sec('Lists',data.lists.map(l=>link('list/'+encodeURIComponent(l.id),l.name,'<i class="dot" style="--c:'+(l.colour||'#8e978d')+'"></i>',cur('list',l.id),count(t=>t.list===l.id))).join('')||'<span class="nav-empty">No lists yet</span>','<button type="button" class="nav-add" data-action="edit-list" aria-label="New list">+</button>')+
     (tags.length?sec('Tags',tags.map(g=>link('tag/'+encodeURIComponent(g),g,icon('hash'),cur('tag',g),count(t=>(t.tags||[]).includes(g)))).join('')):'')+
-    sec('Tools',tools.map(([k,n,ic])=>link(k,n,icon(ic),cur(k),0)).join(''))+
-    sec('HSC',views.map(([k,n,ic])=>link(k,n,icon(ic),cur(k),0)).join(''));
+    sec('Plan',[tools[0],views[0],tools[1],tools[2]].map(([k,n,ic])=>link(k,n,icon(ic),cur(k),0)).join(''))+
+    sec('HSC',views.slice(1).map(([k,n,ic])=>link(k,n,icon(ic),cur(k),0)).join(''));
 }
 function editList(l) {
   const swatches=['#416c55','#376c88','#6b5590','#91602d','#9a4f65','#4a7fb0','#c4513d','#5f6a61'];
@@ -1901,6 +1905,7 @@ function stackActions(id, el) {
     'postpone-overdue':()=>change(()=>{ data.tasks.filter(t=>taskOpen(t)&&t.date&&t.date<today()).forEach(t=>{t.date=today();}); }),
     'open-topics':()=>{courseId=id;location.hash='#topics';},
     'edit-list':()=>editList(customList(id)),
+    'nav-toggle':()=>{ navClosed.has(id)?navClosed.delete(id):navClosed.add(id); try { localStorage.setItem('stacky:nav-closed',JSON.stringify([...navClosed])); } catch {} render(); },
     'delete-list':()=>modal('Delete this list?','<p>Its tasks stay and move to the Inbox (or their subject).</p>','Delete list',()=>{change(()=>{data.lists=data.lists.filter(l=>l.id!==id);data.tasks.forEach(t=>{if(t.list===id)t.list='';});});location.hash='#inbox';}),
     'cal-shift':()=>{calAnchor=calMode==='month'?addMonth(calAnchor.slice(0,8)+'01',Number(id)):addDays(calAnchor,calDays()*Number(id));render();},
     'cal-today':()=>{calAnchor=today();calScroll=null;render();},

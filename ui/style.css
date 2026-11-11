@@ -1141,3 +1141,23 @@ table.balance tr.flag th{box-shadow:inset 2px 0 var(--red)}
 }
 .hl-draw #nav a[aria-current] span,.hl-draw .cal-cell.today .cal-num,.hl-draw .wk-day.today strong{animation:hl-draw .34s cubic-bezier(.25,.8,.25,1) both!important}
 @media(prefers-reduced-motion:reduce){.hl-draw #nav a[aria-current] span{animation:none!important}}
+
+/* ═════════════ Layout tidy (12 Nov) — last word on page width, Overview grid, sidebar ═════════════ */
+/* one reading column for every text page, so titles never jump between pages */
+.panes main,.panes main[data-route=focus]{width:min(100%,960px)}
+.panes main[data-route=focus] .timer,.panes main[data-route=focus] .today-line,.panes main[data-route=focus] .study-grid,.panes main[data-route=focus] .study-log{max-width:none}
+/* Overview: today's work on the left, things to follow up on the right */
+.dash-board{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:0 44px;align-items:start;margin-bottom:8px}
+.dash-col>.card{margin-bottom:32px}
+.dash-col>.card:last-child{margin-bottom:24px}
+@media(max-width:900px){.dash-board{grid-template-columns:1fr}}
+/* sidebar: tighter rows, folding sections */
+#nav a{min-height:28px;height:28px;padding:3px 8px}
+.nav-sec{margin-top:10px}
+.nav-title{height:26px;padding:0 4px 0 2px;justify-content:space-between}
+.nav-toggle{display:flex;align-items:center;gap:4px;border:0;background:none;padding:2px 6px 2px 4px;border-radius:5px;font:inherit;font-size:12px;font-weight:500;color:var(--side-title);cursor:pointer}
+.nav-toggle:hover{background:var(--side-hover);color:var(--side-ink)}
+.nav-toggle svg{width:12px;height:12px;transform:rotate(90deg);transition:transform .15s;opacity:.7}
+.nav-sec.closed .nav-toggle svg{transform:none}
+.nav-sec.closed .nav-body{display:none}
+.nav-gap{height:6px}
