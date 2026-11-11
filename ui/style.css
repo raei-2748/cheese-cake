@@ -769,3 +769,6 @@ code,kbd{background:var(--fill-a);border:0;border-radius:4px;padding:.2em .4em;f
 .nav-title{display:flex;align-items:center;height:30px;padding:0 8px;font-size:12px;line-height:16px;font-weight:500;color:var(--side-title)}
 .brand{min-height:32px;padding:0 8px;border-radius:8px;margin:6px 0}
 .rail-link{min-height:30px;padding:4px 8px;border-radius:6px;font-size:14px;line-height:21px}
+
+/* Subjects table fits its column instead of running past the right edge */
+table.balance{min-width:520px;width:100%}
