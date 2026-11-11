@@ -942,3 +942,52 @@ table.balance tr.flag th{box-shadow:inset 2px 0 var(--red)}
 .peek-rule{margin:18px 0 8px}
 /* a selected row is a soft tint, not a solid block */
 .srow.selected{background:color-mix(in srgb,var(--biro) 12%,var(--bg))!important}
+
+/* ═════════════ Stacky's own touch: the highlighter ═════════════ */
+/* Notion's calm layout, with the original yellow highlighter as the one accent. */
+:root{--hl:#ffe94a;--hl-deep:#e6c400;--hl-soft:#fff6b8;--hl-faint:#fffbe0;--hl-ink:#5c4d00;--on-hl:#1f1f1f;--hl-ring:rgba(230,196,0,.45)}
+:root[data-theme=dark]{--hl:#f2dc3a;--hl-deep:#d9c22a;--hl-soft:#3d3714;--hl-faint:#2a2714;--hl-ink:#f5e47a;--on-hl:#1f1f1f;--hl-ring:rgba(242,220,58,.4)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--hl:#f2dc3a;--hl-deep:#d9c22a;--hl-soft:#3d3714;--hl-faint:#2a2714;--hl-ink:#f5e47a;--on-hl:#1f1f1f;--hl-ring:rgba(242,220,58,.4)}}
+::selection{background:var(--hl);color:var(--on-hl)}
+
+/* the marker stroke: slightly slanted ends, sits low behind the text */
+#nav a[aria-current] span,.hl,.cal-cell.today .cal-num,.wk-day.today strong{
+  background:linear-gradient(100deg,transparent .12em,var(--hl) .12em,var(--hl) calc(100% - .2em),transparent calc(100% - .04em)) 0 62%/100% 70% no-repeat!important;
+  -webkit-box-decoration-break:clone;box-decoration-break:clone;padding:0 .22em!important;margin:0 -.22em!important;color:var(--on-hl)!important;border-radius:0!important}
+#nav a[aria-current]{background:transparent;font-weight:500}
+#nav a[aria-current] span{flex:0 1 auto}
+#nav a[aria-current] svg{color:var(--ink)}
+/* calendar today: a highlighted number, not a red dot */
+.cal-cell.today .cal-num,.wk-day.today strong{width:auto!important;height:auto!important;display:inline-block!important;font-weight:600}
+/* page titles get a thin highlighter swash under the last letters */
+.page-head h1,.list-head h1{display:inline;background:linear-gradient(100deg,transparent .1em,var(--hl) .1em,var(--hl) calc(100% - .15em),transparent) 0 92%/100% 28% no-repeat;padding:0 .08em;margin-left:-.08em}
+
+/* main actions are highlighter-yellow with dark text */
+.button.primary,.quick-go{background:var(--hl)!important;border-color:var(--hl)!important;color:var(--on-hl)!important;font-weight:600}
+.button.primary:hover,.quick-go:hover{background:var(--hl-deep)!important;border-color:var(--hl-deep)!important}
+.button.primary:focus-visible{outline:0;box-shadow:0 0 0 3px var(--hl-ring)}
+/* selected task: warm tint with a marker edge (the original look) */
+.srow.selected{background:var(--hl-faint)!important;box-shadow:inset 3px 0 var(--hl-deep)!important}
+/* progress and goals fill with the marker */
+.goal-bar i,.today-line .goal-bar i,.bar-col.today i,.bar-col.hit i{background:var(--hl-deep)!important}
+.bar-col.today span{color:var(--ink);font-weight:600}
+/* done checkboxes: ink tick on the marker */
+.check.on{background:var(--hl)!important;border-color:var(--hl-deep)!important;color:var(--on-hl)!important}
+.sub-row input[type=checkbox]{accent-color:var(--hl-deep)}
+/* the chosen subject, mode and priority read as highlighted words */
+.subj[aria-pressed=true]{background:var(--hl-soft);color:var(--ink)}
+.subj[aria-pressed=true] i{box-shadow:0 0 0 2px var(--hl-soft)}
+.modes button[aria-pressed=true],.lengths button[aria-pressed=true]{background:var(--hl-soft);color:var(--ink)}
+.timer.running .timer-clock{color:var(--ink)}
+.timer.running{background:var(--hl-faint)}
+.tabs button.selected,.tabs button[aria-pressed=true]{background:var(--hl-soft);color:var(--ink)}
+/* brand mark matches the app icon */
+.brand::before{content:none}
+.brand-mark{width:22px;height:22px;flex:none;border-radius:5px}
+/* quieter "saved" status, with a marker dot while syncing */
+.save-status{font-size:12px;color:var(--faint)}
+/* the title swash sits just under the letters so it never covers them in dark mode */
+.page-head h1,.list-head h1{background-position:0 100%;background-size:100% .2em;padding-bottom:.04em}
+:root[data-theme=dark] .page-head h1,:root[data-theme=dark] .list-head h1{background-size:100% .14em}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .page-head h1,:root:not([data-theme=light]) .list-head h1{background-size:100% .14em}}
+.brand-mark{box-shadow:0 0 0 1px var(--line-a)}
