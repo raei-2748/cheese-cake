@@ -721,3 +721,33 @@ a.subtle-link:hover,.crumb-root:hover{color:var(--ink)}
 #nav a,.nav-sec,.nav-title{min-width:0;max-width:100%}
 #nav a span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 #nav a b{flex:none;margin-left:6px}
+
+/* ── Measured from a live Notion page (notion.notion.site, 11 Nov 2026) ── */
+:root{--line-a:rgba(42,28,0,.07);--fill-a:rgba(33,27,23,.05)}
+:root[data-theme=dark]{--line-a:rgba(255,255,255,.08);--fill-a:rgba(255,255,255,.06)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--line-a:rgba(255,255,255,.08);--fill-a:rgba(255,255,255,.06)}}
+/* page text 16/24, title 40/48 bold with normal tracking */
+body{font-size:16px;line-height:24px}
+.page-head h1,.list-head h1{font-size:40px;font-weight:700;line-height:48px;letter-spacing:normal}
+/* top bar 44px; breadcrumb items 14px in 24px-high, 6px-radius hit areas */
+.topbar{height:44px}
+.crumb-root,.breadcrumb strong{display:inline-flex;align-items:center;height:24px;padding:0 5px;border-radius:6px;font-size:14px;line-height:16.8px}
+/* callout: 12px padding, 10px corners */
+.banner,.today-line{border-radius:10px;padding:12px}
+/* select pills: 14px text in a 20px-high pill, 0 6px, 4px corners */
+.badge,.subject,.tag-chip{font-size:14px;line-height:20px;height:20px;padding:0 6px;border-radius:4px;white-space:nowrap}
+/* view tabs: 32px pills, 6px 12px, 14/500; selected has a soft fill, others are muted */
+.tabs{gap:1px;border-bottom:0;margin-bottom:8px}
+.tabs button{height:32px;padding:6px 12px;border-radius:20px;font-size:14px;font-weight:500;line-height:16.8px;color:var(--muted);margin:0;box-shadow:none}
+.tabs button:hover{background:var(--fill-a);color:var(--ink)}
+.tabs button.selected,.tabs button[aria-pressed=true]{background:var(--fill-a);color:var(--ink);box-shadow:none}
+/* tables and rows: 36px rows, hairlines at 7% warm black, 14px muted headers */
+th,td{border-color:var(--line-a);height:36px;padding:0 8px}
+thead th{font-size:14px;font-weight:400;line-height:16.8px;color:var(--muted);border-top:0}
+.srow{min-height:36px;border-bottom-color:var(--line-a);padding-top:5px;padding-bottom:5px}
+.group-title,.card-head,.record,.log-row{border-bottom-color:var(--line-a)}
+/* inline code and keys */
+code,kbd{background:var(--fill-a);border:0;border-radius:4px;padding:.2em .4em;font-size:85%;color:var(--muted)}
+/* small icons sit in an 18px box with 3.5px corners */
+.brand::before{border-radius:3.5px}
+@media(max-width:760px){.page-head h1,.list-head h1{font-size:32px;line-height:38px}}
