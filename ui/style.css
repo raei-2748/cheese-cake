@@ -881,3 +881,64 @@ table.balance tr.flag th{box-shadow:inset 2px 0 var(--red)}
 .srow-due{font-size:13px;line-height:18px;color:var(--muted);text-align:right}
 .srow-due small{display:block;font-size:12px;color:var(--faint)}
 .srow .check{border-radius:4px;border-width:1.5px}
+
+/* ── Task panel as a Notion page peek ── */
+.detail{background:var(--bg);border-left:0;box-shadow:-1px 0 0 var(--line-a),-8px 0 24px rgba(15,15,15,.04)}
+.detail-head{display:flex;align-items:center;gap:4px;height:44px;padding:0 12px;border:0;background:var(--bg)}
+.detail-head>span{flex:1}
+.detail-head .icon-btn{width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:6px;background:none;color:var(--icon);padding:0;cursor:pointer}
+.detail-head .icon-btn:hover{background:var(--hover);color:var(--ink)}
+.detail-head .icon-btn svg{width:18px;height:18px}
+.peek-btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:0;border-radius:6px;background:none;color:var(--muted);font-size:14px;cursor:pointer}
+.peek-btn:hover{background:var(--hover);color:var(--ink)}
+.peek-btn svg{width:13px;height:13px}
+.detail-body{padding:24px 36px 40px}
+.peek-title{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px}
+.peek-title .check.big{width:22px;height:22px;margin-top:9px;flex:none;border-radius:5px}
+.detail-title{flex:1;font-size:30px;font-weight:700;line-height:38px;border:0;background:none;padding:0;resize:none;color:var(--ink);outline:0;overflow:hidden}
+.detail-title::placeholder{color:var(--faint)}
+/* properties: 34px rows, 140px name column, borderless values that grey on hover */
+.props{display:grid;gap:1px}
+.prop{display:grid;grid-template-columns:140px minmax(0,1fr);align-items:center;min-height:34px}
+.prop-name{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);padding:0 6px;height:34px}
+.prop-name svg{width:16px;height:16px;color:var(--icon);flex:none}
+.prop-value{display:flex;align-items:center;gap:4px;min-width:0;font-size:14px}
+.prop-value input,.prop-value select,.prop .detail-date,.prop .detail-time{height:30px;min-width:0;border:0!important;border-radius:6px;background:transparent!important;color:var(--ink);font:inherit;font-size:14px;padding:0 8px;box-shadow:none!important;outline:0}
+.prop-value input:not([type=date]):not([type=time]),.prop-value select{flex:1}
+.prop-value select{appearance:none;-webkit-appearance:none;cursor:pointer}
+.prop-value input:hover,.prop-value select:hover{background:var(--hover)!important}
+.prop-value input:focus,.prop-value select:focus{background:var(--hover)!important}
+.prop-value input::placeholder{color:var(--faint)}
+.prop-value input[type=number]{max-width:90px;-moz-appearance:textfield}
+.prop-value input[type=number]::-webkit-inner-spin-button{display:none}
+.prop-value .unit{font-size:13px;color:var(--faint)}
+.prop .detail-time{width:auto}
+.prop .detail-time:invalid,.prop .detail-time[value=""]{color:var(--faint)}
+/* priority: small Notion-style options; the chosen one is a tinted pill */
+.prop .pri-pick{display:flex;gap:2px;border:0;background:none;padding:0}
+.prop .pri-pick button{height:24px;padding:0 8px;border:0;border-radius:4px;background:none;color:var(--faint);font-size:13px;font-weight:400;cursor:pointer}
+.prop .pri-pick button:hover{background:var(--hover);color:var(--ink)}
+.prop .pri-pick button[aria-pressed=true]{background:color-mix(in srgb,var(--p) 18%,var(--bg));color:var(--ink);font-weight:500}
+.detail-link{margin:10px 6px 0;font-size:13px;color:var(--faint)}
+.detail-link a{color:var(--muted)}
+.peek-rule{height:1px;background:var(--line-a);margin:20px 0 14px}
+/* subtasks and notes: plain page blocks */
+.subtasks{display:grid;gap:1px;margin-bottom:8px}
+.sub-row{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 4px;border-radius:6px}
+.sub-row:hover{background:var(--hover)}
+.sub-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--biro);margin:0}
+.sub-title,.sub-new{flex:1;border:0!important;background:none!important;font-size:15px;color:var(--ink);padding:4px 0;outline:0;box-shadow:none!important}
+.sub-row.done .sub-title{color:var(--faint);text-decoration:line-through}
+.sub-new{padding:4px 6px;width:100%;font-size:15px}
+.sub-new::placeholder{color:var(--faint)}
+.detail-notes{width:100%;min-height:120px;border:0!important;background:none!important;box-shadow:none!important;padding:6px;font:inherit;font-size:15px;line-height:24px;color:var(--ink);resize:vertical;outline:0}
+.detail-notes::placeholder{color:var(--faint)}
+.detail-foot{display:none}
+@media(max-width:760px){.detail-body{padding:16px 18px 32px}.prop{grid-template-columns:116px minmax(0,1fr)}.detail-title{font-size:26px;line-height:32px}}
+@media(min-width:1131px){.detail{height:calc(100dvh - 44px)}}
+@media(min-width:1280px){.panes.with-detail{grid-template-columns:minmax(0,1fr) 460px}}
+.prop .pri-pick{margin-left:0;overflow:visible;border-radius:0;padding-left:4px}
+.prop .pri-pick button{width:auto;flex:none}
+.peek-rule{margin:18px 0 8px}
+/* a selected row is a soft tint, not a solid block */
+.srow.selected{background:color-mix(in srgb,var(--biro) 12%,var(--bg))!important}

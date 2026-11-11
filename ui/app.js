@@ -33,6 +33,15 @@ const icons = {
   close:'<path d="M6 6l12 12M18 6 6 18"/>',
   menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
   home:'<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+  calendar:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  flag:'<path d="M5 21V4h11l-2 4 2 4H5"/>',
+  book:'<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
+  list:'<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
+  status:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  repeat:'<path d="M4 12a7 7 0 0 1 12-5l2 2M20 12a7 7 0 0 1-12 5l-2-2M18 4v5h-5M6 20v-5h5"/>',
+  clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7v5h4"/>',
+  shape:'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+  text:'<path d="M5 6h14M5 12h14M5 18h9"/>',
   paper:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7M9 8h3"/>'
 };
 const icon = name => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+icons[name]+'</svg>';
@@ -875,30 +884,38 @@ function detailPanel(t) {
   const subs=t.subtasks||[];
   const linked=t.link?{assessment:['Assessment','#assess'],topic:['Syllabus topic','#topics'],error:['Error log','#practice'],feedback:['Teacher feedback','#feedback']}[t.link.type]:null;
   const sessions=data.focus.filter(f=>f.taskId===t.id);
-  return '<div class="detail-head"><button type="button" class="check big'+(t.status==='Done'?' on':'')+'" style="--p:'+priColour(t.priority)+'" data-action="toggle-task" data-id="'+h(t.id)+'" aria-label="'+(t.status==='Done'?'Reopen':'Complete')+'">'+(t.status==='Done'?'✓':'')+'</button>'+
-    '<input class="detail-date" type="date" data-field="date" value="'+h(t.date)+'" aria-label="Date">'+
-    '<input class="detail-time" type="time" data-field="time" value="'+h(t.time)+'" aria-label="Time">'+
-    '<div class="pri-pick" role="group" aria-label="Priority">'+PRI.map(([k,l,c])=>'<button type="button" title="'+l+' priority" aria-pressed="'+(String(t.priority||0)===k)+'" style="--p:'+c+'" data-action="set-priority" data-id="'+k+'">'+(k==='0'?'–':'!'.repeat(Number(k)))+'</button>').join('')+'</div>'+
-    '<button type="button" class="icon-btn" data-action="close-detail" aria-label="Close details">'+icon('close')+'</button></div>'+
-    '<div class="detail-body">'+
-    '<textarea class="detail-title" data-field="title" rows="1" aria-label="Title">'+h(t.title)+'</textarea>'+
-    '<div class="subtasks">'+subs.map(x=>'<div class="sub-row'+(x.done?' done':'')+'"><input type="checkbox" data-sub-toggle="'+h(x.id)+'" '+(x.done?'checked':'')+' aria-label="Complete subtask"><input class="sub-title" data-sub-title="'+h(x.id)+'" value="'+h(x.title)+'" aria-label="Subtask"><button type="button" class="icon-btn small" data-action="sub-delete" data-id="'+h(x.id)+'" aria-label="Delete subtask">'+icon('close')+'</button></div>').join('')+
-      '<input id="sub-new" class="sub-new" placeholder="+ Add subtask" aria-label="Add subtask"></div>'+
-    '<textarea class="detail-notes" data-field="notes" rows="5" placeholder="Notes, instructions, links…">'+h(t.notes)+'</textarea>'+
-    '<div class="detail-grid">'+
-      '<label><span>Subject</span><select data-field="course"><option value="">General</option>'+courses.map(c=>'<option value="'+c.id+'" '+(t.course===c.id?'selected':'')+'>'+h(c.name)+'</option>').join('')+'</select></label>'+
-      '<label><span>List</span><select data-field="list"><option value="">'+(t.course?'—':'Inbox')+'</option>'+data.lists.map(l=>'<option value="'+h(l.id)+'" '+(t.list===l.id?'selected':'')+'>'+h(l.name)+'</option>').join('')+'</select></label>'+
-      '<label><span>Repeat</span><select data-field="repeat">'+Object.entries(repeatLabels).map(([k,l])=>'<option value="'+k+'" '+((t.repeat||'')===k?'selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
-      '<label><span>Estimate (min)</span><input type="number" min="0" max="720" step="5" data-field="minutes" value="'+h(t.minutes||'')+'"></label>'+
-      '<label class="wide"><span>Tags</span><input data-field="tags" value="'+h((t.tags||[]).join(', '))+'" placeholder="trial, essay"></label>'+
-      '<label><span>Status</span><select data-field="status">'+['Planned','In progress','Done','Dropped'].map(x=>'<option '+(t.status===x?'selected':'')+'>'+x+'</option>').join('')+'</select></label>'+
-      '<label><span>Work type</span><select data-field="kind">'+taskKinds.map(x=>'<option '+(t.kind===x?'selected':'')+'>'+x+'</option>').join('')+'</select></label>'+
-      '<label><span>Actual (min)</span><input type="number" min="0" max="720" data-field="actual" value="'+h(t.actual)+'"></label>'+
-      '<label class="wide"><span>Result or next change</span><input data-field="result" value="'+h(t.result)+'" placeholder="Score, evidence, what to change"></label>'+
+  const done=t.status==='Done';
+  // One Notion-style property row: icon and name on the left, a borderless control on the right.
+  const prop=(ico,label,control)=>'<div class="prop"><span class="prop-name">'+icon(ico)+h(label)+'</span><div class="prop-value">'+control+'</div></div>';
+  const sel=(field,options)=>'<select data-field="'+field+'">'+options+'</select>';
+  return '<div class="detail-head">'+
+      '<button type="button" class="icon-btn" data-action="close-detail" aria-label="Close details" title="Close (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l6 6-6 6M13 6l6 6-6 6"/></svg></button>'+
+      '<span></span>'+
+      '<button type="button" class="peek-btn" data-action="focus-task" data-id="'+h(t.id)+'">'+icon('play')+'Study this</button>'+
+      '<button type="button" class="icon-btn" data-action="delete-task" data-id="'+h(t.id)+'" aria-label="Delete task" title="Delete task"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>'+
     '</div>'+
-    (linked?'<p class="detail-link">Linked to <a href="'+linked[1]+'">'+linked[0]+' →</a></p>':'')+
-    (sessions.length?'<p class="detail-link">'+sessions.length+' focus session'+(sessions.length===1?'':'s')+' · '+minutes(sessions.reduce((n,f)=>n+f.minutes,0))+'</p>':'')+
-    '</div><div class="detail-foot">'+button('▶ Study this','focus-task',t.id,'primary')+'<span></span>'+button('Delete','delete-task',t.id,'danger')+'</div>';
+    '<div class="detail-body">'+
+    '<div class="peek-title"><button type="button" class="check big'+(done?' on':'')+'" style="--p:'+priColour(t.priority)+'" data-action="toggle-task" data-id="'+h(t.id)+'" aria-label="'+(done?'Reopen':'Complete')+'">'+(done?'✓':'')+'</button>'+
+      '<textarea class="detail-title" data-field="title" rows="1" aria-label="Title" placeholder="Untitled">'+h(t.title)+'</textarea></div>'+
+    '<div class="props">'+
+      prop('calendar','Date','<input class="detail-date" type="date" data-field="date" value="'+h(t.date)+'" aria-label="Date"><input class="detail-time" type="time" data-field="time" value="'+h(t.time)+'" aria-label="Time">')+
+      prop('flag','Priority','<div class="pri-pick" role="group" aria-label="Priority">'+PRI.map(([k,l,c])=>'<button type="button" title="'+l+' priority" aria-pressed="'+(String(t.priority||0)===k)+'" style="--p:'+c+'" data-action="set-priority" data-id="'+k+'">'+(k==='0'?'None':l)+'</button>').join('')+'</div>')+
+      prop('book','Subject',sel('course','<option value="">General</option>'+courses.map(c=>'<option value="'+c.id+'" '+(t.course===c.id?'selected':'')+'>'+h(c.name)+'</option>').join('')))+
+      prop('list','List',sel('list','<option value="">'+(t.course?'None':'Inbox')+'</option>'+data.lists.map(l=>'<option value="'+h(l.id)+'" '+(t.list===l.id?'selected':'')+'>'+h(l.name)+'</option>').join('')))+
+      prop('status','Status',sel('status',['Planned','In progress','Done','Dropped'].map(x=>'<option '+(t.status===x?'selected':'')+'>'+x+'</option>').join('')))+
+      prop('repeat','Repeat',sel('repeat',Object.entries(repeatLabels).map(([k,l])=>'<option value="'+k+'" '+((t.repeat||'')===k?'selected':'')+'>'+l+'</option>').join('')))+
+      prop('clock','Estimate','<input type="number" min="0" max="720" step="5" data-field="minutes" value="'+h(t.minutes||'')+'" placeholder="Empty" aria-label="Estimate in minutes"><span class="unit">min</span>')+
+      prop('clock','Actual','<input type="number" min="0" max="720" data-field="actual" value="'+h(t.actual)+'" placeholder="Empty" aria-label="Actual minutes"><span class="unit">min</span>')+
+      prop('shape','Work type',sel('kind',taskKinds.map(x=>'<option '+(t.kind===x?'selected':'')+'>'+x+'</option>').join('')))+
+      prop('hash','Tags','<input data-field="tags" value="'+h((t.tags||[]).join(', '))+'" placeholder="Empty" aria-label="Tags">')+
+      prop('text','Result','<input data-field="result" value="'+h(t.result)+'" placeholder="Empty" aria-label="Result or next change">')+
+    '</div>'+
+    (linked||sessions.length?'<p class="detail-link">'+(linked?'Linked to <a href="'+linked[1]+'">'+linked[0]+' →</a>':'')+(linked&&sessions.length?' · ':'')+(sessions.length?sessions.length+' study session'+(sessions.length===1?'':'s')+', '+minutes(sessions.reduce((n,f)=>n+f.minutes,0)):'')+'</p>':'')+
+    '<div class="peek-rule"></div>'+
+    '<div class="subtasks">'+subs.map(x=>'<div class="sub-row'+(x.done?' done':'')+'"><input type="checkbox" data-sub-toggle="'+h(x.id)+'" '+(x.done?'checked':'')+' aria-label="Complete subtask"><input class="sub-title" data-sub-title="'+h(x.id)+'" value="'+h(x.title)+'" aria-label="Subtask"><button type="button" class="icon-btn small" data-action="sub-delete" data-id="'+h(x.id)+'" aria-label="Delete subtask">'+icon('close')+'</button></div>').join('')+
+      '<input id="sub-new" class="sub-new" placeholder="Add a subtask" aria-label="Add subtask"></div>'+
+    '<textarea class="detail-notes" data-field="notes" rows="4" placeholder="Add notes, instructions or links…">'+h(t.notes)+'</textarea>'+
+    '</div>';
 }
 
 // ───────────────────────── Calendar ─────────────────────────
