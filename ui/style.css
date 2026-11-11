@@ -751,3 +751,21 @@ code,kbd{background:var(--fill-a);border:0;border-radius:4px;padding:.2em .4em;f
 /* small icons sit in an 18px box with 3.5px corners */
 .brand::before{border-radius:3.5px}
 @media(max-width:760px){.page-head h1,.list-head h1{font-size:32px;line-height:38px}}
+
+/* ── Sidebar, measured from the signed-in Notion app (11 Nov 2026) ── */
+:root{--side-ink:#5f5e59;--side-title:#a19e99;--side-icon:#7d7a75}
+:root[data-theme=dark]{--side:#202020;--side-ink:#bcbab6;--side-title:#7d7a75;--side-icon:#bcbab6}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--side:#202020;--side-ink:#bcbab6;--side-title:#7d7a75;--side-icon:#bcbab6}}
+@media(min-width:1280px){.shell{grid-template-columns:270px minmax(0,1fr)}}
+.sidebar{padding:6px 8px 10px}
+/* rows: 30px high, 1px apart, 6px corners, 4px 8px inside, 14/21 regular */
+#nav a{min-height:30px;height:30px;margin:0 0 1px;padding:4px 8px;border-radius:6px;gap:9px;font-size:14px;line-height:21px;font-weight:400;color:var(--side-ink)}
+#nav a[aria-current]{font-weight:500}
+/* icons sit in a 20px box */
+#nav a svg{width:20px;height:20px;padding:1px;color:var(--side-icon)}
+#nav .dot{width:20px;height:20px;border-radius:3.5px}#nav .dot::after{inset:7px}
+/* section headings: 12/16 medium in a 30px row, 12px above */
+.nav-sec{margin-top:12px}
+.nav-title{display:flex;align-items:center;height:30px;padding:0 8px;font-size:12px;line-height:16px;font-weight:500;color:var(--side-title)}
+.brand{min-height:32px;padding:0 8px;border-radius:8px;margin:6px 0}
+.rail-link{min-height:30px;padding:4px 8px;border-radius:6px;font-size:14px;line-height:21px}
