@@ -795,3 +795,36 @@ table.balance{min-width:520px;width:100%}
   :root[data-side=collapsed] .menu-btn:hover{background:var(--hover);color:var(--ink)}
   :root[data-side=collapsed] .menu-btn svg{width:18px;height:18px}
 }
+
+/* ── Study page as a Notion page (column and parts measured from Notion, 11 Nov 2026) ── */
+/* Notion's page column is 720px wide */
+.panes main[data-route=focus]{width:min(100%,864px)}
+.panes main[data-route=focus] .today-line,.panes main[data-route=focus] .study-log{max-width:none}
+/* subjects are select pills: 14px in a 24px pill, 4px corners, tinted with the subject colour */
+.subjects{gap:6px;margin-bottom:12px}
+.subj{height:24px;padding:0 8px;gap:6px;border:0;border-radius:4px;font-size:14px;line-height:20px;font-weight:400;color:var(--muted);background:transparent}
+.subj i{width:8px;height:8px;opacity:1}
+.subj:hover{background:var(--fill-a);color:var(--ink)}
+.subj[aria-pressed=true]{background:color-mix(in srgb,var(--c) 22%,var(--bg));color:var(--ink);font-weight:500;border:0}
+/* the timer sits in a callout block: soft fill, 10px corners */
+.timer{background:var(--sheet-2);border-radius:10px;padding:20px 24px 18px;margin-bottom:8px}
+.timer-task select{font-size:14px;color:var(--muted)}
+/* clock in the page-title style: bold, normal tracking, even-width digits */
+.timer-clock{font-weight:700;font-size:clamp(64px,10vw,104px);line-height:1.1;letter-spacing:normal;font-variant-numeric:tabular-nums;font-feature-settings:"tnum";margin:14px 0 6px;color:var(--faint)}
+.timer.running .timer-clock{color:var(--ink)}
+.timer-meta{font-size:14px;line-height:20px;margin-bottom:16px}
+/* Open / Timed and round lengths are view tabs: 28px pills */
+.modes,.lengths{gap:1px;font-size:14px}
+.modes button,.lengths button{height:28px;padding:0 10px;border-radius:20px;font-size:14px;font-weight:500;line-height:16.8px;color:var(--muted)}
+.modes button:hover,.lengths button:hover{background:var(--fill-a);color:var(--ink)}
+.modes button[aria-pressed=true],.lengths button[aria-pressed=true]{background:var(--fill-a);color:var(--ink);font-weight:500}
+.full-btn{width:28px;height:28px;border-radius:6px}
+.timer-keys{margin-top:14px}
+/* today's totals read as plain page text between hairlines, not a second box */
+.today-line{background:transparent;border-radius:0;padding:12px 2px;border-top:1px solid var(--line-a);border-bottom:1px solid var(--line-a);margin:16px 0 32px}
+.today-line span,.today-line small,.today-line p{font-size:14px}
+.today-line strong{font-size:24px;font-weight:600;letter-spacing:normal}
+/* empty log: quiet grey text like an empty database */
+.log-empty{border:0;border-top:1px solid var(--line-a);border-radius:0;text-align:left;padding:12px 2px;margin-top:0;font-size:14px}
+.log-empty strong{display:inline;font-weight:500;margin:0 6px 0 0}.log-empty p{display:inline}
+@media(max-width:760px){.timer{padding:16px 16px 14px}.timer-clock{font-size:clamp(56px,20vw,88px)}}
