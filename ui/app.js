@@ -478,10 +478,10 @@ function assessSteps(a, compact) {
 }
 const prepCount = a => (a.kind==='Trial'?trialSteps:assessmentSteps).filter((_,i)=>a.checks?.[i]).length;
 function assessHero(a, rest) {
-  const c=course(a.course), n=daysFrom(a.date,today()), steps=(a.kind==='Trial'?trialSteps:assessmentSteps).length, done=prepCount(a);
+  const c=course(a.course), steps=(a.kind==='Trial'?trialSteps:assessmentSteps).length, done=prepCount(a);
   const settings=data.settings, extra=[['Trials',settings.trialStart],['HSC exams',settings.hscStart]].filter(([,d])=>d&&d>=today());
   return '<section class="assess-hero" style="--c:'+(c?.colour||'#8b94a1')+'">'+
-    '<div class="hero-top"><span class="hero-eyebrow">Next up · '+daysLeftLabel(n)+'</span>'+subject(a.course)+(a.kind==='Trial'?badge('Trial','gold'):'')+'</div>'+
+    '<div class="hero-top"><span class="hero-eyebrow">Next up</span>'+subject(a.course)+(a.kind==='Trial'?badge('Trial','gold'):'')+'</div>'+
     '<h2>'+h(a.title)+'</h2>'+
     '<p class="hero-when">'+h(pretty(a.date,{weekday:'long',day:'numeric',month:'long'}))+' · '+(a.time?h(a.time):'9:00 am (set a time in Edit)')+(a.weight!==''?' · '+h(a.weight)+'% weighting':'')+'</p>'+
     '<div class="countdown" role="timer" aria-label="Time until '+h(a.title)+'" data-countdown="'+assessTime(a)+'">'+countdownHtml(assessTime(a)-Date.now())+'</div>'+
