@@ -98,9 +98,14 @@ function placeGlide(animate = true) {
   const nav = liveNav(); if (!nav) return;
   const cur = nav.querySelector('a[aria-current] span');
   if (!cur || !cur.offsetWidth) { glide.style.opacity = '0'; rail.classList.remove('has-glide'); glideAt = null; return; }
-  const s = rail.getBoundingClientRect(), r = cur.getBoundingClientRect(), n = nav.getBoundingClientRect();
-  const box = { x: r.left - s.left, y: r.top - s.top, w: r.width, h: r.height };
-  const hidden = r.bottom < n.top || r.top > n.bottom;   // scrolled out of the list
+  // Positions are in the sidebar's own scrolled coordinates, so a scrolled sidebar still lines up.
+  const s = rail.getBoundingClientRect(), r = cur.getBoundingClientRect();
+  const box = { x: r.left - s.left - rail.clientLeft + rail.scrollLeft, y: r.top - s.top - rail.clientTop + rail.scrollTop, w: r.width, h: r.height };
+  // Hide the marker when its row is scrolled out of whichever element actually scrolls.
+  let clip = cur.parentElement;
+  while (clip && clip !== rail && !(/(auto|scroll)/.test(getComputedStyle(clip).overflowY) && clip.clientHeight)) clip = clip.parentElement;
+  const c = (clip || rail).getBoundingClientRect();
+  const hidden = c.height > 0 && (r.bottom < c.top || r.top > c.bottom);
   const moved = glideAt && (Math.abs(glideAt.y - box.y) > 1 || Math.abs(glideAt.x - box.x) > 1 || Math.abs(glideAt.w - box.w) > 1);
   // Re-placing at the same spot must not touch the transition, or a slide in progress snaps.
   if (!glideAt || moved) {
@@ -113,7 +118,10 @@ function placeGlide(animate = true) {
   glideAt = box;
 }
 let glideQueued = false;
-new MutationObserver(() => { if (glideQueued) return; glideQueued = true; setTimeout(() => { glideQueued = false; placeGlide(true); }, 0); })
+new MutationObserver(records => {
+  // Ignore the sidebar's own has-glide class flips, which this code makes.
+  if (records.every(m => m.target === rail && m.attributeName === 'class')) return;
+  if (glideQueued) return; glideQueued = true; setTimeout(() => { glideQueued = false; placeGlide(true); }, 0); })
   .observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-current', 'class'] });
 addEventListener('hashchange', () => setTimeout(() => placeGlide(true), 0));
 rail.addEventListener('scroll', () => placeGlide(false), { passive: true, capture: true });
