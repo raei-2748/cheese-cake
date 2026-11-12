@@ -22,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     config.preferences.javaScriptCanOpenWindowsAutomatically = true
     config.preferences.isElementFullscreenEnabled = true
     config.defaultWebpagePreferences.allowsContentJavaScript = true
+    // Tell the page it runs in the Mac app, so it can leave room for the window buttons.
+    config.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('in-mac-app')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     web = WKWebView(frame: .zero, configuration: config)
     web.customUserAgent = safariUA
     web.uiDelegate = self
@@ -30,11 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     web.setValue(false, forKey: "drawsBackground")   // no white flash in dark mode
 
     window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1320, height: 860),
-                      styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                      styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                       backing: .buffered, defer: false)
     window.title = "Stacky"
     window.titlebarAppearsTransparent = true
     window.titleVisibility = .hidden
+    window.titlebarSeparatorStyle = .none
     window.minSize = NSSize(width: 720, height: 520)
     window.backgroundColor = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(red: 0.098, green: 0.098, blue: 0.098, alpha: 1) : .white }
     window.contentView = web
@@ -46,6 +49,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     web.load(URLRequest(url: homeURL))
     NSApp.activate(ignoringOtherApps: true)
   }
+
+  // In full screen there are no window buttons, so the page drops the top band.
+  func windowDidEnterFullScreen(_ n: Notification) { web.evaluateJavaScript("document.documentElement.classList.add('mac-fullscreen')", completionHandler: nil) }
+  func windowDidExitFullScreen(_ n: Notification) { web.evaluateJavaScript("document.documentElement.classList.remove('mac-fullscreen')", completionHandler: nil) }
 
   func applicationShouldHandleReopen(_ s: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
     if !flag { window.makeKeyAndOrderFront(nil) }

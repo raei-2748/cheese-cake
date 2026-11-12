@@ -1577,3 +1577,16 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .float-timer:not(.running).active .ft-time{color:var(--muted)}
 @media(max-width:760px){.float-timer{right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}.ft-btn[data-action=timer-full]{display:none}}
 @media(prefers-reduced-motion:reduce){.float-timer{animation:none}.float-timer.running .ft-what i{animation:none}}
+
+/* ═════════════ Mac app window (12 Nov) ═════════════ */
+/* The window buttons sit in a 28px band at the top: the sidebar runs up behind them, as in Notion,
+   and the page keeps the band clear so nothing clickable sits under the title bar. */
+html.in-mac-app:not(.mac-fullscreen) .sidebar{padding-top:36px!important;z-index:41}
+html.in-mac-app:not(.mac-fullscreen) .side-collapse{top:40px!important}
+html.in-mac-app:not(.mac-fullscreen) .work{padding-top:28px}
+html.in-mac-app:not(.mac-fullscreen) body::before{content:'';position:fixed;top:0;left:0;right:0;height:28px;background:var(--bg);z-index:40;pointer-events:none}
+html.in-mac-app:not(.mac-fullscreen) .detail{top:28px;height:calc(100dvh - 28px)}
+html.in-mac-app .skip{display:none}
+
+/* ═════════════ Sidebar list fades out at the bottom instead of cutting a row in half ═════════════ */
+#nav{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);padding-bottom:28px}
