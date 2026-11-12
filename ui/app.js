@@ -108,11 +108,22 @@ function route() {
   let arg = '';
   try { arg = cut<0 ? '' : decodeURIComponent(raw.slice(cut+1)); } catch { arg = raw.slice(cut+1); }
   if (['list','tag','search'].includes(name)) return {name,arg};
-  return routeNames[name] ? {name,arg:''} : {name:'dash',arg:''};
+  return Object.hasOwn(routeNames,name) ? {name,arg:''} : {name:'dash',arg:''};
 }
 const courseOptions = () => courses.map(c => [c.id,c.name]);
 const row = (key,id) => data[key].find(item=>item.id === id);
-const change = fn => { fn(); dirty = true; render(); queueSave(); };
+// A field commits (fires `change`) on the mouse-down of whatever is clicked next. Re-rendering
+// at that moment replaces the element under the pointer and the click is lost, so the render
+// waits until the pointer is released.
+let pointerHeld = false, heldRender = 0;
+const flushHeld = () => { pointerHeld = false; if (heldRender) { clearTimeout(heldRender); heldRender = 0; render(); } };
+addEventListener('pointerdown',()=>{ pointerHeld = true; },true);
+for (const type of ['pointerup','pointercancel','dragend']) addEventListener(type,()=>setTimeout(flushHeld,0),true);
+const change = fn => {
+  fn(); dirty = true; queueSave();
+  if (pointerHeld && window.event?.type==='change') { heldRender ||= setTimeout(flushHeld,700); return; }
+  render();
+};
 function notify(message) {
   toast.textContent = message;
   toast.hidden = false;
@@ -288,7 +299,7 @@ async function parseRemote(gist) {
 // The same gist also carries stacky.ics, a calendar Apple and Google Calendar can subscribe to.
 const FEED_FILE='stacky.ics';
 function icsFeed() {
-  const esc=t=>String(t??'').replace(/\\/g,'\\\\').replace(/;/g,'\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+  const esc=t=>String(t??'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
   const utc=ms=>new Date(ms).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
   const day=d=>d.replace(/-/g,''), stamp=utc(Date.now());
   const from=addDays(today(),-60), to=addDays(today(),180), ev=[];
@@ -296,7 +307,7 @@ function icsFeed() {
   for (const t of data.tasks) {
     if (!t.date||t.date<from||t.date>to||t.status==='Dropped') continue;
     const name=(t.status==='Done'?'✓ ':'')+t.title+(course(t.course)?' · '+course(t.course).short:'');
-    if (t.time) { const st=Date.parse(t.date+'T'+t.time); push('task-'+t.id,['DTSTART:'+utc(st),'DTEND:'+utc(st+Math.max(15,Number(t.minutes)||30)*60000),'SUMMARY:'+esc(name)]); }
+    if (t.time) { const st=sydneyEpoch(t.date,t.time); push('task-'+t.id,['DTSTART:'+utc(st),'DTEND:'+utc(st+Math.max(15,Number(t.minutes)||30)*60000),'SUMMARY:'+esc(name)]); }
     else push('task-'+t.id,['DTSTART;VALUE=DATE:'+day(t.date),'DTEND;VALUE=DATE:'+day(addDays(t.date,1)),'SUMMARY:'+esc(name)]);
   }
   for (const a of data.assessments) if (a.date&&a.date>=from&&a.date<=to) push('assess-'+a.id,['DTSTART;VALUE=DATE:'+day(a.date),'DTEND;VALUE=DATE:'+day(addDays(a.date,1)),'SUMMARY:'+esc((a.kind==='Trial'?'Trial: ':'Due: ')+a.title)]);
@@ -440,7 +451,7 @@ function nextActions() {
 
 function taskRow(t) {
   const label = t.status==='Done'?'Reopen '+t.title:'Mark '+t.title+' done';
-  return '<div class="task-row'+(t.status==='Dropped'?' dropped':'')+'"><button type="button" class="tick '+(taskDone(t)?'checked':'')+'" aria-label="'+h(label)+'" aria-pressed="'+taskDone(t)+'" data-action="toggle-task" data-id="'+h(t.id)+'">'+(taskDone(t)?'✓':'')+'</button><button class="task-name" type="button" data-action="edit-task" data-id="'+h(t.id)+'"><strong>'+h(t.title)+'</strong><small>'+h(course(t.course)?.short ?? t.kind)+(t.course?' · '+h(t.kind):'')+'</small></button><span class="task-time">'+(t.minutes?minutes(t.minutes):'')+'</span></div>';
+  return '<div class="task-row'+(t.status==='Dropped'?' dropped':'')+(taskDone(t)?' done':'')+'"><button type="button" class="tick '+(taskDone(t)?'checked':'')+'" aria-label="'+h(label)+'" aria-pressed="'+taskDone(t)+'" data-action="toggle-task" data-id="'+h(t.id)+'">'+(taskDone(t)?'✓':'')+'</button><button class="task-name" type="button" data-action="edit-task" data-id="'+h(t.id)+'"><strong>'+h(t.title)+'</strong><small>'+h(course(t.course)?.short ?? t.kind)+(t.course?' · '+h(t.kind):'')+'</small></button><span class="task-time">'+(t.minutes?minutes(t.minutes):'')+'</span></div>';
 }
 function weekly() {
   const plan = capacity();
@@ -672,6 +683,7 @@ function render() {
   // Remember focus so typing in the detail panel or quick add survives a re-render.
   const active=document.activeElement;
   const focusKey=active?.dataset?.field ? '[data-field="'+active.dataset.field+'"]' : active?.id && active.id!=='search' ? '#'+CSS.escape(active.id) : null;
+  const typed=focusKey && active.matches('input[type=text],input:not([type]),textarea') && active.closest('.quick') ? active.value : null, caret=active?.selectionStart??0;
   $('section-label').textContent=routeLabel(r);
   nav.innerHTML=navHtml(r);
   const opened=[...main.querySelectorAll('details.module[open] summary strong')].map(x=>x.textContent);
@@ -689,13 +701,18 @@ function render() {
   panel.hidden=!selected;
   document.querySelector('.panes').classList.toggle('with-detail',!!selected);
   if (r.name!=='search' && document.activeElement!==$('search')) $('search').value='';
-  if (focusKey) document.querySelector(focusKey)?.focus();
+  if (focusKey) {
+    const again=document.querySelector(focusKey);
+    again?.focus();
+    // A re-render nobody asked for (timer tick-over, sync, calendar pull) must not eat half-typed text.
+    if (again && typed!=null && again!==active && 'value' in again && again.value==='' ) { again.value=typed; try { again.setSelectionRange(caret,caret); } catch {} again.dispatchEvent(new Event('input',{bubbles:true})); }
+  }
   renderFull();
   renderFloat();
   updateTimerDom();
 }
 document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();main.focus();});
-window.addEventListener('hashchange',()=>{ if(data) {selected=null; render(); window.scrollTo(0,0);} });
+window.addEventListener('hashchange',()=>{ if(data) {selected=null; render(); window.scrollTo(0,0); nav.querySelector('[aria-current]')?.scrollIntoView({block:'nearest'});} });
 
 const field = (name,label,value='',options={}) => {
   const type=options.type||'text';
@@ -1166,7 +1183,7 @@ function weekGrid() {
         (d===t0?'<i class="now-line" style="top:'+(nowMins/60*HOUR_PX)+'px"></i>':'')+
         items.map(it=>{
           const top=it.s/60*HOUR_PX, height=Math.max(18,(it.e-it.s)/60*HOUR_PX-2), pos='top:'+top+'px;height:'+height+'px;left:calc('+(it.lane*100/it.lanes)+'% + 1px);width:calc('+(100/it.lanes)+'% - 3px)';
-          const short=it.e-it.s<=45?' short':'', past=(d<t0||(d===t0&&it.e<=nowMins))?' past':'';
+          const short=(it.e-it.s<=45?' short':'')+(it.lanes>=3?' tight':''), past=(d<t0||(d===t0&&it.e<=nowMins))?' past':'';
           if (it.x?.kind==='session') return '<button type="button" class="wk-event session'+short+past+'" data-action="edit-session" data-id="'+h(it.x.id)+'" style="--c:'+h(it.x.colour)+';'+pos+'" title="Studied · '+h(it.x.title)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+' · '+minutes(it.x.minutes)+'</span></button>';
           if (it.x) return '<a class="wk-event ext'+short+past+'"'+(it.x.link?' href="'+h(it.x.link)+'" target="_blank" rel="noopener"':'')+' style="--c:'+h(it.x.colour)+';'+pos+'" title="'+h(it.x.title+' · '+it.x.calName)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span></a>';
           const t=it.t;
@@ -1177,7 +1194,7 @@ function weekGrid() {
 function calAfterRender() {
   const sc=main.querySelector('.wk-scroll');
   if (!sc) return;
-  sc.scrollTop = calScroll ?? 7*HOUR_PX;
+  sc.scrollTop = calScroll ?? 7*HOUR_PX-12;   // a little above 7am, so its label is not cut in half
   sc.addEventListener('scroll',()=>{ calScroll=sc.scrollTop; },{passive:true});
 }
 // Drawing, moving and resizing blocks with the mouse, pen or a finger.
@@ -1284,7 +1301,7 @@ const calCfg = () => {
 let extCache=(()=>{ try { return JSON.parse(localStorage.getItem(EXT_KEY))||{}; } catch { return {}; } })();   // {google:{from,to,at,events}, ics:{id:{at,vevents,error}}}
 const storeExt = () => { try { localStorage.setItem(EXT_KEY,JSON.stringify(extCache)); } catch {} };
 let gToken=(()=>{ try { const x=JSON.parse(sessionStorage.getItem(GTOKEN_KEY)); return x&&x.exp>Date.now()?x:null; } catch { return null; } })();
-let gPullError='', gPullNote='', gNeedConsent=false, gClient=null, gScript=null, gBusy=false, gError='', gPushTimer, gPushing=false, gPushAgain=false;
+let gPullError='', gPullNote='', gNeedConsent=false, gClient=null, gScript=null, gBusy=false, gFailAt=0, gError='', gPushTimer, gPushing=false, gPushAgain=false;
 const gOn = () => !!calCfg().google.clientId;
 const gReady = () => !!(gToken && gToken.exp>Date.now());
 
@@ -1333,7 +1350,7 @@ function extEnsure(from,to) {
   const cfg=calCfg(), now=Date.now();
   if (gOn()) gPreload();
   const g=extCache.google;
-  if (gOn() && gReady() && !gBusy && (!g || g.from>from || g.to<to || now-g.at>5*60e3)) { extWant=[from,to]; setTimeout(()=>gPull(from,to),0); }
+  if (gOn() && gReady() && !gBusy && now-gFailAt>60e3 && (!g || g.from>from || g.to<to || now-g.at>5*60e3)) { extWant=[from,to]; setTimeout(()=>gPull(from,to),0); }
   for (const c of cfg.ics) if (c.url && !gBusyIcs.has(c.id)) { const x=extCache.ics?.[c.id]; if (!x || now-x.at>30*60e3) setTimeout(()=>icsFetch(c),0); }
 }
 
@@ -1397,8 +1414,9 @@ async function gPull(from,to,force=false) {
       } while (page);
     }
     extCache.google={from:lo,to:hi,at:Date.now(),events}; storeExt();
-    gPullError='';
-  } catch (e) { gPullError=e.message; extCache.google={...(extCache.google||{events:[]}),from:extCache.google?.from??from,to:extCache.google?.to??to,at:Date.now()}; }
+    gPullError=''; gFailAt=0;
+  } catch (e) { gPullError=e.message; gFailAt=Date.now();   // wait a minute before trying again by itself
+    extCache.google={...(extCache.google||{events:[]}),from:extCache.google?.from??from,to:extCache.google?.to??to,at:Date.now()}; }
   gBusy=false;
   if (data && route().name==='calendar') render();
 }
@@ -1454,7 +1472,7 @@ async function gPush() {
     }
     for (const ev of ours.values()) await gApi('/calendars/'+cal+'/events/'+encodeURIComponent(ev.id),{method:'DELETE'});   // deleted or unscheduled here
     if (fromGoogle.length) {
-      change(()=>fromGoogle.forEach(([t,ev])=>{ const s=sydWall(Date.parse(ev.start.dateTime)); t.title=ev.summary||t.title; t.date=s.date; t.time=s.time; t.minutes=Math.round((Date.parse(ev.end.dateTime)-Date.parse(ev.start.dateTime))/60000); }));
+      change(()=>fromGoogle.forEach(([t,ev])=>{ const s=sydWall(Date.parse(ev.start.dateTime)); t.title=ev.summary||'Untitled'; t.date=s.date; t.time=s.time; t.minutes=Math.round((Date.parse(ev.end.dateTime)-Date.parse(ev.start.dateTime))/60000); }));
       notify(fromGoogle.length===1?'Updated a block you changed in Google Calendar.':'Updated '+fromGoogle.length+' blocks you changed in Google Calendar.');
       gPushAgain=true;   // record the new signatures in Google
     }
@@ -1628,6 +1646,8 @@ const phaseName = {focus:'Study',short:'Short break',long:'Long break',reading:'
 const ratings = ['Focused','OK','Distracted'];
 const sydneyTime = new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const hhmm = ms => sydneyTime.format(new Date(ms));
+// Where the timer rests between sessions. An exam with no reading time starts at writing.
+const restPhase = () => timer.mode==='exam' ? (examCfg().reading>0?'reading':'writing') : 'focus';
 function storeTimer() { try { localStorage.setItem(TIMER_KEY,JSON.stringify(timer)); } catch {} }
 function resetTimer(extra={}) { Object.assign(timer,{running:false,elapsed:0,runFrom:0,startedAt:null},extra); storeTimer(); }
 function startTimer() {
@@ -1668,7 +1688,7 @@ function finishExamPhase() {
   }
   const end=Date.now(), mins=ex.reading+ex.writing, startMs=timer.startedAt??end-mins*60000;
   change(()=>addSession({taskId:timer.taskId,course:timer.course,date:sydney.format(new Date(startMs)),start:new Date(startMs).toISOString(),end:new Date(end).toISOString(),minutes:mins,note:'Exam conditions · '+ex.name}));
-  resetTimer({phase:'reading',warned:[]});
+  resetTimer({phase:restPhase(),warned:[]});
   chime(); closeFull(); announce('Pens down. '+ex.name+' is logged. Mark it, then save the result.');
   editPaper(null,{title:ex.name+' (timed practice)',course:timer.course||ex.course,source:'HSC',minutes:ex.writing,limit:ex.writing,date:today()});
 }
@@ -1721,7 +1741,7 @@ function sessionForm(s, title, submit, onDiscard) {
     '</div>',submit,v=>{
       const mins=Math.round(Number(v.minutes));
       if (!(mins>=1&&mins<=720)) { formError('Minutes must be between 1 and 720.'); return false; }
-      const startMs=Date.parse(v.date+'T'+v.start);
+      const startMs=sydneyEpoch(v.date,v.start);
       if (Number.isNaN(startMs)) { formError('Check the date and start time.'); return false; }
       const t=v.taskId&&row('tasks',v.taskId);
       const next={taskId:v.taskId||null,course:v.course||t?.course||'',date:v.date,start:new Date(startMs).toISOString(),end:new Date(startMs+mins*60000).toISOString(),minutes:mins,rating:v.rating,note:v.note};
@@ -1732,7 +1752,7 @@ function sessionForm(s, title, submit, onDiscard) {
           if (t) t.actual=(Number(t.actual)||0)+mins;
         } else addSession(next);
       });
-      if (!s.id) { resetTimer({phase:timer.mode==='exam'?'reading':'focus',warned:[]}); notify('Logged '+minutes(mins)+(course(next.course)?' of '+course(next.course).short:'')+'.'); render(); }
+      if (!s.id) { if (s.fromTimer) resetTimer({phase:restPhase(),warned:[]}); notify('Logged '+minutes(mins)+(course(next.course)?' of '+course(next.course).short:'')+'.'); render(); }
     },onDiscard);
 }
 // ───────────────────────── Full-screen timer ─────────────────────────
@@ -1804,9 +1824,9 @@ function finishSession() {
   pauseTimer();
   const secs=timer.phase==='writing'?examCfg().reading*60+elapsedSecs():isBreak(timer.phase)?0:elapsedSecs();
   const mins=Math.max(1,Math.round(secs/60)), startMs=timer.startedAt??Date.now()-secs*1000;
-  sessionForm({taskId:timer.taskId,course:timer.course,date:sydney.format(new Date(startMs)),start:new Date(startMs).toISOString(),minutes:mins,note:timer.mode==='exam'?'Exam conditions · '+examCfg().name+' (ended early)':''},
+  sessionForm({fromTimer:true,taskId:timer.taskId,course:timer.course,date:sydney.format(new Date(startMs)),start:new Date(startMs).toISOString(),minutes:mins,note:timer.mode==='exam'?'Exam conditions · '+examCfg().name+' (ended early)':''},
     'Finish session · '+clock(secs),'Save to log',
-    {label:'Discard',title:'Discard this session?',body:'The timer resets and nothing is logged.',run:()=>{resetTimer({phase:timer.mode==='exam'?'reading':'focus',warned:[]});render();}});
+    {label:'Discard',title:'Discard this session?',body:'The timer resets and nothing is logged.',run:()=>{resetTimer({phase:restPhase(),warned:[]});render();}});
   render();
 }
 const logPast = () => sessionForm({course:timer.course,date:today(),start:new Date(Date.now()-3600000).toISOString(),minutes:60},'Log a past session','Save to log');
@@ -1835,7 +1855,7 @@ function renderFloat() {
   if (!show) { floatEl.innerHTML=''; return; }
   const active=sessionActive(), brk=isBreak(timer.phase), c=course(timer.course);
   const colour = brk ? 'var(--sky)' : c?.colour ?? '#787774';
-  const mode = timer.mode==='exam' ? examCfg().name : timer.mode==='timed' ? pomo().focus+' min' : 'Open';
+  const mode = timer.mode==='exam' ? examCfg().name : timer.mode==='timed' ? pomo().focus+' min' : 'Stopwatch';
   const what = brk ? phaseName[timer.phase] : (c?.short ?? 'General');
   floatEl.style.setProperty('--c', colour);
   floatEl.classList.toggle('running', timer.running);
@@ -2162,8 +2182,8 @@ function editList(l) {
 
 // ───────────────────────── Backup & settings ─────────────────────────
 // One quiet settings row: label on the left, a small input (and unit) on the right.
-const setRow = (key,label,value,unit,min,max,step=1) => '<label class="set-row"><span>'+h(label)+'</span><span class="set-input"><input name="'+key+'" type="number" value="'+h(value)+'" min="'+min+'" max="'+max+'" step="'+step+'" required>'+(unit?'<small>'+h(unit)+'</small>':'')+'</span></label>';
-const setDate = (key,label,value) => '<label class="set-row"><span>'+h(label)+'</span><span class="set-input"><input name="'+key+'" type="date" value="'+h(value||'')+'"></span></label>';
+const setRow = (key,label,value,unit,min,max,step=1) => '<label class="set-row"><span>'+h(label)+'</span><span class="set-input"><input id="set-'+key+'" name="'+key+'" type="number" value="'+h(value)+'" min="'+min+'" max="'+max+'" step="'+step+'" required>'+(unit?'<small>'+h(unit)+'</small>':'')+'</span></label>';
+const setDate = (key,label,value) => '<label class="set-row"><span>'+h(label)+'</span><span class="set-input"><input id="set-'+key+'" name="'+key+'" type="date" value="'+h(value||'')+'"></span></label>';
 // scope 'timer' (from the Study page) shows only the timer; otherwise the full, still short, settings.
 // ───────────────────────── Settings page ─────────────────────────
 const HIGHLIGHTS=[['yellow','Yellow','#f5d547'],['green','Green','#7dd38d'],['blue','Blue','#74b9f0'],['pink','Pink','#f490c0'],['orange','Orange','#f7ac63'],['purple','Purple','#b99af2']];
@@ -2272,9 +2292,10 @@ function stackActions(id, el) {
     'set-priority':()=>change(()=>{row('tasks',selected).priority=Number(id);}),
     'delete-task':()=>modal('Delete this task?','<p>'+h(row('tasks',id)?.title)+'</p>','Delete',()=>{change(()=>{data.tasks=data.tasks.filter(t=>t.id!==id);});selected=null;}),
     'sub-delete':()=>change(()=>{const t=row('tasks',selected);t.subtasks=t.subtasks.filter(x=>x.id!==id);}),
-    'focus-task':()=>{ const t=row('tasks',id); Object.assign(timer,{taskId:id,course:t?.course??timer.course}); if (timer.phase!=='focus') resetTimer({phase:'focus'}); startTimer(); selected=null; location.hash='#focus'; render(); },
+    'focus-task':()=>{ const t=row('tasks',id); if (sessionActive() && timer.mode==='exam') { notify('An exam is in progress. Finish it first.'); location.hash='#focus'; return; }
+      Object.assign(timer,{taskId:id,course:t?.course??timer.course}); if (timer.mode==='exam') resetTimer({mode:'open',phase:'focus'}); else if (timer.phase!=='focus') resetTimer({phase:'focus'}); storeTimer(); startTimer(); selected=null; location.hash='#focus'; render(); },
     'toggle-done':()=>{ showDone=!showDone; },
-    'postpone-overdue':()=>change(()=>{ data.tasks.filter(t=>taskOpen(t)&&t.date&&t.date<today()).forEach(t=>{t.date=today();}); }),
+    'postpone-overdue':()=>change(()=>{ const spec=listSpec(route()); data.tasks.filter(t=>taskOpen(t)&&t.date&&t.date<today()&&(!spec||spec.open(t))).forEach(t=>{t.date=today();}); }),
     'open-topics':()=>{courseId=id;location.hash='#topics';},
     'edit-list':()=>editList(customList(id)),
     'nav-toggle':()=>{ navClosed.has(id)?navClosed.delete(id):navClosed.add(id); try { localStorage.setItem('stacky:nav-closed',JSON.stringify([...navClosed])); } catch {} render(); },
@@ -2372,8 +2393,9 @@ document.addEventListener('submit',event=>{
   const input=form.querySelector('input[name=q]');
   if (!data || !input.value.trim()) return;
   const defaults=JSON.parse(form.dataset.defaults||'{}');
-  const t=createFromQuick(input.value,defaults);
-  input.value='';
+  const text=input.value;
+  input.value='';   // cleared first: the re-render keeps whatever is still typed in the box
+  const t=createFromQuick(text,defaults);
   const spec=listSpec(route());
   if (spec && !spec.open(t)) notify('Added “'+t.title+'”'+(t.date?' for '+pretty(t.date,{weekday:'short',day:'numeric',month:'short'}):' to the Inbox')+'.');
 });
@@ -2440,7 +2462,7 @@ document.addEventListener('drop',event=>{
     if (zone.dataset.dropAllday) t.time='';
     if (zone.dataset.dropCol) {
       const y=event.clientY-grabY-zone.getBoundingClientRect().top;
-      const mins=Math.min((DAY_END*60)-15,Math.max(DAY_START*60,Math.round((y/HOUR_PX*60+DAY_START*60)/15)*15));
+      const mins=Math.max(0,Math.min(DAY_MINS-SNAP,snapMin(y/HOUR_PX*60)));
       t.time=pad2(Math.floor(mins/60))+':'+pad2(mins%60);
     }
   });
