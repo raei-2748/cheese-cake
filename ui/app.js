@@ -1207,7 +1207,7 @@ const calCfg = () => {
 let extCache=(()=>{ try { return JSON.parse(localStorage.getItem(EXT_KEY))||{}; } catch { return {}; } })();   // {google:{from,to,at,events}, ics:{id:{at,vevents,error}}}
 const storeExt = () => { try { localStorage.setItem(EXT_KEY,JSON.stringify(extCache)); } catch {} };
 let gToken=(()=>{ try { const x=JSON.parse(sessionStorage.getItem(GTOKEN_KEY)); return x&&x.exp>Date.now()?x:null; } catch { return null; } })();
-let gNeedConsent=false, gClient=null, gScript=null, gBusy=false, gError='', gPushTimer, gPushing=false, gPushAgain=false;
+let gPullError='', gPullNote='', gNeedConsent=false, gClient=null, gScript=null, gBusy=false, gError='', gPushTimer, gPushing=false, gPushAgain=false;
 const gOn = () => !!calCfg().google.clientId;
 const gReady = () => !!(gToken && gToken.exp>Date.now());
 
@@ -1247,8 +1247,8 @@ function extFor(from,to,withSessions=false) {
 function extStatus() {
   const cfg=calCfg(), bits=[];
   if (gOn()) bits.push(!gReady()?'<button type="button" class="ext-pill warn" data-action="g-connect" title="Sign in again to sync">Reconnect Google</button>'
-    : gError?'<button type="button" class="ext-pill warn" data-action="g-connect" title="'+h(gError)+'">Google: '+h(gError.length>60?gError.slice(0,57)+'…':gError)+' · Fix</button>'
-    : '<span class="ext-pill ok" title="Connected to Google Calendar">Google'+(extCache.google?.events?' · '+extCache.google.events.length+' events':'')+'</span>');
+    : (gPullError||gError)?(e=>'<button type="button" class="ext-pill warn" data-action="g-connect" title="'+h(e)+'">Google: '+h(e.length>60?e.slice(0,57)+'…':e)+' · Fix</button>')(gPullError||gError)
+    : '<span class="ext-pill ok" title="'+h(gPullNote||'Connected to Google Calendar')+'">Google'+(extCache.google?.events?' · '+extCache.google.events.length+' events':'')+'</span>');
   if (cfg.ics.length) bits.push('<span class="ext-pill ok">'+cfg.ics.length+' iCal</span>');
   if (gBusy) bits.push('<span class="ext-pill">Syncing…</span>');
   return bits.length?'<div class="ext-status">'+bits.join('')+'</div>':'';
@@ -1299,7 +1299,11 @@ async function gPull(from,to,force=false) {
   gBusy=true;
   try {
     const cfg=calCfg().google;
-    const list=(await gApi('/users/me/calendarList?minAccessRole=reader&maxResults=250')).items||[];
+    // The calendar list needs its own permission; without it, still read your main calendar.
+    let list;
+    try { list=(await gApi('/users/me/calendarList?minAccessRole=reader&maxResults=250')).items||[]; }
+    catch (e) { list=[{id:'primary',summary:'Google Calendar',backgroundColor:'#4285f4',primary:true,accessRole:'owner',selected:true}]; gPullNote='Showing your main Google calendar only. Press Reconnect in Settings → Calendar and tick every box to see your other calendars.'; }
+    if (list.length>1||list[0]?.id!=='primary') gPullNote='';
     const fresh=list.map(c=>({id:c.id,name:c.summaryOverride||c.summary,colour:c.backgroundColor||'#4285f4',primary:!!c.primary,writable:['owner','writer'].includes(c.accessRole)}));
     if (JSON.stringify(fresh)!==JSON.stringify(cfg.list)) { cfg.list=fresh; list.forEach(c=>{ if (cfg.show[c.id]==null) cfg.show[c.id]=c.selected!==false; }); dirty=true; queueSave(); }
     const lo=addDays(from,-7), hi=addDays(to,35), events=[];
@@ -1318,8 +1322,8 @@ async function gPull(from,to,force=false) {
       } while (page);
     }
     extCache.google={from:lo,to:hi,at:Date.now(),events}; storeExt();
-    gError='';
-  } catch (e) { gError=e.message; extCache.google={...(extCache.google||{events:[]}),from:extCache.google?.from??from,to:extCache.google?.to??to,at:Date.now()}; }
+    gPullError='';
+  } catch (e) { gPullError=e.message; extCache.google={...(extCache.google||{events:[]}),from:extCache.google?.from??from,to:extCache.google?.to??to,at:Date.now()}; }
   gBusy=false;
   if (data && route().name==='calendar') render();
 }
