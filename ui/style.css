@@ -2178,3 +2178,25 @@ html.mini-mode.in-float-panel .mp{padding-top:20px}
     border-bottom:1px solid color-mix(in srgb,var(--rule-2) 70%,transparent)}
   .panes main{padding-top:14px}
 }
+
+/* ═════════════ Phone: sidebar under the page, two layers (13 Nov) ═════════════ */
+@media (max-width:760px){
+  :root{--drawer:0;--drawer-w:min(300px,82vw)}
+  html:has(body.nav-open){--drawer:1}
+  html:has(body.nav-open),body.nav-open{background:var(--side)}
+  body.nav-open{overflow:hidden}
+  /* the sidebar sits still underneath; the page moves */
+  .sidebar{transform:none!important;transition:none!important;z-index:1!important;width:var(--drawer-w)!important;
+    padding-top:calc(14px + env(safe-area-inset-top))!important;background:var(--side)!important;
+    opacity:calc(.4 + var(--drawer)*.6)}
+  .work{position:relative;z-index:2;min-height:100dvh;background:var(--bg);transform-origin:0 50%;
+    border-radius:calc(var(--drawer)*22px);
+    box-shadow:0 0 0 calc(var(--drawer)*1px) color-mix(in srgb,var(--ink) 10%,transparent),-12px 0 40px rgba(0,0,0,calc(var(--drawer)*.35));
+    transition:transform .38s cubic-bezier(.2,.85,.25,1),border-radius .38s cubic-bezier(.2,.85,.25,1),box-shadow .38s}
+  /* only move the page while the sidebar is opening or open, so pinned panels stay put otherwise */
+  html.drawer-drag .work,html:has(body.nav-open) .work{transform:translateX(calc(var(--drawer)*var(--drawer-w))) scale(calc(1 - var(--drawer)*.07));overflow:clip}
+  html.drawer-drag .work,html.drawer-drag .sidebar{transition:none!important}
+  body.nav-open .scrim{display:none!important}
+  .sidebar{transition:opacity .38s!important}
+}
+@media (max-width:760px) and (prefers-reduced-motion:reduce){.work{transition:none}}
