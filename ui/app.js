@@ -2406,6 +2406,31 @@ document.addEventListener('submit',event=>{
   const spec=listSpec(route());
   if (spec && !spec.open(t)) notify('Added “'+t.title+'”'+(t.date?' for '+pretty(t.date,{weekday:'short',day:'numeric',month:'short'}):' to the Inbox')+'.');
 });
+// ───────────────────────── Keyboard shortcuts ─────────────────────────
+const GO_KEYS={'1':['dash','Overview'],'2':['focus','Study'],'3':['today','Today'],'4':['calendar','Calendar'],'5':['assess','Assessments'],'6':['topics','Syllabus'],'7':['papers','Past papers'],'8':['week','Weekly plan'],'9':['habits','Habits']};
+const isMac=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent);
+const keyCap=k=>'<kbd>'+h(k.replace('Cmd',isMac?'⌘':'Ctrl').replace('Shift',isMac?'⇧':'Shift').replace('Enter','↩'))+'</kbd>';
+function shortcutsSheet() {
+  const group=(title,rows)=>'<section class="keys-group"><h3>'+h(title)+'</h3>'+rows.map(([keys,what])=>'<div class="keys-row"><span>'+h(what)+'</span><span class="keys">'+keys.map(keyCap).join('')+'</span></div>').join('')+'</section>';
+  modal('Keyboard shortcuts','<div class="keys-sheet">'+
+    group('Go to',Object.entries(GO_KEYS).map(([n,[,label]])=>[['Cmd',n],label]).concat([[['Cmd',','],'Settings']]))+
+    group('Anywhere',[[['Cmd','N'],'New task'],[['Cmd','K'],'Search'],[['Cmd','Enter'],'Start or pause the timer'],[['Cmd','Shift','F'],'Full-screen timer'],[['Cmd','\\'],'Show or hide the sidebar'],[['Cmd','/'],'This list']])+
+    group('Without ⌘',[[['Q'],'Add a task on this page'],[['S'],'Start or pause the timer'],[['F'],'Full-screen timer'],[['/'],'Search'],[['Esc'],'Close the open panel']])+
+    group('Calendar',[[['←'],'Previous week or month'],[['→'],'Next week or month'],[['T'],'Today'],[['W'],'Week view'],[['M'],'Month view']])+
+  '</div>','',null);
+  dialog.classList.add('keys-dialog');
+  dialog.addEventListener('close',()=>dialog.classList.remove('keys-dialog'),{once:true});
+}
+// Commands the Mac app's menus call.
+const stackyCmd = window.stackyCmd = {
+  go:hash=>{ location.hash='#'+hash; },
+  newTask:()=>{ const q=main.querySelector('.quick input'); if (q) { q.focus(); return; } location.hash='#inbox'; setTimeout(()=>main.querySelector('.quick input')?.focus(),50); },
+  search:()=>{ $('search')?.focus(); $('search')?.select(); },
+  toggleTimer:()=>toggleTimer(),
+  fullTimer:()=>{ fullTimer?closeFull():openFull(); },
+  shortcuts:()=>shortcutsSheet()
+};
+
 document.addEventListener('keydown',event=>{
   const el=event.target;
   if (el.id==='sub-new' && event.key==='Enter') {
@@ -2433,6 +2458,24 @@ document.addEventListener('keydown',event=>{
     if (matchMedia('(max-width:760px)').matches) document.body.classList.add('nav-open');
     $('search').focus(); $('search').select(); return;
   }
+  // ⌘ shortcuts (Ctrl on Windows). A browser keeps ⌘N and ⌘1–9 for itself; the Mac app has them in its menus.
+  if ((event.metaKey||event.ctrlKey) && !event.altKey && data && !dialog.open) {
+    const k=event.key.toLowerCase();
+    if (!event.shiftKey && GO_KEYS[k]) { event.preventDefault(); location.hash='#'+GO_KEYS[k][0]; return; }
+    if (!event.shiftKey && k==='n') { event.preventDefault(); stackyCmd.newTask(); return; }
+    if (!event.shiftKey && k===',') { event.preventDefault(); location.hash='#settings'; return; }
+    if (!event.shiftKey && (k==='/'||k==='?')) { event.preventDefault(); shortcutsSheet(); return; }
+    if (!event.shiftKey && k==='enter') { event.preventDefault(); toggleTimer(); return; }
+    if (event.shiftKey && k==='f') { event.preventDefault(); fullTimer?closeFull():openFull(); return; }
+  }
+  // Calendar: arrows change week or month, T jumps to today, W and M switch view.
+  if (route().name==='calendar' && data && !dialog.open && !event.metaKey && !event.ctrlKey && !event.altKey && !el.closest('input,textarea,select,[contenteditable]')) {
+    const k=event.key;
+    if (k==='ArrowLeft'||k==='ArrowRight') { event.preventDefault(); calShift(k==='ArrowLeft'?-1:1); return; }
+    if (k==='t'||k==='T') { event.preventDefault(); calAnchor=today(); calScroll=null; render(); return; }
+    if (k==='w'||k==='m') { event.preventDefault(); calMode=k==='w'?'week':'month'; render(); return; }
+  }
+  if (event.key==='?' && !el.closest('input,textarea,select,[contenteditable]') && !dialog.open) { event.preventDefault(); shortcutsSheet(); return; }
   if (el.id==='search' && event.key==='Escape') { el.value=''; el.blur(); history.replaceState(null,'','#today'); render(); return; }
   if (el.closest('input,textarea,select,[contenteditable]') || event.metaKey || event.ctrlKey || event.altKey || dialog.open) return;
   if (event.key==='q' || event.key==='n') { const q=main.querySelector('.quick input'); if (q) { event.preventDefault(); q.focus(); } }

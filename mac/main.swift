@@ -187,6 +187,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     app.addItem(withTitle: "Quit Stacky", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     appItem.submenu = app
 
+    let fileItem = NSMenuItem(); main.addItem(fileItem)
+    let file = NSMenu(title: "File")
+    for (title, cmd, key, mods) in [("New Task", "newTask()", "n", NSEvent.ModifierFlags.command), ("Search", "search()", "k", .command),
+                                    ("Start or Pause Timer", "toggleTimer()", "\r", .command), ("Full-Screen Timer", "fullTimer()", "f", [.command, .shift])] {
+      let item = file.addItem(withTitle: title, action: #selector(runCommand(_:)), keyEquivalent: key)
+      item.keyEquivalentModifierMask = mods; item.representedObject = cmd
+    }
+    fileItem.submenu = file
+
     let editItem = NSMenuItem(); main.addItem(editItem)
     let edit = NSMenu(title: "Edit")
     edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
@@ -200,7 +209,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
 
     let goItem = NSMenuItem(); main.addItem(goItem)
     let go = NSMenu(title: "Go")
-    for (title, hash, key) in [("Overview", "dash", "1"), ("Study", "focus", "2"), ("Today", "today", "3"), ("Calendar", "calendar", "4"), ("Assessments", "assess", "5")] {
+    for (title, hash, key) in [("Overview", "dash", "1"), ("Study", "focus", "2"), ("Today", "today", "3"), ("Calendar", "calendar", "4"), ("Assessments", "assess", "5"),
+                               ("Syllabus", "topics", "6"), ("Past Papers", "papers", "7"), ("Weekly Plan", "week", "8"), ("Habits", "habits", "9")] {
       let item = go.addItem(withTitle: title, action: #selector(goTo(_:)), keyEquivalent: key); item.representedObject = hash
     }
     go.addItem(.separator())
@@ -224,10 +234,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     win.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
     winItem.submenu = win
     NSApp.windowsMenu = win
+    let helpItem = NSMenuItem(); main.addItem(helpItem)
+    let help = NSMenu(title: "Help")
+    let keys = help.addItem(withTitle: "Keyboard Shortcuts", action: #selector(runCommand(_:)), keyEquivalent: "/"); keys.representedObject = "shortcuts()"
+    helpItem.submenu = help
+    NSApp.helpMenu = help
     NSApp.mainMenu = main
   }
   @objc func openSettings() { show(); web.evaluateJavaScript("location.hash='#settings'", completionHandler: nil) }
   @objc func goTo(_ item: NSMenuItem) { show(); if let h = item.representedObject as? String { web.evaluateJavaScript("location.hash='#\(h)'", completionHandler: nil) } }
+  @objc func runCommand(_ item: NSMenuItem) { show(); if let c = item.representedObject as? String { web.evaluateJavaScript("window.stackyCmd && window.stackyCmd.\(c)", completionHandler: nil) } }
   @objc func goBack() { web.goBack() }
   @objc func goForward() { web.goForward() }
   @objc func reload() { web.reloadFromOrigin() }

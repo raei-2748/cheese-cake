@@ -1893,3 +1893,12 @@ html{background:var(--bg)}
 /* A long press opens the menu on a touch screen, so it must not also select text or open the system callout. */
 @media(pointer:coarse){.srow,.task-row,.wk-event,.cal-chip,.log-row,.habit-row,#nav a{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}}
 .st-picks .st-task{min-width:0}
+
+/* ═════════════ Keyboard shortcuts sheet (⌘/) ═════════════ */
+dialog.keys-dialog{width:min(94vw,640px)}
+.keys-sheet{display:grid;grid-template-columns:1fr 1fr;gap:18px 28px}
+.keys-group h3{font-size:12px;font-weight:600;color:var(--muted);margin:0 0 6px}
+.keys-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--rule-2);font-size:13.5px}
+.keys{display:inline-flex;gap:3px;flex:none}
+.keys kbd{min-width:22px;height:22px;display:inline-grid;place-items:center;padding:0 6px;border-radius:5px;border:1px solid var(--rule);border-bottom-width:2px;background:var(--sheet);font:inherit;font-size:12px;color:var(--ink)}
+@media(max-width:600px){.keys-sheet{grid-template-columns:1fr}}
