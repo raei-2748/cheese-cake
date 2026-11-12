@@ -1061,15 +1061,26 @@ function calendarList() {
 }
 // Move the calendar by one week (or month). Also reached by a sideways trackpad swipe,
 // a finger swipe on a touch screen, and the ← → arrow keys.
-function calShift(n) { calAnchor=calMode==='month'?addMonth(calAnchor.slice(0,8)+'01',n):addDays(calAnchor,calDays()*n); render(); }
+const calGrid = () => main.querySelector('.wk,.month');
+function calShift(n) {
+  calAnchor=calMode==='month'?addMonth(calAnchor.slice(0,8)+'01',n):addDays(calAnchor,calDays()*n); render();
+  const g=calGrid();   // slide the new week in from the side it comes from, like a scrolling panel
+  if (g && !matchMedia('(prefers-reduced-motion: reduce)').matches) g.animate([{transform:'translateX('+(n>0?56:-56)+'px)',opacity:.35},{transform:'none',opacity:1}],{duration:300,easing:'cubic-bezier(.2,.8,.2,1)'});
+}
+function calDragTo(px,settle) {   // the grid follows a sideways swipe a little before it changes week
+  const g=calGrid(); if (!g) return;
+  if (settle) { g.animate([{transform:g.style.transform||'none'},{transform:'none'}],{duration:220,easing:'cubic-bezier(.2,.8,.2,1)'}); g.style.transform=''; }
+  else g.style.transform='translateX('+px+'px)';
+}
 let swipeAcc=0, swipeLock=0, swipeTimer;
 document.addEventListener('wheel',event=>{
   if (!data || route().name!=='calendar' || !event.target.closest('.cal-wrap')) return;
   if (Math.abs(event.deltaX)<=Math.abs(event.deltaY)) return;          // vertical scrolling stays scrolling
   event.preventDefault();
   if (Date.now()<swipeLock) return;                                   // one move per swipe gesture
-  swipeAcc+=event.deltaX; clearTimeout(swipeTimer); swipeTimer=setTimeout(()=>{ swipeAcc=0; },180);
-  if (Math.abs(swipeAcc)>70) { calShift(swipeAcc>0?1:-1); swipeAcc=0; swipeLock=Date.now()+550; }
+  swipeAcc+=event.deltaX; clearTimeout(swipeTimer); swipeTimer=setTimeout(()=>{ swipeAcc=0; calDragTo(0,true); },160);
+  calDragTo(Math.max(-90,Math.min(90,-swipeAcc*.6)));
+  if (Math.abs(swipeAcc)>110) { const dir=swipeAcc>0?1:-1; swipeAcc=0; swipeLock=Date.now()+500; calShift(dir); }
 },{passive:false});
 let touchFrom=null;
 document.addEventListener('touchstart',event=>{
@@ -1311,14 +1322,11 @@ function extFor(from,to,withSessions=false) {
   }
   return out;
 }
-function extStatus() {
-  const cfg=calCfg(), bits=[];
-  if (gOn()) bits.push(!gReady()?'<button type="button" class="ext-pill warn" data-action="g-connect" title="Sign in again to sync">Reconnect Google</button>'
-    : (gPullError||gError)?(e=>'<button type="button" class="ext-pill warn" data-action="g-connect" title="'+h(e)+'">Google: '+h(e.length>60?e.slice(0,57)+'…':e)+' · Fix</button>')(gPullError||gError)
-    : '<span class="ext-pill ok" title="'+h(gPullNote||'Connected to Google Calendar')+'">Google'+(extCache.google?.events?' · '+extCache.google.events.length+' events':'')+'</span>');
-  if (cfg.ics.length) bits.push('<span class="ext-pill ok">'+cfg.ics.length+' iCal</span>');
-  if (gBusy) bits.push('<span class="ext-pill">Syncing…</span>');
-  return bits.length?'<div class="ext-status">'+bits.join('')+'</div>':'';
+function extStatus() {   // shown only when something needs your action
+  if (!gOn()) return '';
+  if (!gReady()) return '<div class="ext-status"><button type="button" class="ext-pill warn" data-action="g-connect" title="Sign in again to sync">Reconnect Google</button></div>';
+  const e=gPullError||gError;
+  return e ? '<div class="ext-status"><button type="button" class="ext-pill warn" data-action="g-connect" title="'+h(e)+'">Google: '+h(e.length>60?e.slice(0,57)+'…':e)+' · Fix</button></div>' : '';
 }
 let extWant=null;
 function extEnsure(from,to) {

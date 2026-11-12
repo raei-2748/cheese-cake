@@ -1635,3 +1635,18 @@ html{background:var(--bg)}
 .cal-side-link{justify-self:start;margin:10px 0 6px 6px;border:0;background:none;padding:0;font:inherit;font-size:12.5px;color:var(--muted);cursor:pointer}
 .cal-side-link:hover{color:var(--ink);text-decoration:underline}
 .cal-wrap{overscroll-behavior-x:none}
+
+/* ═════════════ Week view like Apple Calendar (13 Nov) ═════════════ */
+/* the hour grid's scrollbar no longer narrows its columns, so they line up with the header */
+.wk-scroll{scrollbar-width:none!important}
+.wk-scroll::-webkit-scrollbar{display:none}
+/* header: "Thu 12" on one line; today's date in a red circle, no highlighter */
+.wk-head .wk-day{flex-direction:row!important;align-items:center!important;justify-content:center;gap:5px!important;padding:6px 0!important;color:var(--muted)}
+.wk-head .wk-day small{font-size:15px!important;font-weight:400!important;text-transform:none!important;letter-spacing:0!important;color:inherit!important}
+.wk-head .wk-day strong{font-size:15px!important;font-weight:500!important;color:var(--ink)}
+.wk-head .wk-day.today small{color:var(--ink)!important;font-weight:500!important}
+.wk-head .wk-day.today strong,.cal-cell.today .cal-num{background:#e5484d!important;background-image:none!important;color:#fff!important;border-radius:999px!important;
+  min-width:26px!important;height:26px!important;width:auto!important;display:inline-grid!important;place-items:center;padding:0 7px!important;margin:0!important;font-weight:600!important;box-shadow:none!important}
+.cal-cell.today .cal-num{min-width:24px!important;height:24px!important;padding:0 6px!important;font-size:12px}
+.wk-col.today{background-color:transparent!important}
+.wk,.month{will-change:transform}
