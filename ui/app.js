@@ -620,7 +620,7 @@ function topicsPage() {
   const courseTabs=tabGroup('Course','course',courseId,courses.map(c=>[c.id,c.short]));
   const due=dueTopics();
   return pageHead('','Syllabus & priorities','',button('+ Custom topic','new-topic','','primary'))+
-    (due.length?section('Due for review',String(due.length),reviewList(due.slice(0,12))):'')+
+    (due.length?section('Due for review',due.length+(due.length===1?' topic':' topics'),reviewList(due.slice(0,12))):'')+
     section('Priorities','',flagged.length?'<div class="focus-list">'+flagged.map(t=>'<div class="focus-row"><div><div class="line">'+subject(t.course)+badge(topicState(t.id).priority,topicState(t.id).priority==='Urgent'?'alert':'gold')+'</div><strong>'+h(t.title)+'</strong><small>'+h(t.module)+'</small></div>'+button('Plan practice','plan-topic',t.id,'text')+'</div>').join('')+'</div>':emptyCard('Nothing flagged','Set a topic to High or Urgent with its Update button.'))+
     section(c.name,'Year 12 · '+c.year+' syllabus · '+all.filter(t=>topicState(t.id).stage==='Retested').length+' of '+all.length+' topics retested',courseTabs+
     '<div class="topic-tools"><label><input type="checkbox" id="priority-only" '+(priorityOnly?'checked':'')+'> Priorities only</label><a class="subtle-link" href="'+h(c.url)+'" target="_blank" rel="noopener">Official NESA syllabus ↗</a></div>'+
@@ -712,7 +712,7 @@ function render() {
   updateTimerDom();
 }
 document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();main.focus();});
-window.addEventListener('hashchange',()=>{ if(data) {selected=null; render(); window.scrollTo(0,0); nav.querySelector('[aria-current]')?.scrollIntoView({block:'nearest'});} });
+window.addEventListener('hashchange',()=>{ if(data) {selected=null; render(); window.scrollTo(0,0); const cur=nav.querySelector('[aria-current]'); if (cur) { const a=cur.getBoundingClientRect(), b=nav.getBoundingClientRect(); if (a.top<b.top+8 || a.bottom>b.bottom-40) nav.scrollTop+=a.top-b.top-b.height/2+a.height/2; }} });
 
 const field = (name,label,value='',options={}) => {
   const type=options.type||'text';
@@ -1194,7 +1194,7 @@ function weekGrid() {
 function calAfterRender() {
   const sc=main.querySelector('.wk-scroll');
   if (!sc) return;
-  sc.scrollTop = calScroll ?? 7*HOUR_PX-12;   // a little above 7am, so its label is not cut in half
+  sc.scrollTop = calScroll ?? 6.5*HOUR_PX;   // open at 6:30, so the 7am line and its label are in full view
   sc.addEventListener('scroll',()=>{ calScroll=sc.scrollTop; },{passive:true});
 }
 // Drawing, moving and resizing blocks with the mouse, pen or a finger.
@@ -1952,8 +1952,6 @@ function focusPage() {
   const open=sortTasks(data.tasks.filter(taskOpen));
   const goal=studyGoal(), pct=Math.min(100,s.today/goal*100);
   const c=course(timer.course);
-  const subjects=[['','General','#787774'],...courses.map(x=>[x.id,x.short,x.colour])].map(([id,label,col])=>
-    '<button type="button" class="subj" style="--c:'+col+'" aria-pressed="'+((timer.course||'')===id)+'" data-action="study-course" data-id="'+id+'">'+subjectIcon(id)+h(label)+'</button>').join('');
   const controls = timerControls('Start'), state = timerState(), info = timerInfo();
   const lengths = timer.mode==='timed' && !active && !onBreak
     ? '<span class="lengths" role="group" aria-label="Round length">'+[...new Set([...focusLengths,pomo().focus])].sort((a,b)=>a-b).map(m=>'<button type="button" aria-pressed="'+(pomo().focus===m)+'" data-action="focus-length" data-id="'+m+'">'+m+'</button>').join('')+'<button type="button" data-action="focus-custom" title="Pick any length">Custom</button><small>min</small></span>'
@@ -1961,32 +1959,35 @@ function focusPage() {
     ? '<span class="lengths exam-pick"><label><span class="sr">Exam paper</span><select data-exam-preset>'+examPresets.map(e=>'<option value="'+e.id+'" '+(examCfg().id===e.id?'selected':'')+'>'+h(e.name)+' · '+e.reading+'+'+hrs(e.writing)+'</option>').join('')+(examCfg().id==='custom'?'<option value="custom" selected>'+h(examCfg().name)+' · '+examCfg().reading+'+'+hrs(examCfg().writing)+'</option>':'')+'</select></label><button type="button" data-action="exam-custom">Custom</button></span>' : '';
   const R=92, C=2*Math.PI*R;
   const modeTabs='<div class="tt-modes" role="group" aria-label="Timer type">'+[['open','Stopwatch'],['timed','Pomo'],['exam','Exam']].map(([k,l])=>'<button type="button" aria-pressed="'+(timer.mode===k)+'" data-action="study-mode" data-id="'+k+'">'+l+'</button>').join('')+'</div>';
-  const focusOn = onBreak
-    ? '<p class="tt-break">Stand up, look away from the screen, drink some water.</p>'
-    : '<div class="tt-focus-on">'+
-        '<label class="tt-pick"><span class="sr">Subject</span>'+subjectIcon(timer.course)+'<select data-study-course>'+[['','General'],...courses.map(x=>[x.id,x.short])].map(([id,l])=>'<option value="'+id+'" '+((timer.course||'')===id?'selected':'')+'>'+h(l)+'</option>').join('')+'</select></label>'+
-        '<label class="tt-pick task"><span class="sr">Task</span><select data-timer-task><option value="">No task, just the subject</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+'</option>').join('')+'</select></label>'+
-      '</div>';
-  const overview = [[minutes(s.today),'Today'],[String(s.todayCount),'Sessions today'],[minutes(s.week),'This week'],[s.streak+(s.streak===1?' day':' days'),'Streak']];
-  return '<div class="tt">'+
-    '<section class="tt-main timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'#787774')+'">'+
-      '<div class="tt-top"><h1 class="sr">Study</h1>'+modeTabs+'<div class="tt-top-tools">'+
-        '<button type="button" class="icon-btn" data-action="settings" data-id="timer" title="Timer settings" aria-label="Timer settings">'+icon('sliders')+'</button>'+
-        '<button type="button" class="icon-btn" data-action="timer-full" title="Full screen (f)" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div></div>'+
-      focusOn+
-      '<div class="tt-ring"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="tt-track" cx="100" cy="100" r="'+R+'"/><circle id="timer-ring" class="tt-prog" cx="100" cy="100" r="'+R+'" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-ringFrac(secs))).toFixed(2)+'"/></svg>'+
-        '<div class="tt-centre"><div id="timer-text" class="tt-clock" role="timer" aria-live="off">'+clock(secs)+'</div><span class="tt-state">'+(timer.running?'<i></i>':'')+h(state)+'</span></div></div>'+
-      '<p class="tt-info">'+h(info)+'</p>'+
-      (lengths?'<div class="tt-lengths">'+lengths+'</div>':'')+
-      '<div class="tt-buttons">'+controls+'</div>'+
-    '</section>'+
-    '<aside class="tt-side">'+
-      '<h2>Overview</h2><div class="tt-cards">'+overview.map(([v,l])=>'<div class="tt-card"><small>'+h(l)+'</small><b>'+h(v)+'</b></div>').join('')+'</div>'+
-      '<div class="tt-goal"><div><span>Daily goal</span><b>'+minutes(s.today)+' / '+minutes(goal)+'</b></div><div class="goal-bar"><i style="width:'+pct+'%"></i></div></div>'+
-      '<div class="tt-week"><h3>This week</h3><div class="bars">'+s.days.map(([d,m])=>'<div class="bar-col'+(d===today()?' today':'')+(m>=goal?' hit':'')+'"><i style="height:'+(m/s.dmax*100)+'%"></i><span>'+pretty(d,{weekday:'narrow'})+'</span><small>'+(m?minutes(m):'')+'</small></div>').join('')+'</div>'+
-        (s.bySubject.length?'<div class="tt-subjects">'+s.bySubject.map(([x,m])=>'<div class="hbar"><span>'+h(x.short)+'</span><div><i style="width:'+(m/s.max*100)+'%;background:'+x.colour+'"></i></div><b>'+minutes(m)+'</b></div>').join('')+'</div>':'')+'</div>'+
-      '<section class="study-log tt-log"><div class="log-head"><h2>Focus record</h2>'+button('+ Add','log-past','','text')+'</div>'+studyLog()+'</section>'+
-    '</aside>'+
+  // One page, three parts: the timer, today's numbers beside it, and the log underneath.
+  const chips = '<div class="st-subjects" role="group" aria-label="Subject">'+[['','General','#787774'],...courses.map(x=>[x.id,x.short,x.colour])].map(([id,label,col])=>
+    '<button type="button" class="st-chip" style="--c:'+col+'" aria-pressed="'+((timer.course||'')===id)+'" data-action="study-course" data-id="'+id+'">'+subjectIcon(id)+'<span>'+h(label)+'</span></button>').join('')+'</div>';
+  const taskPick = '<label class="st-task"><span class="sr">Task</span>'+icon('check')+'<select data-timer-task><option value="">No task, just the subject</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+'</option>').join('')+'</select></label>';
+  const left = Math.max(0,goal-s.today);
+  const facts = [['Sessions',String(s.todayCount)],['Streak',s.streak+(s.streak===1?' day':' days')],['This week',minutes(s.week)]];
+  return '<div class="st'+(c||onBreak?'':' gen')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'var(--ink)')+'">'+
+    '<header class="st-head"><h1 class="sr">Study</h1>'+modeTabs+'<div class="st-tools">'+
+      '<button type="button" class="icon-btn" data-action="settings" data-id="timer" title="Timer settings" aria-label="Timer settings">'+icon('sliders')+'</button>'+
+      '<button type="button" class="icon-btn" data-action="timer-full" title="Full screen (f)" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div></header>'+
+    '<div class="st-grid">'+
+      '<section class="st-timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" aria-label="Timer">'+
+        (onBreak?'<p class="st-break">Stand up, look away from the screen, drink some water.</p>':chips+taskPick)+
+        '<div class="st-ring"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="st-track" cx="100" cy="100" r="'+R+'"/><circle id="timer-ring" class="st-prog" cx="100" cy="100" r="'+R+'" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-ringFrac(secs))).toFixed(2)+'"/></svg>'+
+          '<div class="st-centre"><div id="timer-text" class="st-clock" role="timer" aria-live="off">'+clock(secs)+'</div><span class="st-state">'+(timer.running?'<i></i>':'')+h(state)+'</span></div></div>'+
+        '<p class="st-info">'+h(info)+'</p>'+
+        (lengths?'<div class="st-lengths">'+lengths+'</div>':'')+
+        '<div class="st-buttons">'+controls+'</div>'+
+      '</section>'+
+      '<aside class="st-stats" aria-label="Your study">'+
+        '<div class="st-today"><span class="st-label">Today</span>'+
+          '<div class="st-big"><b>'+minutes(s.today)+'</b><span>'+(left?minutes(left)+' to reach '+minutes(goal):'Goal of '+minutes(goal)+' reached')+'</span></div>'+
+          '<div class="goal-bar"><i style="width:'+pct+'%"></i></div>'+
+          '<dl class="st-facts">'+facts.map(([l,v])=>'<div><dt>'+h(l)+'</dt><dd>'+h(v)+'</dd></div>').join('')+'</dl></div>'+
+        '<div class="st-week"><span class="st-label">This week</span><div class="bars">'+s.days.map(([d,m])=>'<div class="bar-col'+(d===today()?' today':'')+(m>=goal?' hit':'')+'" title="'+h(pretty(d,{weekday:'long'}))+' · '+minutes(m)+'"><i style="height:'+(m/s.dmax*100)+'%"></i><span>'+pretty(d,{weekday:'narrow'})+'</span><small>'+(m?minutes(m):'')+'</small></div>').join('')+'</div></div>'+
+        (s.bySubject.length?'<div class="st-bysubject"><span class="st-label">By subject</span>'+s.bySubject.map(([x,m])=>'<div class="hbar"><span>'+h(x.short)+'</span><div><i style="width:'+(m/s.max*100)+'%;background:'+x.colour+'"></i></div><b>'+minutes(m)+'</b></div>').join('')+'</div>':'')+
+      '</aside>'+
+    '</div>'+
+    '<section class="study-log st-log"><div class="log-head"><h2>Study log</h2>'+button('+ Log a session','log-past','','text')+'</div>'+studyLog()+'</section>'+
   '</div>';
 }
 
@@ -2090,7 +2091,7 @@ function dashPage() {
         (todays.length?todays.slice(0,6).map(t=>stackRow(t,true)).join('')+(todays.length>6?'<a class="subtle-link more-link" href="#today">'+(todays.length-6)+' more →</a>':''):emptyCard('Nothing due today',''))+quickAdd('Today',{date:t0},true),
         '<a class="subtle-link" href="#today">Open →</a>')+
     '</div><div class="dash-col">'+
-      section('Reviews',due.length?String(due.length):'',
+      section('Reviews',due.length?due.length+' due':'',
         due.length?reviewList(due.slice(0,6))+(due.length>6?'<a class="subtle-link more-link" href="#topics">'+(due.length-6)+' more →</a>':''):emptyCard('No reviews due','Press Review on a syllabus topic after you study it.'),
         '<a class="subtle-link" href="#topics">Syllabus →</a>')+
       section('Retests & feedback','',
