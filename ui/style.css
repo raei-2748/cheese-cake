@@ -2127,3 +2127,16 @@ main[data-route]:has(.board){max-width:none}
 @media(max-width:760px){.board{grid-auto-columns:78vw}.bcol{max-height:none}}
 @media(prefers-reduced-motion:reduce){.pal,.pal-box,.pop,.bulk{animation:none}}
 @media(max-width:1180px){body:has(#float-timer:not([hidden])) .bulk{bottom:calc(78px + env(safe-area-inset-bottom))}body.has-bulk:has(#float-timer:not([hidden])) .toast{bottom:calc(130px + env(safe-area-inset-bottom))!important}}
+/* ═════════════ iPhone and iPad Home Screen app (12 Nov) ═════════════ */
+/* Full screen under a see-through status bar: keep content clear of the notch, the
+   Dynamic Island and the home bar. env() is 0 everywhere else, so browsers are unchanged. */
+.sidebar{padding-top:calc(6px + env(safe-area-inset-top))}
+.topbar{padding-top:env(safe-area-inset-top);height:calc(44px + env(safe-area-inset-top))}
+.topbar{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}
+@media(max-width:760px){
+  .sidebar{padding-top:calc(14px + env(safe-area-inset-top))!important;padding-bottom:calc(14px + env(safe-area-inset-bottom))!important}
+}
+/* no rubber-band flash of white behind the app, and no tap highlight boxes */
+html{background:var(--bg)}
+@media(display-mode:standalone){html,body{overscroll-behavior-y:none}}
+*{-webkit-tap-highlight-color:transparent}
