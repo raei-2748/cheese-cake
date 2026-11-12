@@ -1791,7 +1791,7 @@ function focusPage() {
   return '<div class="tt">'+
     '<section class="tt-main timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'#787774')+'">'+
       '<div class="tt-top"><h1 class="sr">Study</h1>'+modeTabs+'<div class="tt-top-tools">'+
-        '<button type="button" class="icon-btn" data-action="settings" title="Timer settings" aria-label="Timer settings">'+icon('sliders')+'</button>'+
+        '<button type="button" class="icon-btn" data-action="settings" data-id="timer" title="Timer settings" aria-label="Timer settings">'+icon('sliders')+'</button>'+
         '<button type="button" class="icon-btn" data-action="timer-full" title="Full screen (f)" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div></div>'+
       focusOn+
       '<div class="tt-ring"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="tt-track" cx="100" cy="100" r="'+R+'"/><circle id="timer-ring" class="tt-prog" cx="100" cy="100" r="'+R+'" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-ringFrac(secs))).toFixed(2)+'"/></svg>'+
@@ -2006,19 +2006,29 @@ function editList(l) {
 }
 
 // ───────────────────────── Backup & settings ─────────────────────────
-function settingsModal() {
-  const p=pomo();
-  modal('Backup & settings','<div class="form-grid">'+
-    number('goal','Daily study goal (min)',studyGoal(),{min:15,max:720,step:15,required:true})+number('focus','Timed round length (min)',p.focus,{min:5,max:120,required:true})+number('short','Short break (min)',p.short,{min:1,max:60,required:true})+
-    number('long','Long break (min)',p.long,{min:1,max:90,required:true})+number('every','Long break after (rounds)',p.every,{min:2,max:12,required:true})+
-    dateField('trialStart','Trials start',data.settings.trialStart)+dateField('hscStart','First HSC exam',data.settings.hscStart)+
-    '<small class="note full">Use your school’s Trial timetable and the NESA HSC timetable. The Overview counts down to both.</small>'+
-    (localMode?'<div class="field full"><span>Sync across devices</span><div class="line wrap">'+button(syncOn()?'Sync settings':'Set up sync','sync-setup','',syncOn()?'secondary':'primary')+'<small class="note">'+(syncOn()?'On'+(syncCfg.device?' · '+h(syncCfg.device):'')+(syncCfg.lastSync?' · last synced '+h(hhmm(Date.parse(syncCfg.lastSync))):''):'Off. Records stay in this browser only.')+'</small></div></div>':'')+
-    '<div class="field full"><span>Backup</span><div class="line wrap">'+button('Export backup (.json)','export')+'<label class="button secondary file-btn">Import backup<input type="file" id="import-file" accept="application/json,.json" hidden></label></div>'+
-    '<small class="note">'+(localMode?(data.settings.lastExport?'Last exported '+h(pretty(data.settings.lastExport,{day:'numeric',month:'short',year:'numeric'}))+'. ':'')+'Export a backup now and then even with sync on, and keep it somewhere safe.':'Your records sync through your account.')+'</small></div>'+
-    (localMode&&Object.keys(snapshots()).length?'<div class="field full"><span>Daily snapshots</span><small class="note">This browser keeps your records as they were when you first opened Stacky each day, for the last 7 days.</small><div class="line wrap">'+Object.keys(snapshots()).sort().reverse().map(d=>button('Restore '+pretty(d,{weekday:'short',day:'numeric',month:'short'}),'restore-snap',d,'text')).join('')+'</div></div>':'')+
-    '<div class="field full"><span>Shortcuts</span><small class="note"><kbd>s</kbd> start or pause studying · <kbd>q</kbd> quick add · <kbd>/</kbd> search · <kbd>Esc</kbd> close details</small></div></div>',
-    'Save settings',v=>change(()=>{ data.settings.pomo={focus:+v.focus,short:+v.short,long:+v.long,every:+v.every}; data.settings.studyGoal=+v.goal; data.settings.trialStart=v.trialStart; data.settings.hscStart=v.hscStart; }));
+// One quiet settings row: label on the left, a small input (and unit) on the right.
+const setRow = (key,label,value,unit,min,max,step=1) => '<label class="set-row"><span>'+h(label)+'</span><span class="set-input"><input name="'+key+'" type="number" value="'+h(value)+'" min="'+min+'" max="'+max+'" step="'+step+'" required>'+(unit?'<small>'+h(unit)+'</small>':'')+'</span></label>';
+const setDate = (key,label,value) => '<label class="set-row"><span>'+h(label)+'</span><span class="set-input"><input name="'+key+'" type="date" value="'+h(value||'')+'"></span></label>';
+// scope 'timer' (from the Study page) shows only the timer; otherwise the full, still short, settings.
+function settingsModal(scope) {
+  const p=pomo(), timerOnly=scope==='timer';
+  const timerRows='<div class="set-group">'+(timerOnly?'':'<h3>Study</h3>')+
+    setRow('goal','Daily goal',studyGoal(),'min',15,720,15)+setRow('focus','Pomo length',p.focus,'min',5,120)+
+    setRow('short','Short break',p.short,'min',1,60)+setRow('long','Long break',p.long,'min',1,90)+setRow('every','Long break every',p.every,'rounds',2,12)+'</div>';
+  const snaps=localMode?Object.keys(snapshots()).sort().reverse():[];
+  const rest=timerOnly?'':
+    '<div class="set-group"><h3>Exam dates</h3>'+setDate('trialStart','Trials start',data.settings.trialStart)+setDate('hscStart','First HSC exam',data.settings.hscStart)+'</div>'+
+    '<div class="set-group"><h3>Data</h3>'+
+      (localMode?'<div class="set-row"><span>Sync'+'<small>'+(syncOn()?'On'+(syncCfg.lastSync?' · '+h(hhmm(Date.parse(syncCfg.lastSync))):''):'Off')+'</small></span>'+button(syncOn()?'Manage':'Set up','sync-setup','','text')+'</div>':'')+
+      '<div class="set-row"><span>Backup'+(localMode&&data.settings.lastExport?'<small>Last '+h(pretty(data.settings.lastExport))+'</small>':'')+'</span><span class="set-actions">'+button('Export','export','','text')+'<label class="button text file-btn">Import<input type="file" id="import-file" accept="application/json,.json" hidden></label></span></div>'+
+      (snaps.length?'<details class="set-more"><summary>Restore a daily snapshot</summary><div class="set-actions">'+snaps.map(d=>button(pretty(d,{weekday:'short',day:'numeric',month:'short'}),'restore-snap',d,'text')).join('')+'</div></details>':'')+
+    '</div>';
+  modal(timerOnly?'Timer':'Settings','<div class="set-list">'+timerRows+rest+'</div>','Save',v=>change(()=>{
+    data.settings.pomo={focus:+v.focus,short:+v.short,long:+v.long,every:+v.every}; data.settings.studyGoal=+v.goal;
+    if (!timerOnly) { data.settings.trialStart=v.trialStart; data.settings.hscStart=v.hscStart; }
+  }));
+  dialog.classList.add('set-dialog');
+  dialog.addEventListener('close',()=>dialog.classList.remove('set-dialog'),{once:true});
 }
 function restoreSnapshot(day) {
   const snap=snapshots()[day];
@@ -2086,7 +2096,7 @@ function stackActions(id, el) {
     'habit-open':()=>{habitOpen=habitOpen===id?null:id;render();},
     'habit-toggle':()=>change(()=>{ const log=(data.habitLog[id]??={}); const d=el.dataset.date; if(log[d]) delete log[d]; else log[d]=1; }),
     'habit-suggest':()=>{ const [name,c]=id.split('|'); change(()=>data.habits.push({id:uid(),name,course:c,days:Array(7).fill(true),created:today()})); },
-    settings:settingsModal,
+    settings:()=>settingsModal(id),
     export:exportData,
     'go-study':()=>{ location.hash='#focus'; },
     'review-topic':()=>{ const t=topicRecord(id); if (t) reviewTopic(t); },
