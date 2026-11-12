@@ -1553,3 +1553,27 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 #nav{position:relative;z-index:1}
 #nav a[aria-current]{background-color:transparent}
 @media(prefers-reduced-motion:reduce){.sidebar>.nav-glide{transition:none}}
+
+/* ═════════════ Floating timer (13 Nov) ═════════════ */
+.float-timer{position:fixed;right:20px;bottom:20px;z-index:45;display:flex;align-items:center;gap:2px;padding:4px;border-radius:12px;
+  background:var(--sheet);color:var(--ink);box-shadow:0 0 0 1px var(--rule),0 6px 20px rgba(15,15,15,.12),0 1px 3px rgba(15,15,15,.08);
+  font-variant-numeric:tabular-nums;animation:ft-in .22s cubic-bezier(.2,.8,.2,1)}
+:root[data-theme=dark] .float-timer{box-shadow:0 0 0 1px var(--rule),0 8px 24px rgba(0,0,0,.45)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .float-timer{box-shadow:0 0 0 1px var(--rule),0 8px 24px rgba(0,0,0,.45)}}
+@keyframes ft-in{from{opacity:0;transform:translateY(8px)}}
+.ft-btn{display:grid;place-items:center;width:34px;height:34px;border:0;border-radius:9px;background:none;color:var(--muted);padding:0;cursor:pointer;transition:background-color .12s,color .12s,transform .08s}
+.ft-btn svg{width:16px;height:16px}
+.ft-btn:hover{background:var(--hover);color:var(--ink)}
+.ft-btn:active{transform:scale(.94)}
+.ft-btn.primary{width:38px;height:38px;border-radius:10px;background:var(--c);color:#fff}
+.ft-btn.primary:hover{background:color-mix(in srgb,var(--c) 86%,#000);color:#fff}
+.ft-body{display:grid;gap:0;padding:0 10px 0 8px;min-width:96px;text-decoration:none;color:inherit;border-radius:8px;line-height:1.2}
+.ft-body:hover{background:var(--hover)}
+.ft-what{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
+.ft-what i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+.float-timer.running .ft-what i{animation:breathe 1.6s ease-in-out infinite}
+.ft-time{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.ft-mode{font-size:13px;font-weight:500;white-space:nowrap}
+.float-timer:not(.running).active .ft-time{color:var(--muted)}
+@media(max-width:760px){.float-timer{right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}.ft-btn[data-action=timer-full]{display:none}}
+@media(prefers-reduced-motion:reduce){.float-timer{animation:none}.float-timer.running .ft-what i{animation:none}}

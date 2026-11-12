@@ -691,6 +691,7 @@ function render() {
   if (r.name!=='search' && document.activeElement!==$('search')) $('search').value='';
   if (focusKey) document.querySelector(focusKey)?.focus();
   renderFull();
+  renderFloat();
   updateTimerDom();
 }
 document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();main.focus();});
@@ -1713,6 +1714,7 @@ function idleChrome() {
   chromeTimer = setTimeout(()=>{ if (fullTimer && timer.running) { chromeHidden=true; fsEl().classList.add('calm'); } },4000);
 }
 function renderFull() {
+  renderFloat();
   const el = fsEl();
   if (!el) return;
   el.hidden = !fullTimer;
@@ -1758,8 +1760,42 @@ const editSession = s => sessionForm(s,'Edit session','Save',{label:'Delete',tit
 
 // Ring fill: elapsed share of a timed phase; the stopwatch sweeps once an hour.
 const ringFrac = secs => countsUp() ? (secs%3600)/3600 : 1-secs/phaseSecs(timer.phase);
+// ───────────────────────── Floating timer ─────────────────────────
+// A small timer that stays in the corner on every page, so studying starts in one click.
+// It hides on the Study page (the big timer is there) and in full screen.
+const floatEl = (()=>{ const el=document.createElement('div'); el.id='float-timer'; el.className='float-timer'; el.setAttribute('role','region'); el.setAttribute('aria-label','Study timer'); el.hidden=true; document.body.append(el); return el; })();
+const svgIcon = d => '<svg viewBox="0 0 24 24" aria-hidden="true">'+d+'</svg>';
+const FI = {
+  play:svgIcon('<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>'),
+  pause:svgIcon('<path d="M8 5.5h2.6v13H8zM13.4 5.5H16v13h-2.6z" fill="currentColor"/>'),
+  stop:svgIcon('<rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor"/>'),
+  skip:svgIcon('<path d="M6 6l8 6-8 6zM16 6h2v12h-2z" fill="currentColor"/>'),
+  full:svgIcon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>')
+};
+function renderFloat() {
+  const show = data && data.settings.floatTimer!==false && route().name!=='focus' && !fullTimer;
+  floatEl.hidden = !show;
+  if (!show) { floatEl.innerHTML=''; return; }
+  const active=sessionActive(), brk=isBreak(timer.phase), c=course(timer.course);
+  const colour = brk ? 'var(--sky)' : c?.colour ?? '#787774';
+  const mode = timer.mode==='exam' ? examCfg().name : timer.mode==='timed' ? pomo().focus+' min' : 'Open';
+  const what = brk ? phaseName[timer.phase] : (c?.short ?? 'General');
+  floatEl.style.setProperty('--c', colour);
+  floatEl.classList.toggle('running', timer.running);
+  floatEl.classList.toggle('active', active);
+  const ib = (action,icon,label,primary) => '<button type="button" class="ft-btn'+(primary?' primary':'')+'" data-action="'+action+'" title="'+h(label)+'" aria-label="'+h(label)+'">'+icon+'</button>';
+  floatEl.innerHTML =
+    (active
+      ? ib(timer.running?'timer-pause':'timer-start', timer.running?FI.pause:FI.play, timer.running?'Pause (s)':'Resume (s)', true)
+      : ib('timer-start', FI.play, (brk?'Start break':'Start studying')+' (s)', true))+
+    '<a class="ft-body" href="#focus" title="Open the Study page"><span class="ft-what"><i></i>'+h(what)+'</span>'+
+      (active ? '<span id="float-time" class="ft-time">'+clock(shownSecs())+'</span>' : '<span class="ft-mode">'+h(mode)+'</span>')+'</a>'+
+    (active ? (brk ? ib('timer-skip', FI.skip, 'Skip break') : ib('timer-finish', FI.stop, timer.mode==='exam'?'End exam':'Finish and log')) : '')+
+    ib('timer-full', FI.full, 'Full screen (f)');
+}
 function updateTimerDom() {
   const secs=shownSecs();
+  const ft=$('float-time'); if (ft) ft.textContent=clock(secs);
   const ring=$('timer-ring'); if (ring) ring.style.strokeDashoffset=String(2*Math.PI*92*(1-ringFrac(secs)));
   const text=$('timer-text'); if (text) text.textContent=clock(secs);
   const bar=$('timer-bar'); if (bar) bar.style.width=(countsUp()?0:100*(1-secs/phaseSecs(timer.phase)))+'%';
@@ -1767,7 +1803,7 @@ function updateTimerDom() {
   const fsBar=$('fs-bar'); if (fsBar) fsBar.style.width=(100*(1-secs/phaseSecs(timer.phase)))+'%';
   const mini=$('mini-timer');
   if (mini) {
-    mini.hidden=!sessionActive() || route().name==='focus';
+    mini.hidden=!sessionActive() || route().name==='focus' || !floatEl.hidden;   // the floating timer already shows it
     const who=timer.mode==='exam'?phaseName[timer.phase]:timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase];
     mini.textContent=(timer.running?'● ':'❚❚ ')+who+' '+clock(secs);
     mini.dataset.phase=timer.phase;
@@ -2099,7 +2135,8 @@ function settingsPage() {
       choice('Highlighter','<span class="swatches" role="radiogroup" aria-label="Highlighter colour">'+HIGHLIGHTS.map(([k,l,c])=>'<button type="button" role="radio" aria-checked="'+(hl===k)+'" title="'+l+'" aria-label="'+l+'" data-action="set-hl" data-id="'+k+'" style="--sw:'+c+'"></button>').join('')+'</span>'))+
     group('Study timer',
       setRow('goal','Daily goal',studyGoal(),'min',15,720,15)+setRow('focus','Round length',p.focus,'min',5,240)+
-      setRow('short','Short break',p.short,'min',1,60)+setRow('long','Long break',p.long,'min',1,90)+setRow('every','Long break every',p.every,'rounds',2,12))+
+      setRow('short','Short break',p.short,'min',1,60)+setRow('long','Long break',p.long,'min',1,90)+setRow('every','Long break every',p.every,'rounds',2,12)+
+      '<label class="set-row"><span>Floating timer<small>A small timer in the corner of every page</small></span><input type="checkbox" class="switch" name="floatTimer" '+(data.settings.floatTimer!==false?'checked':'')+'></label>')+
     group('Exam dates',setDate('trialStart','Trials start',data.settings.trialStart)+setDate('hscStart','First HSC exam',data.settings.hscStart),'The Overview counts down to these.')+
     group('Calendar',
       '<label class="set-row"><span>Show study sessions<small>Logged sessions show on the week view, in Google Calendar when it is connected, and in the subscribed calendar feed</small></span><input type="checkbox" class="switch" name="calSessions" '+(data.settings.calSessions!==false?'checked':'')+'></label>'+
@@ -2121,6 +2158,7 @@ function saveSettingField(el) {
     else if (['focus','short','long','every'].includes(n)) data.settings.pomo={...pomo(),[n]:num(n)};
     else if (n==='trialStart'||n==='hscStart') data.settings[n]=v;
     else if (n==='calSessions') data.settings.calSessions=!!v;
+    else if (n==='floatTimer') data.settings.floatTimer=!!v;
   });
   if (el.type!=='checkbox') notify('Saved.');
 }
