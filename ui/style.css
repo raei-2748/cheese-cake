@@ -1545,14 +1545,8 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .page-head h1,.list-head h1,.cal-title h1,.goal-bar i{background-image:linear-gradient(var(--hl),var(--hl))!important}
 #nav a[aria-current] span,.hl{border-radius:2px!important}
 
-/* ═════════════ Sidebar highlight glides between pages (12 Nov) ═════════════ */
-.sidebar>.nav-glide{position:absolute;left:0;top:0;z-index:0;pointer-events:none;border-radius:2px;opacity:0;
-  background:linear-gradient(var(--hl),var(--hl)) 0 62%/100% 70% no-repeat;
-  transition:transform .34s cubic-bezier(.3,.9,.3,1),width .34s cubic-bezier(.3,.9,.3,1),height .34s cubic-bezier(.3,.9,.3,1)}
-.sidebar.has-glide #nav a[aria-current] span{background:none!important;position:relative;z-index:2}
-#nav{position:relative;z-index:1}
+/* Sidebar: the current page is highlighted without animation (13 Nov) */
 #nav a[aria-current]{background-color:transparent}
-@media(prefers-reduced-motion:reduce){.sidebar>.nav-glide{transition:none}}
 
 /* ═════════════ Floating timer (13 Nov) ═════════════ */
 .float-timer{position:fixed;right:20px;bottom:20px;z-index:45;display:flex;align-items:center;gap:2px;padding:4px;border-radius:12px;
@@ -1667,4 +1661,82 @@ body.nav-open .float-timer{display:none}
   .topic-row>div:first-child{flex:1 1 100%}
   .topic-row .line{flex:1 1 100%;justify-content:flex-start;flex-wrap:nowrap}
 }
-:root[data-side=collapsed] .sidebar>.nav-glide{display:none}
+
+/* ═════════════ Mac app window (12 Nov) ═════════════ */
+/* The window buttons sit in a 28px band at the top: the sidebar runs up behind them, as in Notion,
+   and the page keeps the band clear so nothing clickable sits under the title bar. */
+html.in-mac-app:not(.mac-fullscreen) .sidebar{padding-top:36px!important;z-index:41}
+html.in-mac-app:not(.mac-fullscreen) .side-collapse{top:40px!important}
+html.in-mac-app:not(.mac-fullscreen) .work{padding-top:28px}
+html.in-mac-app:not(.mac-fullscreen) body::before{content:'';position:fixed;top:0;left:0;right:0;height:28px;background:var(--bg);z-index:40;pointer-events:none}
+html.in-mac-app:not(.mac-fullscreen) .detail{top:28px;height:calc(100dvh - 28px)}
+html.in-mac-app .skip{display:none}
+
+/* ═════════════ Sidebar list fades out at the bottom instead of cutting a row in half ═════════════ */
+#nav{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);padding-bottom:28px}
+
+/* ═════════════ Sidebar search, Notion style (12 Nov) ═════════════ */
+.side-search{position:relative;display:flex;align-items:center;gap:7px;height:30px;margin:2px 4px 8px;padding:0 8px;border-radius:7px;
+  background:var(--side-hover,rgba(0,0,0,.04));color:var(--faint);cursor:text;transition:background-color .15s,box-shadow .15s}
+.side-search:hover{background:color-mix(in srgb,var(--side-hover,#eee) 70%,var(--ink) 6%)}
+.side-search:focus-within{background:var(--sheet);box-shadow:0 0 0 1px var(--rule),0 1px 3px rgba(15,15,15,.08)}
+.side-search svg{width:15px;height:15px;flex:none}
+.side-search .search{flex:1;min-width:0;width:auto!important;height:100%;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;outline:0;font:inherit;font-size:13.5px;color:var(--ink)}
+.side-search .search::placeholder{color:var(--faint)}
+.side-search .search::-webkit-search-cancel-button{display:none}
+.side-search-key{font-family:var(--sans);font-size:11px;color:var(--faint);border:0;background:none;padding:0;letter-spacing:.02em}
+.side-search:focus-within .side-search-key{opacity:0}
+.topbar .search{display:none}
+/* collapsed icon rail: a magnifier that opens into a field while focused */
+:root[data-side=collapsed] .side-search{width:40px;height:28px;margin:0 0 6px;padding:0;justify-content:center;background:none}
+:root[data-side=collapsed] .side-search .search,:root[data-side=collapsed] .side-search-key{position:absolute;opacity:0;width:0!important;pointer-events:none}
+:root[data-side=collapsed] .side-search:focus-within{position:absolute;z-index:60;left:6px;width:230px;justify-content:flex-start;padding:0 8px;background:var(--sheet)}
+:root[data-side=collapsed] .side-search:focus-within .search{position:static;opacity:1;width:auto!important;pointer-events:auto}
+/* Mac app: no "Stacky" title in the window; search takes the first row, beside the sidebar toggle */
+html.in-mac-app .brand{display:none!important}
+html.in-mac-app:not([data-side=collapsed]) .side-search{margin-right:34px}
+html.in-mac-app:not(.mac-fullscreen) .side-collapse{top:39px!important}
+html.in-mac-app.mac-fullscreen .side-collapse{top:7px!important}
+html.in-mac-app.mac-fullscreen .sidebar{padding-top:6px!important}
+
+/* ═════════════ No rubber-band bounce past the top or bottom (12 Nov) ═════════════ */
+html,body{overscroll-behavior:none}
+html{background:var(--bg)}
+#nav,.detail,.wk-scroll,dialog,.dialog-content,.fs-timer,.sidebar{overscroll-behavior:none}
+
+/* ═════════════ Calendar: straight-edged blocks, like Apple Calendar (12 Nov) ═════════════ */
+.wk-event,.wk-event.ext,.wk-event.session,.cal-span,.cal-chip,.wk-allcell .cal-chip,.wk-new,.wk-event.picked{border-radius:2px!important}
+.cal-span.cont-l,.cal-span.cont-r{border-radius:0!important}
+.cal-cell.today .cal-num,.wk-day.today strong{border-radius:2px!important}
+
+/* ═════════════ Calendar list beside the grid (13 Nov) ═════════════ */
+.cal-wrap.no-side{grid-template-columns:minmax(0,1fr) 200px}
+.cal-side{display:grid;align-content:start;gap:1px}
+.cal-side-h{font-size:12px!important;font-weight:500!important;color:var(--faint);margin:14px 0 4px 6px!important;letter-spacing:0}
+.cal-side-h:first-child{margin-top:0!important}
+.cal-layer{display:flex;align-items:center;gap:8px;width:100%;min-height:28px;padding:3px 6px;border:0;border-radius:6px;background:none;color:var(--ink);font:inherit;font-size:13.5px;text-align:left;cursor:pointer}
+.cal-layer:hover{background:var(--hover)}
+.cal-layer i{flex:none;width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1.5px var(--c);position:relative}
+.cal-layer[aria-pressed=true] i{background:var(--c);box-shadow:none}
+.cal-layer[aria-pressed=true] i::after{content:'';position:absolute;left:4.5px;top:2px;width:3.5px;height:7px;border:solid #fff;border-width:0 1.6px 1.6px 0;transform:rotate(45deg)}
+.cal-layer span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-layer[aria-pressed=false] span{color:var(--muted)}
+.cal-side-note{font-size:12.5px;color:var(--muted);margin:2px 6px}
+.cal-side-link{justify-self:start;margin:10px 0 6px 6px;border:0;background:none;padding:0;font:inherit;font-size:12.5px;color:var(--muted);cursor:pointer}
+.cal-side-link:hover{color:var(--ink);text-decoration:underline}
+.cal-wrap{overscroll-behavior-x:none}
+
+/* ═════════════ Week view like Apple Calendar (13 Nov) ═════════════ */
+/* the hour grid's scrollbar no longer narrows its columns, so they line up with the header */
+.wk-scroll{scrollbar-width:none!important}
+.wk-scroll::-webkit-scrollbar{display:none}
+/* header: "Thu 12" on one line; today's date in a red circle, no highlighter */
+.wk-head .wk-day{flex-direction:row!important;align-items:center!important;justify-content:center;gap:5px!important;padding:6px 0!important;color:var(--muted)}
+.wk-head .wk-day small{font-size:15px!important;font-weight:400!important;text-transform:none!important;letter-spacing:0!important;color:inherit!important}
+.wk-head .wk-day strong{font-size:15px!important;font-weight:500!important;color:var(--ink)}
+.wk-head .wk-day.today small{color:var(--ink)!important;font-weight:500!important}
+.wk-head .wk-day.today strong,.cal-cell.today .cal-num{background:#e5484d!important;background-image:none!important;color:#fff!important;border-radius:999px!important;
+  min-width:26px!important;height:26px!important;width:auto!important;display:inline-grid!important;place-items:center;padding:0 7px!important;margin:0!important;font-weight:600!important;box-shadow:none!important}
+.cal-cell.today .cal-num{min-width:24px!important;height:24px!important;padding:0 6px!important;font-size:12px}
+.wk-col.today{background-color:transparent!important}
+.wk,.month{will-change:transform}

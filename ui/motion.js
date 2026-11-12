@@ -42,7 +42,6 @@ const setCollapsed = on => {
   writeSide({ collapsed: on });
   labelMenu();
   labelCollapse();
-  setTimeout(() => placeGlide(false), 0);   // the highlight belongs to the wide sidebar only
 };
 // Collapsed, the sidebar becomes an icon rail; the same corner button opens it again.
 const labelCollapse = () => { const l = collapsed() ? 'Expand sidebar' : 'Collapse sidebar'; collapseButton.setAttribute('aria-label', l); collapseButton.title = l; };
@@ -84,47 +83,3 @@ grip.addEventListener('keydown', event => {
 { const s = readSide(); if (s.w) root.style.setProperty('--side-w', s.w + 'px'); if (s.collapsed) root.dataset.side = 'collapsed'; labelCollapse(); }
 wide.addEventListener('change', labelMenu);
 labelMenu();
-
-// Sidebar highlight glides to the page you open. Highlights elsewhere appear instantly.
-// The marker lives beside the nav list (the list is re-rendered often), and slides
-// from the previous current item to the new one.
-const rail = document.querySelector('.sidebar');
-const liveNav = () => document.getElementById('nav');
-const glide = document.createElement('i');
-glide.className = 'nav-glide'; glide.setAttribute('aria-hidden', 'true');
-rail.prepend(glide);
-let glideAt = null;
-const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-function placeGlide(animate = true) {
-  const nav = liveNav(); if (!nav) return;
-  const cur = nav.querySelector('a[aria-current] span');
-  if (!cur || !cur.offsetWidth) { glide.style.opacity = '0'; rail.classList.remove('has-glide'); glideAt = null; return; }
-  // Positions are in the sidebar's own scrolled coordinates, so a scrolled sidebar still lines up.
-  const s = rail.getBoundingClientRect(), r = cur.getBoundingClientRect();
-  const box = { x: r.left - s.left - rail.clientLeft + rail.scrollLeft, y: r.top - s.top - rail.clientTop + rail.scrollTop, w: r.width, h: r.height };
-  // Hide the marker when its row is scrolled out of whichever element actually scrolls.
-  let clip = cur.parentElement;
-  while (clip && clip !== rail && !(/(auto|scroll)/.test(getComputedStyle(clip).overflowY) && clip.clientHeight)) clip = clip.parentElement;
-  const c = (clip || rail).getBoundingClientRect();
-  const hidden = c.height > 0 && (r.bottom < c.top || r.top > c.bottom);
-  const moved = glideAt && (Math.abs(glideAt.y - box.y) > 1 || Math.abs(glideAt.x - box.x) > 1 || Math.abs(glideAt.w - box.w) > 1);
-  // Re-placing at the same spot must not touch the transition, or a slide in progress snaps.
-  if (!glideAt || moved) {
-    glide.style.transition = animate && moved && !reduceMotion() ? '' : 'none';
-    glide.style.transform = 'translate(' + box.x + 'px,' + box.y + 'px)';
-    glide.style.width = box.w + 'px'; glide.style.height = box.h + 'px';
-  }
-  glide.style.opacity = hidden ? '0' : '1';
-  rail.classList.add('has-glide');
-  glideAt = box;
-}
-let glideQueued = false;
-new MutationObserver(records => {
-  // Ignore the sidebar's own has-glide class flips, which this code makes.
-  if (records.every(m => m.target === rail && m.attributeName === 'class')) return;
-  if (glideQueued) return; glideQueued = true; setTimeout(() => { glideQueued = false; placeGlide(true); }, 0); })
-  .observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-current', 'class'] });
-addEventListener('hashchange', () => setTimeout(() => placeGlide(true), 0));
-rail.addEventListener('scroll', () => placeGlide(false), { passive: true, capture: true });
-addEventListener('resize', () => placeGlide(false));
-placeGlide(false);
