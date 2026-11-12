@@ -1545,14 +1545,8 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .page-head h1,.list-head h1,.cal-title h1,.goal-bar i{background-image:linear-gradient(var(--hl),var(--hl))!important}
 #nav a[aria-current] span,.hl{border-radius:2px!important}
 
-/* ═════════════ Sidebar highlight glides between pages (12 Nov) ═════════════ */
-.sidebar>.nav-glide{position:absolute;left:0;top:0;z-index:0;pointer-events:none;border-radius:2px;opacity:0;
-  background:linear-gradient(var(--hl),var(--hl)) 0 62%/100% 70% no-repeat;
-  transition:transform .34s cubic-bezier(.3,.9,.3,1),width .34s cubic-bezier(.3,.9,.3,1),height .34s cubic-bezier(.3,.9,.3,1)}
-.sidebar.has-glide #nav a[aria-current] span{background:none!important;position:relative;z-index:2}
-#nav{position:relative;z-index:1}
+/* Sidebar: the current page is highlighted without animation (13 Nov) */
 #nav a[aria-current]{background-color:transparent}
-@media(prefers-reduced-motion:reduce){.sidebar>.nav-glide{transition:none}}
 
 /* ═════════════ Floating timer (13 Nov) ═════════════ */
 .float-timer{position:fixed;right:20px;bottom:20px;z-index:45;display:flex;align-items:center;gap:2px;padding:4px;border-radius:12px;
@@ -1590,3 +1584,27 @@ html.in-mac-app .skip{display:none}
 
 /* ═════════════ Sidebar list fades out at the bottom instead of cutting a row in half ═════════════ */
 #nav{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);padding-bottom:28px}
+
+/* ═════════════ Sidebar search, Notion style (12 Nov) ═════════════ */
+.side-search{position:relative;display:flex;align-items:center;gap:7px;height:30px;margin:2px 4px 8px;padding:0 8px;border-radius:7px;
+  background:var(--side-hover,rgba(0,0,0,.04));color:var(--faint);cursor:text;transition:background-color .15s,box-shadow .15s}
+.side-search:hover{background:color-mix(in srgb,var(--side-hover,#eee) 70%,var(--ink) 6%)}
+.side-search:focus-within{background:var(--sheet);box-shadow:0 0 0 1px var(--rule),0 1px 3px rgba(15,15,15,.08)}
+.side-search svg{width:15px;height:15px;flex:none}
+.side-search .search{flex:1;min-width:0;width:auto!important;height:100%;padding:0!important;border:0!important;background:none!important;box-shadow:none!important;outline:0;font:inherit;font-size:13.5px;color:var(--ink)}
+.side-search .search::placeholder{color:var(--faint)}
+.side-search .search::-webkit-search-cancel-button{display:none}
+.side-search-key{font-family:var(--sans);font-size:11px;color:var(--faint);border:0;background:none;padding:0;letter-spacing:.02em}
+.side-search:focus-within .side-search-key{opacity:0}
+.topbar .search{display:none}
+/* collapsed icon rail: a magnifier that opens into a field while focused */
+:root[data-side=collapsed] .side-search{width:40px;height:28px;margin:0 0 6px;padding:0;justify-content:center;background:none}
+:root[data-side=collapsed] .side-search .search,:root[data-side=collapsed] .side-search-key{position:absolute;opacity:0;width:0!important;pointer-events:none}
+:root[data-side=collapsed] .side-search:focus-within{position:absolute;z-index:60;left:6px;width:230px;justify-content:flex-start;padding:0 8px;background:var(--sheet)}
+:root[data-side=collapsed] .side-search:focus-within .search{position:static;opacity:1;width:auto!important;pointer-events:auto}
+/* Mac app: no "Stacky" title in the window; search takes the first row, beside the sidebar toggle */
+html.in-mac-app .brand{display:none!important}
+html.in-mac-app:not([data-side=collapsed]) .side-search{margin-right:34px}
+html.in-mac-app:not(.mac-fullscreen) .side-collapse{top:39px!important}
+html.in-mac-app.mac-fullscreen .side-collapse{top:7px!important}
+html.in-mac-app.mac-fullscreen .sidebar{padding-top:6px!important}
