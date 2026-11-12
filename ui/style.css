@@ -175,7 +175,7 @@ kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;paddi
 @media(max-width:1130px){
   .panes.with-detail{grid-template-columns:minmax(0,1fr)}
   .detail{position:fixed;right:0;top:0;bottom:0;width:min(420px,100vw);height:100dvh;z-index:30;box-shadow:-20px 0 60px #00000026}
-  .cal-wrap{grid-template-columns:1fr}.cal-side{position:static}
+  .cal-wrap{grid-template-columns:minmax(0,1fr)}.cal-side{position:static}
   .focus-wrap{grid-template-columns:1fr}
 }
 @media(max-width:760px){
@@ -1110,7 +1110,7 @@ table.balance tr.flag th{box-shadow:inset 2px 0 var(--red)}
 .toggle-field{display:flex!important;align-items:center;gap:10px;flex-direction:row!important}
 .form-grid .rule{height:1px;background:var(--line-a);margin:6px 0}
 .steps code,.note code{font-size:12px}
-@media(max-width:1100px){.cal-wrap{grid-template-columns:1fr}.cal-side{position:static}}
+@media(max-width:1100px){.cal-wrap{grid-template-columns:minmax(0,1fr)}.cal-side{position:static}}
 @media(max-width:760px){
   .panes main[data-route=calendar]{padding:16px 10px 40px}
   .cal-title h1{font-size:26px}
@@ -1129,7 +1129,7 @@ table.balance tr.flag th{box-shadow:inset 2px 0 var(--red)}
 .wk-day{flex-direction:column;align-items:center;gap:0;line-height:1.15}
 .wk-day small{font-size:11px}
 /* with a task open, the grid gets the room and the unscheduled list steps aside */
-.panes.with-detail main[data-route=calendar] .cal-wrap{grid-template-columns:1fr}
+.panes.with-detail main[data-route=calendar] .cal-wrap{grid-template-columns:minmax(0,1fr)}
 .panes.with-detail main[data-route=calendar] .cal-side{display:none}
 .panes.with-detail main[data-route=calendar]{padding-left:20px;padding-right:20px}
 @media(max-width:760px){
@@ -1577,3 +1577,86 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .float-timer:not(.running).active .ft-time{color:var(--muted)}
 @media(max-width:760px){.float-timer{right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}.ft-btn[data-action=timer-full]{display:none}}
 @media(prefers-reduced-motion:reduce){.float-timer{animation:none}.float-timer.running .ft-what i{animation:none}}
+
+/* ═════════════ Bug sweep (Nov): layout repairs ═════════════ */
+/* Sidebar: a long list name used to widen the whole column, and the count on the
+   current page sat next to its label instead of at the right edge. */
+#nav{grid-template-columns:minmax(0,1fr)}
+#nav a b{margin-left:auto;padding-left:6px}
+.nav-empty{line-height:1.4}
+
+/* Text that wraps keeps a normal line height (the page default is a fixed 24px,
+   which is far too open for small type). */
+.record h3,.record p,.record-detail,.metric small,.note,.zero p,.srow-title,.set-row small,
+.focus-row strong,.focus-row small,.attempts p,.banner strong,.banner span{line-height:1.45}
+.record p{margin-top:3px}
+
+/* Weekly plan: the day cards were still on the first draft's 9px type. */
+.day{padding:10px}
+.day-heading strong{font-size:15px;line-height:1.2}
+.day-heading small{font-size:12px;line-height:1.3;color:var(--muted)}
+.day .load{margin-top:8px}
+.day .load span{font-size:11.5px;color:var(--muted)}
+.task-row{gap:8px;padding:8px 0;align-items:flex-start}
+.task-row .tick{width:16px;height:16px;margin-top:1px;border-radius:4px;border:1.5px solid var(--faint);background:transparent;font-size:0;cursor:pointer}
+.task-row .tick.checked{background:var(--ink);border-color:var(--ink);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.2l2.6 2.6L12 5.4' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-size:100%}
+:root[data-theme=dark] .task-row .tick.checked{filter:invert(1)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .task-row .tick.checked{filter:invert(1)}}
+.task-name{line-height:1.35;cursor:pointer}
+.task-name strong{font-size:13px;font-weight:500;color:var(--ink)}
+.task-name small{font-size:11.5px;margin-top:2px}
+.task-row .task-time{font-size:11.5px;line-height:1.5;white-space:nowrap}
+.task-row.done .task-name strong{text-decoration:line-through;color:var(--muted)}
+.day-empty{font-size:12px;line-height:1.4;padding-top:8px}
+@media(min-width:1001px){.day-grid{grid-template-columns:repeat(7,minmax(132px,1fr));overflow-x:auto}}
+
+/* Study page: the seven day bars share one baseline whether or not a day has minutes. */
+.bars{align-items:stretch}
+.bar-col{line-height:1.2}
+.bar-col span{padding-top:5px}
+.bar-col small{height:14px;min-height:0;line-height:14px;white-space:nowrap}
+
+/* Assessments: week labels sit clear of the markers on the eight-week line. */
+.runway{padding-top:40px}
+.rw-week{top:-36px;line-height:14px}
+.rw-week::after{top:28px}
+.rw-today::before{line-height:1;bottom:-15px}
+
+/* Calendar: three or more blocks side by side show the name only. */
+.wk-event.tight{padding-left:4px;padding-right:2px}
+.wk-event.tight span{display:none}
+.wk-event.tight b{text-overflow:clip}
+
+/* Dialogs: the heading and the buttons stay put; only the form scrolls. */
+dialog[open]{display:flex;flex-direction:column;overflow:hidden}
+dialog #edit-form{display:flex;flex-direction:column;flex:1;min-height:0}
+dialog .dialog-head{flex:none}
+dialog .dialog-content{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+dialog .dialog-actions{flex:none;padding-top:12px;border-top:1px solid var(--line-a)}
+
+/* Floating timer: it no longer covers the last row of a page, the toast, the task
+   panel or the phone menu. */
+body:has(#float-timer:not([hidden])) .panes main{padding-bottom:104px}
+body:has(#float-timer:not([hidden])) .toast{bottom:calc(76px + env(safe-area-inset-bottom))}
+body.nav-open .float-timer{display:none}
+@media(min-width:1131px){body:has(#detail:not([hidden])) .float-timer{right:480px}}
+@media(max-width:1130px){body:has(#detail:not([hidden])) .float-timer{display:none}}
+@media(max-width:760px){
+  .float-timer:not(.active) .ft-body{display:none}
+  .float-timer:not(.active){border-radius:14px}
+  .toast{left:12px;right:12px;max-width:none;text-align:center}
+}
+
+/* Phones: habit names get their own line above the week of ticks. */
+@media(max-width:560px){
+  .habit-row{grid-template-columns:repeat(7,minmax(0,1fr)) 52px;row-gap:6px;justify-items:center}
+  .habit-row .habit-name{grid-column:1/-1;justify-self:stretch}
+  .habit-row.head>span:first-child{display:none}
+}
+.task-row{display:grid;grid-template-columns:16px minmax(0,1fr);column-gap:8px;row-gap:1px}
+.task-row .task-time{grid-column:2}
+.task-name{overflow-wrap:break-word}
+.cal-more{white-space:nowrap}
+@media(max-width:760px){.cal-more{font-size:10px;padding-left:0;padding-right:0;letter-spacing:-.02em}}
+.hero-then b{white-space:nowrap}

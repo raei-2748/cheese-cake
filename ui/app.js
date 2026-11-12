@@ -440,7 +440,7 @@ function nextActions() {
 
 function taskRow(t) {
   const label = t.status==='Done'?'Reopen '+t.title:'Mark '+t.title+' done';
-  return '<div class="task-row'+(t.status==='Dropped'?' dropped':'')+'"><button type="button" class="tick '+(taskDone(t)?'checked':'')+'" aria-label="'+h(label)+'" aria-pressed="'+taskDone(t)+'" data-action="toggle-task" data-id="'+h(t.id)+'">'+(taskDone(t)?'✓':'')+'</button><button class="task-name" type="button" data-action="edit-task" data-id="'+h(t.id)+'"><strong>'+h(t.title)+'</strong><small>'+h(course(t.course)?.short ?? t.kind)+(t.course?' · '+h(t.kind):'')+'</small></button><span class="task-time">'+(t.minutes?minutes(t.minutes):'')+'</span></div>';
+  return '<div class="task-row'+(t.status==='Dropped'?' dropped':'')+(taskDone(t)?' done':'')+'"><button type="button" class="tick '+(taskDone(t)?'checked':'')+'" aria-label="'+h(label)+'" aria-pressed="'+taskDone(t)+'" data-action="toggle-task" data-id="'+h(t.id)+'">'+(taskDone(t)?'✓':'')+'</button><button class="task-name" type="button" data-action="edit-task" data-id="'+h(t.id)+'"><strong>'+h(t.title)+'</strong><small>'+h(course(t.course)?.short ?? t.kind)+(t.course?' · '+h(t.kind):'')+'</small></button><span class="task-time">'+(t.minutes?minutes(t.minutes):'')+'</span></div>';
 }
 function weekly() {
   const plan = capacity();
@@ -695,7 +695,7 @@ function render() {
   updateTimerDom();
 }
 document.querySelector('.skip').addEventListener('click',event=>{event.preventDefault();main.focus();});
-window.addEventListener('hashchange',()=>{ if(data) {selected=null; render(); window.scrollTo(0,0);} });
+window.addEventListener('hashchange',()=>{ if(data) {selected=null; render(); window.scrollTo(0,0); nav.querySelector('[aria-current]')?.scrollIntoView({block:'nearest'});} });
 
 const field = (name,label,value='',options={}) => {
   const type=options.type||'text';
@@ -1107,7 +1107,7 @@ function weekGrid() {
         (d===t0?'<i class="now-line" style="top:'+(nowMins/60*HOUR_PX)+'px"></i>':'')+
         items.map(it=>{
           const top=it.s/60*HOUR_PX, height=Math.max(18,(it.e-it.s)/60*HOUR_PX-2), pos='top:'+top+'px;height:'+height+'px;left:calc('+(it.lane*100/it.lanes)+'% + 1px);width:calc('+(100/it.lanes)+'% - 3px)';
-          const short=it.e-it.s<=45?' short':'', past=(d<t0||(d===t0&&it.e<=nowMins))?' past':'';
+          const short=(it.e-it.s<=45?' short':'')+(it.lanes>=3?' tight':''), past=(d<t0||(d===t0&&it.e<=nowMins))?' past':'';
           if (it.x?.kind==='session') return '<button type="button" class="wk-event session'+short+past+'" data-action="edit-session" data-id="'+h(it.x.id)+'" style="--c:'+h(it.x.colour)+';'+pos+'" title="Studied · '+h(it.x.title)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+' · '+minutes(it.x.minutes)+'</span></button>';
           if (it.x) return '<a class="wk-event ext'+short+past+'"'+(it.x.link?' href="'+h(it.x.link)+'" target="_blank" rel="noopener"':'')+' style="--c:'+h(it.x.colour)+';'+pos+'" title="'+h(it.x.title+' · '+it.x.calName)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span></a>';
           const t=it.t;
@@ -1118,7 +1118,7 @@ function weekGrid() {
 function calAfterRender() {
   const sc=main.querySelector('.wk-scroll');
   if (!sc) return;
-  sc.scrollTop = calScroll ?? 7*HOUR_PX;
+  sc.scrollTop = calScroll ?? 7*HOUR_PX-12;   // a little above 7am, so its label is not cut in half
   sc.addEventListener('scroll',()=>{ calScroll=sc.scrollTop; },{passive:true});
 }
 // Drawing, moving and resizing blocks with the mouse, pen or a finger.
@@ -1778,7 +1778,7 @@ function renderFloat() {
   if (!show) { floatEl.innerHTML=''; return; }
   const active=sessionActive(), brk=isBreak(timer.phase), c=course(timer.course);
   const colour = brk ? 'var(--sky)' : c?.colour ?? '#787774';
-  const mode = timer.mode==='exam' ? examCfg().name : timer.mode==='timed' ? pomo().focus+' min' : 'Open';
+  const mode = timer.mode==='exam' ? examCfg().name : timer.mode==='timed' ? pomo().focus+' min' : 'Stopwatch';
   const what = brk ? phaseName[timer.phase] : (c?.short ?? 'General');
   floatEl.style.setProperty('--c', colour);
   floatEl.classList.toggle('running', timer.running);
