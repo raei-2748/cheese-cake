@@ -9,7 +9,25 @@ let appHost = "raei-2748.github.io"
 // Google blocks sign-in inside embedded web views by user agent; present as Safari.
 let safariUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 
-final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate, WKDownloadDelegate, NSWindowDelegate {
+// The page fills the whole window (no title bar), so the page tells us when a press lands on
+// an empty part of the top strip or top bar; we then let macOS move the window from that press.
+final class StackyWebView: WKWebView {
+  var lastMouseDown: NSEvent?
+  override func mouseDown(with event: NSEvent) { lastMouseDown = event; super.mouseDown(with: event) }
+}
+let dragScript = """
+(() => {
+  const controls = 'a,button,input,select,textarea,label,summary,[contenteditable],[data-action],[data-select],[draggable=true],[role=button],[role=tab],[role=slider],.wk-col,.wk-event,.srow,.sidebar-resize,.nav-search';
+  const inTopStrip = e => e.clientY <= (document.documentElement.classList.contains('mac-fullscreen') ? 0 : 44);
+  addEventListener('mousedown', e => {
+    if (e.button !== 0 || e.target.closest(controls)) return;
+    if (!inTopStrip(e) && !e.target.closest('.topbar')) return;
+    window.webkit?.messageHandlers?.stackyWindow?.postMessage(e.detail >= 2 ? 'zoom' : 'drag');
+  }, true);
+})();
+"""
+
+final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate, WKDownloadDelegate, NSWindowDelegate, WKScriptMessageHandler {
   var window: NSWindow!
   var web: WKWebView!
   var popups: [NSWindow] = []
@@ -24,7 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     config.defaultWebpagePreferences.allowsContentJavaScript = true
     // Tell the page it runs in the Mac app, so it can leave room for the window buttons.
     config.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('in-mac-app')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
-    web = WKWebView(frame: .zero, configuration: config)
+    config.userContentController.addUserScript(WKUserScript(source: dragScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+    config.userContentController.add(self, name: "stackyWindow")
+    web = StackyWebView(frame: .zero, configuration: config)
     web.customUserAgent = safariUA
     web.uiDelegate = self
     web.navigationDelegate = self
@@ -49,6 +69,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     // Always check for a newer page on launch; versioned scripts and styles still come from cache.
     web.load(URLRequest(url: homeURL, cachePolicy: .reloadRevalidatingCacheData))
     NSApp.activate(ignoringOtherApps: true)
+  }
+
+  // Window moves and double-click zoom requested by the page (see dragScript).
+  func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
+    guard let what = message.body as? String, !window.styleMask.contains(.fullScreen) else { return }
+    if what == "drag", let down = (web as? StackyWebView)?.lastMouseDown { window.performDrag(with: down) }
+    if what == "zoom" {
+      switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") ?? "Maximize" {
+      case "Minimize": window.performMiniaturize(nil)
+      case "None": break
+      default: window.performZoom(nil)
+      }
+    }
   }
 
   // In full screen there are no window buttons, so the page drops the top band.
