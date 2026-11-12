@@ -379,7 +379,7 @@ const badge = (label, tone='neutral') => label ? '<span class="badge '+tone+'">'
 const subject = id => id && course(id) ? '<span class="subject" style="--subject:'+course(id).colour+'">'+subjectIcon(id)+h(course(id).short)+'</span>' : '<span class="subject general">'+subjectIcon()+'General</span>';
 const emptyCard = (title, description, action='') => '<div class="empty" title="'+h(description)+'"><strong>'+h(title)+'</strong>'+action+'</div>';
 const pageHead = (eyebrow,title,copy,action='') => '<div class="page-head"><div>'+(eyebrow?'<div class="eyebrow">'+h(eyebrow)+'</div>':'')+'<h1>'+h(title)+'</h1>'+(copy?'<p>'+h(copy)+'</p>':'')+'</div><div class="head-action">'+action+'</div></div>';
-const section = (title, sub, body, action='') => '<section class="card"><div class="card-head"><div><h2>'+h(title)+'</h2>'+(sub?'<p>'+h(sub)+'</p>':'')+'</div>'+action+'</div>'+body+'</section>';
+const section = (title, sub, body, action='') => '<section class="card">'+(title||action?'<div class="card-head"><div>'+(title?'<h2>'+h(title)+'</h2>':'')+(sub?'<p>'+h(sub)+'</p>':'')+'</div>'+action+'</div>':'')+body+'</section>';
 const metric = (label,value,detail,tone='') => '<div class="metric '+tone+(value==='—'?' unset':'')+'"><span>'+h(label)+'</span><strong>'+h(value==='—'?'Not set':value)+'</strong>'+(detail!==''&&detail!=null?'<small>'+h(detail)+'</small>':'')+'</div>';
 const tabGroup = (label,action,selected,items) => '<div class="tabs" role="group" aria-label="'+h(label)+'">'+items.map(item=>{const [id,name]=Array.isArray(item)?item:[item,item];return '<button type="button" aria-pressed="'+(id===selected)+'" class="'+(id===selected?'selected':'')+'" data-action="'+action+'" data-id="'+h(id)+'">'+h(name)+'</button>';}).join('')+'</div>';
 const weekLabel = () => pretty(week)+' – '+pretty(addDays(week,6),{day:'numeric',month:'short',year:'numeric'});
@@ -1950,7 +1950,7 @@ function papersPage() {
   }).join('');
   return pageHead('','Past papers','',button('+ Log paper','edit-paper','','primary'))+
     (cards?'<div class="paper-grid">'+cards+'</div>':'')+
-    section('Log','',
+    section('','',
       tabGroup('Course','paper-filter',paperFilter,[['all','All'],...courses.map(c=>[c.id,c.short])])+
       (shown.length?'<div class="record-list">'+shown.map(p=>{
         const pct=paperPct(p), over=p.minutes&&p.limit&&Number(p.minutes)>Number(p.limit);

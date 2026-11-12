@@ -1438,3 +1438,22 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .cal-cals svg{width:18px;height:18px}
 .month-head{background:none!important;border-top:0!important}
 .month-head span{font-size:11px;color:var(--faint);font-weight:500}
+
+/* ═════════════ Motion: instant switches, drawn highlighters (12 Nov) ═════════════ */
+/* pills, tabs, filters and segmented controls change state with no animation */
+.tabs button,.subj,.modes button,.lengths button,.tt-modes button,.pri-pick button,.template-pick,.prep-step{transition:none!important;animation:none!important}
+.tabs button:active{transform:none}
+.hl-draw .subj[aria-pressed=true],.hl-draw .modes button[aria-pressed=true],.hl-draw .lengths button[aria-pressed=true],.hl-draw .tabs button.selected,.hl-draw .tabs button[aria-pressed=true],.hl-draw .prop .pri-pick button[aria-pressed=true]{animation:none!important}
+/* the page title's highlighter is drawn left to right when you arrive on a page */
+:root{--title-hl:.2em}
+:root[data-theme=dark]{--title-hl:.14em}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--title-hl:.14em}}
+@keyframes title-draw{from{background-size:0% var(--title-hl)}to{background-size:100% var(--title-hl)}}
+.hl-title .page-head h1,.hl-title .list-head h1{animation:title-draw .45s cubic-bezier(.25,.8,.25,1) both}
+@media(prefers-reduced-motion:reduce){.hl-title .page-head h1,.hl-title .list-head h1{animation:none}}
+
+/* ═════════════ Neater records: quiet actions (12 Nov) ═════════════ */
+.record-head .button.secondary,.record .button.secondary{background:none!important;border-color:transparent!important;color:var(--muted)!important;box-shadow:none!important}
+.record-head .button.secondary:hover,.record .button.secondary:hover{background:var(--hover)!important;color:var(--ink)!important}
+.record h3{margin-top:4px}
+.card>.tabs:first-child{margin-bottom:6px}
