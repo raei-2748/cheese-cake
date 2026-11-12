@@ -1217,8 +1217,11 @@ function calAfterRender() {
   const wk=sc.closest('.wk'), vis=calDays(), col=()=>sc.querySelector('.wk-col')?.offsetWidth||1;
   sc.scrollTop = calScroll ?? 6.5*HOUR_PX;   // open at 6:30, so the 7am line and its label are in full view
   sc.scrollLeft = vis*col();                 // the middle screen of the strip is the one you asked for
+  const home = sc.scrollLeft;
   let settle;
   const recentre = () => {                   // after a scroll stops, the strip is rebuilt around where you stopped
+    if (!sc.isConnected || calDrag) return;  // an older copy of the grid, or a block being dragged
+    if (Math.abs(sc.scrollLeft-home)<col()/2) { calScroll=sc.scrollTop; return; }
     const idx=Math.round(sc.scrollLeft/col());
     calScroll=sc.scrollTop;
     if (idx===vis) return;

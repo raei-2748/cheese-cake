@@ -1928,3 +1928,16 @@ html.mini-mode .ft-btn[data-action=float-close]{margin-left:auto;opacity:.6}
 html.mini-mode .ft-btn[data-action=float-close]:hover{opacity:1}
 /* Mac app panel: the top strip is for dragging the window */
 html.mini-mode.in-float-panel body{padding-top:16px}
+
+/* ═════════════ Continuous horizontal scrolling (13 Nov) ═════════════ */
+/* The hour grid, header and all-day row share one scroller: trackpad swipes scroll the
+   days with momentum and snap to a day edge; the time column stays put on the left. */
+.wk .wk-scroll{overflow:auto!important;container-type:inline-size;scroll-snap-type:x mandatory;scroll-padding-left:var(--gut);overscroll-behavior:none}
+.wk .wk-scroll>.wk-top,.wk .wk-scroll>.wk-body{width:max-content;min-width:100%}
+.wk .wk-scroll .wk-head,.wk .wk-scroll .wk-allday,.wk .wk-scroll .wk-body{grid-template-columns:var(--gut) repeat(var(--days),calc((100cqw - var(--gut)) / var(--vis)))!important}
+.wk .wk-top{position:sticky;top:0;z-index:5;background:var(--bg)}
+.wk .wk-top .wk-head{position:static!important}
+.wk .wk-col{scroll-snap-align:start}
+.wk .wk-head>.wk-gutter,.wk .wk-allday>.wk-gutter,.wk .wk-body>.wk-gutter{position:sticky!important;left:0;z-index:4;background:var(--bg)}
+.wk .wk-body>.wk-gutter{z-index:3}
+.wk .cal-span span{position:sticky;left:calc(var(--gut) + 8px)}
