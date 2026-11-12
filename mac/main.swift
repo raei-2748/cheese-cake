@@ -75,7 +75,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
 
   // Window moves and double-click zoom requested by the page (see dragScript).
   func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
-    if message.name == "stackyFloat" { (message.body as? String) == "close" ? floatPanel?.close() : openFloat(); return }
+    if message.name == "stackyFloat" {
+      switch message.body as? String {
+        case "close": floatPanel?.close()
+        case "main": window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)   // finishing a session: the log form is in the main window
+        default: openFloat()
+      }
+      return
+    }
     guard let what = message.body as? String, !window.styleMask.contains(.fullScreen) else { return }
     if what == "drag", let down = (web as? StackyWebView)?.lastMouseDown { window.performDrag(with: down) }
     if what == "zoom" {
@@ -97,7 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     let mini = WKWebView(frame: .zero, configuration: config)
     mini.customUserAgent = safariUA
     mini.setValue(false, forKey: "drawsBackground")
-    let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 78),
+    let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 180),
                     styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel, .utilityWindow],
                     backing: .buffered, defer: false)
     p.title = "Stacky timer"
@@ -113,8 +120,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     p.contentView = mini
     p.isReleasedWhenClosed = false
     p.delegate = self
-    p.setFrameAutosaveName("StackyFloat")
-    if !p.setFrameUsingName("StackyFloat"), let v = NSScreen.main?.visibleFrame { p.setFrameOrigin(NSPoint(x: v.maxX - 380, y: v.maxY - 100)) }
+    p.setFrameAutosaveName("StackyPlayer")
+    if !p.setFrameUsingName("StackyPlayer"), let v = NSScreen.main?.visibleFrame { p.setFrameOrigin(NSPoint(x: v.maxX - 380, y: v.maxY - 200)) }
     mini.load(URLRequest(url: URL(string: homeURL.absoluteString + "#mini")!, cachePolicy: .reloadRevalidatingCacheData))
     p.orderFrontRegardless()
     floatPanel = p
