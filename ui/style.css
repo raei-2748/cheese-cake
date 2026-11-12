@@ -1413,3 +1413,28 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .template-pick svg{width:16px;height:16px;color:var(--muted)}
 .template-pick small{font-family:var(--mono);font-size:12px;color:var(--muted)}
 .save-status{opacity:.6}
+
+/* ═════════════ Calendar, minimal (12 Nov) ═════════════ */
+/* hour lines only, no column washes; today is marked in the header alone */
+.wk-col{background-image:linear-gradient(to bottom,color-mix(in srgb,var(--line-a) 70%,transparent) 1px,transparent 1px)!important;background-size:100% var(--hour)!important}
+.wk-col.past,.wk-col.today{background-color:transparent!important}
+.wk-col.drag-over{background-color:var(--hl-faint)!important}
+.wk-col{border-left-color:color-mix(in srgb,var(--line-a) 70%,transparent)}
+.wk-day.past strong,.wk-day.past small{color:var(--faint)}
+.cal-cell.other{background:none!important}
+.cal-cell{border-color:color-mix(in srgb,var(--line-a) 70%,transparent)}
+/* blocks: one line of title, quiet time */
+.wk-event b{white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis;display:block}
+.wk-event{box-shadow:inset 2px 0 var(--c,#888)}
+.wk-event:hover{box-shadow:inset 2px 0 var(--c,#888),0 1px 4px rgba(15,15,15,.1)}
+/* unscheduled list: plain rows, small label, only when there is something to place */
+.cal-wrap.no-side{grid-template-columns:minmax(0,1fr)!important}
+.cal-side h2{font-size:12px!important;font-weight:500!important;color:var(--muted);margin:6px 0 6px!important;letter-spacing:0!important}
+.cal-side .cal-chip{background:none!important;padding:5px 6px;font-size:13px;border-radius:5px}
+.cal-side .cal-chip:hover{background:var(--hover)!important}
+/* header tools */
+.cal-cals{width:32px;height:32px;display:grid;place-items:center;border:0;background:none;border-radius:6px;color:var(--muted);cursor:pointer;padding:0}
+.cal-cals:hover{background:var(--hover);color:var(--ink)}
+.cal-cals svg{width:18px;height:18px}
+.month-head{background:none!important;border-top:0!important}
+.month-head span{font-size:11px;color:var(--faint);font-weight:500}

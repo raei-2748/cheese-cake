@@ -1033,9 +1033,9 @@ function calendarPage() {
   return '<div class="cal-head"><div class="cal-title"><h1>'+h(calTitle())+'</h1>'+extStatus()+'</div><div class="cal-tools">'+
     '<div class="week-picker"><button type="button" aria-label="Previous" data-action="cal-shift" data-id="-1">‹</button>'+button('Today','cal-today','','text')+'<button type="button" aria-label="Next" data-action="cal-shift" data-id="1">›</button></div>'+
     tabGroup('Calendar view','cal-mode',calMode,[['week','Week'],['month','Month']])+
-    '<button type="button" class="button text" data-action="calendars">'+icon('calendar')+'Calendars</button></div></div>'+
-    '<div class="cal-wrap">'+(calMode==='month'?monthGrid():weekGrid())+
-    '<aside class="cal-side"><h2 title="Drag onto the grid to plan it">Unscheduled</h2>'+(unscheduled.length?sortTasks(unscheduled).map(chip).join(''):'<p class="note quiet">Everything has a date.</p>')+'</aside></div>';
+    '<button type="button" class="icon-btn cal-cals" data-action="calendars" title="Calendars" aria-label="Calendars">'+icon('calendar')+'</button></div></div>'+
+    '<div class="cal-wrap'+(unscheduled.length?'':' no-side')+'">'+(calMode==='month'?monthGrid():weekGrid())+
+    (unscheduled.length?'<aside class="cal-side"><h2 title="Drag onto the grid to plan it">Unscheduled</h2>'+sortTasks(unscheduled).map(chip).join('')+'</aside>':'')+'</div>';
 }
 function monthGrid() {
   const monthStart=calAnchor.slice(0,8)+'01', start=monday(monthStart), month=monthStart.slice(0,7), t0=today();
