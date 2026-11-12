@@ -1613,3 +1613,8 @@ html.in-mac-app.mac-fullscreen .sidebar{padding-top:6px!important}
 html,body{overscroll-behavior:none}
 html{background:var(--bg)}
 #nav,.detail,.wk-scroll,dialog,.dialog-content,.fs-timer,.sidebar{overscroll-behavior:none}
+
+/* ═════════════ Calendar: straight-edged blocks, like Apple Calendar (12 Nov) ═════════════ */
+.wk-event,.wk-event.ext,.wk-event.session,.cal-span,.cal-chip,.wk-allcell .cal-chip,.wk-new,.wk-event.picked{border-radius:2px!important}
+.cal-span.cont-l,.cal-span.cont-r{border-radius:0!important}
+.cal-cell.today .cal-num,.wk-day.today strong{border-radius:2px!important}
