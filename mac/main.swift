@@ -46,7 +46,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     window.setFrameAutosaveName("StackyMain")
     if !window.setFrameUsingName("StackyMain") { window.center() }
     window.makeKeyAndOrderFront(nil)
-    web.load(URLRequest(url: homeURL))
+    // Always check for a newer page on launch; versioned scripts and styles still come from cache.
+    web.load(URLRequest(url: homeURL, cachePolicy: .reloadRevalidatingCacheData))
     NSApp.activate(ignoringOtherApps: true)
   }
 
