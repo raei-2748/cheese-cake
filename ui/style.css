@@ -1277,3 +1277,107 @@ table.balance tr.flag th{box-shadow:inset 2px 0 var(--red)}
 .rw-week{top:-28px}
 .rw-dot{top:-13px}
 .rw-today{top:-4px}
+
+/* ═════════════ Collapsed sidebar = icon rail (12 Nov) ═════════════ */
+@media(min-width:761px){
+  :root[data-side=collapsed] .shell{grid-template-columns:56px minmax(0,1fr)}
+  :root[data-side=collapsed] .sidebar{visibility:visible;padding:8px 8px 10px;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;align-items:center}
+  :root[data-side=collapsed] .sidebar::-webkit-scrollbar{display:none}
+  :root[data-side=collapsed] .side-grip,:root[data-side=collapsed] .menu-btn{display:none!important}
+  :root[data-side=collapsed] .brand{font-size:0;gap:0;margin:4px 0 2px;padding:0;min-height:32px;width:40px;justify-content:center}
+  :root[data-side=collapsed] .brand svg{margin:0}
+  :root[data-side=collapsed] .side-collapse{position:static;width:40px;height:28px;margin:0 0 6px;flex:none}
+  :root[data-side=collapsed] .side-collapse svg{transform:rotate(180deg)}
+  :root[data-side=collapsed] #nav{width:40px;flex:1 0 auto}
+  :root[data-side=collapsed] #nav a{justify-content:center;width:40px;height:34px;min-height:34px;padding:0;gap:0;border-radius:8px;position:relative}
+  :root[data-side=collapsed] #nav a>span,:root[data-side=collapsed] #nav a>b{display:none}
+  :root[data-side=collapsed] #nav a svg{width:19px;height:19px;margin:0}
+  :root[data-side=collapsed] #nav a[aria-current]{background:var(--hl-soft)}
+  :root[data-side=collapsed] #nav a[aria-current] svg{color:var(--ink)}
+  :root[data-side=collapsed] #nav a:hover{background:var(--side-hover)}
+  :root[data-side=collapsed] .nav-gap{height:4px}
+  :root[data-side=collapsed] .nav-title,:root[data-side=collapsed] .nav-empty{display:none}
+  :root[data-side=collapsed] .nav-sec{margin-top:6px;padding-top:6px;border-top:1px solid var(--rule-2,var(--rule))}
+  :root[data-side=collapsed] .nav-sec.closed .nav-body{display:block}
+  :root[data-side=collapsed] #nav .dot{width:18px;height:18px}
+  :root[data-side=collapsed] .rail-bottom{width:40px;align-items:center}
+  :root[data-side=collapsed] .rail-link{justify-content:center;width:40px;padding:0;gap:0}
+  :root[data-side=collapsed] .rail-link span{display:none}
+}
+
+/* ═════════════ Study page: focus layout with a progress ring (12 Nov) ═════════════ */
+.panes main[data-route=focus]{width:min(100%,1120px)}
+.tt{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:0;align-items:stretch;min-height:calc(100dvh - 120px)}
+.tt-main.timer{--tint:color-mix(in srgb,var(--c) 14%,var(--bg));display:flex;flex-direction:column;align-items:center;padding:8px 32px 28px!important;background:none!important;border:0!important;box-shadow:none!important;border-radius:0;max-width:none;margin:0}
+.tt-top{position:relative;width:100%;display:flex;justify-content:center;align-items:center;min-height:40px;margin-bottom:22px}
+.tt-top-tools{position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;gap:2px}
+.tt-top-tools .icon-btn{width:32px;height:32px;display:grid;place-items:center;border:0;background:none;border-radius:6px;color:var(--muted);cursor:pointer;padding:0}
+.tt-top-tools .icon-btn:hover{background:var(--hover);color:var(--ink)}
+.tt-top-tools svg{width:18px;height:18px}
+.tt-modes{display:inline-flex;padding:3px;border-radius:999px;background:var(--hover);gap:2px}
+.tt-modes button{border:0;background:none;font:inherit;font-size:13.5px;font-weight:500;color:var(--muted);padding:5px 16px;border-radius:999px;cursor:pointer;transition:background .15s,color .15s}
+.tt-modes button:hover{color:var(--ink)}
+.tt-modes button[aria-pressed=true]{background:var(--bg);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08),0 0 0 .5px rgba(0,0,0,.06)}
+.tt-focus-on{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:26px;max-width:100%}
+.tt-pick{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 6px 0 12px;border-radius:999px;background:var(--tint);color:var(--ink);max-width:100%;min-width:0}
+.tt-pick .subj-ico{width:15px;height:15px;color:color-mix(in srgb,var(--c) 80%,var(--ink))}
+.tt-pick select{appearance:none;-webkit-appearance:none;border:0;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%23787774' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 6px center/12px;font:inherit;font-size:13.5px;font-weight:500;color:inherit;padding:0 24px 0 0;cursor:pointer;min-width:0;max-width:280px;text-overflow:ellipsis}
+.tt-pick.task{background:var(--hover);padding-left:14px}
+.tt-pick.task select{font-weight:400;color:var(--muted)}
+.tt-pick select:focus-visible{outline:2px solid var(--c);outline-offset:4px;border-radius:4px}
+.tt-break{margin:0 0 26px;color:var(--muted)}
+.tt-ring{position:relative;width:min(300px,72vw);aspect-ratio:1}
+.tt-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.tt-track{fill:none;stroke:var(--tint);stroke-width:7}
+.tt-prog{fill:none;stroke:var(--c);stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset .9s linear}
+.tt-centre{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.tt-clock{font-family:var(--mono);font-size:clamp(44px,6vw,58px);font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1;color:var(--ink)}
+.timer:not(.active) .tt-clock{color:color-mix(in srgb,var(--ink) 70%,var(--bg))}
+.tt-state{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.tt-state i{width:7px;height:7px;border-radius:50%;background:var(--c);animation:tt-pulse 1.6s ease-in-out infinite}
+@keyframes tt-pulse{50%{opacity:.35}}
+.tt-info{margin:18px 0 0;font-size:13px;color:var(--muted);text-align:center}
+.tt-lengths{margin-top:14px}
+.tt-buttons{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:24px}
+.tt-buttons .button{min-width:200px;height:44px;border-radius:999px!important;font-size:15px;font-weight:600}
+.tt-buttons .button.primary{background:var(--c)!important;border-color:var(--c)!important;color:#fff!important}
+.tt-buttons .button.secondary{background:none!important;border:1px solid var(--rule)!important;color:var(--ink)!important}
+.tt-buttons .button.text{min-width:0;height:32px;font-size:13.5px;font-weight:500}
+.tt-main .timer-keys{margin-top:auto;padding-top:22px}
+/* right column */
+.tt-side{border-left:1px solid var(--rule);padding:8px 0 28px 28px;min-width:0}
+.tt-side h2{font-size:15px;font-weight:600;margin:6px 0 12px}
+.tt-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tt-card{padding:12px 14px;border-radius:8px;background:var(--hover)}
+.tt-card small{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.tt-card b{font-family:var(--mono);font-size:20px;font-weight:600}
+.tt-goal{margin:16px 0 22px}
+.tt-goal>div:first-child{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.tt-goal b{font-family:var(--mono);font-weight:600;color:var(--ink)}
+.tt-week h3{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 8px}
+.tt-week .bars{height:110px}
+.tt-subjects{margin-top:12px}
+.tt-log{margin-top:26px;max-width:none}
+.tt-log .log-head h2{font-size:15px;margin:0}
+.tt-log .log-row{grid-template-columns:auto minmax(0,1fr) auto;gap:10px}
+.tt-log .log-rating{display:none}
+@media(max-width:1000px){
+  .tt{grid-template-columns:1fr;min-height:0}
+  .tt-side{border-left:0;border-top:1px solid var(--rule);padding:24px 0 0}
+  .tt-main.timer{padding:4px 0 28px!important}
+}
+@media(max-width:520px){
+  .tt-top{justify-content:flex-start}
+  .tt-modes button{padding:5px 11px;font-size:13px}
+  .tt-pick select{max-width:200px}
+}
+
+.tt-log .log-row>span:empty{display:none}
+.tt-log .log-row{grid-template-columns:86px minmax(0,1fr) auto}
+.tt-log .log-mins{align-self:start}
+@media(min-width:761px){
+  :root[data-side=collapsed] .sidebar{overflow:hidden}
+  :root[data-side=collapsed] #nav{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none}
+  :root[data-side=collapsed] #nav::-webkit-scrollbar{display:none}
+  :root[data-side=collapsed] .rail-bottom{flex:none}
+}

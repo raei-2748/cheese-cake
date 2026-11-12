@@ -41,8 +41,11 @@ const setCollapsed = on => {
   if (on) root.dataset.side = 'collapsed'; else delete root.dataset.side;
   writeSide({ collapsed: on });
   labelMenu();
+  labelCollapse();
 };
-collapseButton.addEventListener('click', () => setCollapsed(true));
+// Collapsed, the sidebar becomes an icon rail; the same corner button opens it again.
+const labelCollapse = () => { const l = collapsed() ? 'Expand sidebar' : 'Collapse sidebar'; collapseButton.setAttribute('aria-label', l); collapseButton.title = l; };
+collapseButton.addEventListener('click', () => setCollapsed(!collapsed()));
 // On a wide screen the top-bar menu button brings the sidebar back; on a phone it still opens the drawer.
 document.addEventListener('click', event => {
   if (!wide.matches || !event.target.closest('.menu-btn')) return;
@@ -77,7 +80,7 @@ grip.addEventListener('keydown', event => {
   setWidth(sidebar.getBoundingClientRect().width + (event.key === 'ArrowRight' ? 16 : -16));
 });
 // Also applied here in case the page's early inline script was blocked.
-{ const s = readSide(); if (s.w) root.style.setProperty('--side-w', s.w + 'px'); if (s.collapsed) root.dataset.side = 'collapsed'; }
+{ const s = readSide(); if (s.w) root.style.setProperty('--side-w', s.w + 'px'); if (s.collapsed) root.dataset.side = 'collapsed'; labelCollapse(); }
 wide.addEventListener('change', labelMenu);
 labelMenu();
 
