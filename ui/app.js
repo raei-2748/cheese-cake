@@ -2334,6 +2334,13 @@ document.addEventListener('keydown',event=>{
     if (document.body.classList.contains('nav-open')) { document.body.classList.remove('nav-open'); return; }
     if (selected) { selected=null; render(); return; }
   }
+  // ⌘K (Ctrl+K elsewhere) jumps to the sidebar search, as in Notion.
+  if ((event.metaKey||event.ctrlKey) && !event.altKey && event.key.toLowerCase()==='k' && !dialog.open) {
+    event.preventDefault();
+    if (matchMedia('(max-width:760px)').matches) document.body.classList.add('nav-open');
+    $('search').focus(); $('search').select(); return;
+  }
+  if (el.id==='search' && event.key==='Escape') { el.value=''; el.blur(); history.replaceState(null,'','#today'); render(); return; }
   if (el.closest('input,textarea,select,[contenteditable]') || event.metaKey || event.ctrlKey || event.altKey || dialog.open) return;
   if (event.key==='q' || event.key==='n') { const q=main.querySelector('.quick input'); if (q) { event.preventDefault(); q.focus(); } }
   if (event.key==='/') { event.preventDefault(); $('search').focus(); }
