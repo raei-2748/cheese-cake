@@ -375,12 +375,12 @@ document.addEventListener('visibilitychange',()=>{ if (document.visibilityState=
 setInterval(()=>{ if (document.visibilityState==='visible' && syncOn() && !lastSyncError) syncNow(); },10000);
 
 const button = (label, action, id='', tone='secondary') => '<button type="button" class="button '+tone+'" data-action="'+action+'" data-id="'+h(id)+'">'+h(label)+'</button>';
-const badge = (label, tone='neutral') => '<span class="badge '+tone+'">'+h(label)+'</span>';
+const badge = (label, tone='neutral') => label ? '<span class="badge '+tone+'">'+h(label)+'</span>' : '';
 const subject = id => id && course(id) ? '<span class="subject" style="--subject:'+course(id).colour+'">'+subjectIcon(id)+h(course(id).short)+'</span>' : '<span class="subject general">'+subjectIcon()+'General</span>';
-const emptyCard = (title, description, action='') => '<div class="empty"><strong>'+h(title)+'</strong><p>'+h(description)+'</p>'+action+'</div>';
+const emptyCard = (title, description, action='') => '<div class="empty" title="'+h(description)+'"><strong>'+h(title)+'</strong>'+action+'</div>';
 const pageHead = (eyebrow,title,copy,action='') => '<div class="page-head"><div>'+(eyebrow?'<div class="eyebrow">'+h(eyebrow)+'</div>':'')+'<h1>'+h(title)+'</h1>'+(copy?'<p>'+h(copy)+'</p>':'')+'</div><div class="head-action">'+action+'</div></div>';
 const section = (title, sub, body, action='') => '<section class="card"><div class="card-head"><div><h2>'+h(title)+'</h2>'+(sub?'<p>'+h(sub)+'</p>':'')+'</div>'+action+'</div>'+body+'</section>';
-const metric = (label,value,detail,tone='') => '<div class="metric '+tone+(value==='—'?' unset':'')+'"><span>'+h(label)+'</span><strong>'+h(value==='—'?'Not set':value)+'</strong><small>'+h(detail)+'</small></div>';
+const metric = (label,value,detail,tone='') => '<div class="metric '+tone+(value==='—'?' unset':'')+'"><span>'+h(label)+'</span><strong>'+h(value==='—'?'Not set':value)+'</strong>'+(detail!==''&&detail!=null?'<small>'+h(detail)+'</small>':'')+'</div>';
 const tabGroup = (label,action,selected,items) => '<div class="tabs" role="group" aria-label="'+h(label)+'">'+items.map(item=>{const [id,name]=Array.isArray(item)?item:[item,item];return '<button type="button" aria-pressed="'+(id===selected)+'" class="'+(id===selected?'selected':'')+'" data-action="'+action+'" data-id="'+h(id)+'">'+h(name)+'</button>';}).join('')+'</div>';
 const weekLabel = () => pretty(week)+' – '+pretty(addDays(week,6),{day:'numeric',month:'short',year:'numeric'});
 const weekPicker = () => '<div class="week-picker"><button type="button" aria-label="Previous week" data-action="shift-week" data-id="-7">‹</button><strong>'+h(weekLabel())+'</strong><button type="button" aria-label="Next week" data-action="shift-week" data-id="7">›</button>'+button('Current week','current-week','','text')+button('Jump to date','jump-week','','text')+'</div>';
@@ -412,7 +412,7 @@ function nextActions() {
   const list = deadlines().slice(0,3);
   const repairs = retests().slice(0,3);
   return list.length || repairs.length ? '<div class="focus-list">'+[
-    ...list.map(a=>({meta:subject(a.course)+' '+badge(a.kind,a.kind==='Trial'?'gold':'neutral'), title:a.title,
+    ...list.map(a=>({meta:subject(a.course)+(a.kind==='Trial'?' '+badge('Trial','gold'):''), title:a.title,
       detail:(a.weight!==''?a.weight+'% of course · ':'')+(a.date<today()?'Overdue · ':'Due ')+pretty(a.date), action:button('Plan prep','prep-assessment',a.id,'text')})),
     ...repairs.map(e=>({meta:subject(e.course)+' '+badge('Retest','gold'),title:e.title,detail:(e.retest<today()?'Overdue · ':'Due ')+pretty(e.retest),action:button('Plan retest','plan-retest',e.id,'text')}))
   ].map(x=>'<div class="focus-row"><div><div class="line">'+x.meta+'</div><strong>'+h(x.title)+'</strong><small>'+h(x.detail)+'</small></div>'+x.action+'</div>').join('')+'</div>'
@@ -436,13 +436,12 @@ function weekly() {
       metric(headroom<0?'Over budget':'Unallocated',minutes(Math.abs(headroom)),plan.filter(d=>d.remaining+d.completed>d.available).length+' days over capacity',headroom<0?'alert':'accent')+'</div>'+
     '<div class="overview-grid">'+section('Coming up','',nextActions(),'<a class="subtle-link" href="#assess">Assessments →</a>')+
     section('Energy this week','',tabGroup('Energy','energy',weekData().energy,['Low','Steady','High'])+
-    '<p class="note">Low uses 65% of free time, Steady 85%, and High 100%. Your buffer is applied after commitments and the energy adjustment.</p>'+
-    (moved.length?'<div class="carry"><strong>'+moved.length+' unfinished from earlier weeks</strong>'+button('Triage carry-over','show-carry','','text')+'</div>':'<div class="carry"><strong>Carry-over is clear</strong><span>Earlier unfinished blocks show here.</span></div>'))+'</div>'+
+    (moved.length?'<div class="carry"><strong>'+moved.length+' unfinished from earlier weeks</strong>'+button('Triage carry-over','show-carry','','text')+'</div>':''))+'</div>'+
     section('Week at a glance','', '<div class="day-grid">'+plan.map(({day,available,commitments,tasks,remaining,completed})=>{
       const used=remaining+completed;
       return '<article class="day '+(day===today()?'today ':'')+(used>available?'over':'')+'"><div class="day-heading"><div><strong>'+pretty(day,{weekday:'short'})+'</strong><small>'+pretty(day)+'</small></div><button type="button" aria-label="Add block on '+h(pretty(day))+'" data-action="task-day" data-id="'+day+'">+</button></div><div class="load"><span>'+minutes(used)+' / '+minutes(available)+'</span><div class="bar"><i style="width:'+Math.min(100,available ? used/available*100 : used?100:0)+'%"></i></div></div>'+
       commitments.map(c=>'<button type="button" class="commit" data-action="edit-commitment" data-id="'+h(c.id)+'">'+h(c.title)+' <span>'+minutes(c.minutes)+'</span></button>').join('')+
-      tasks.map(taskRow).join('')+(tasks.length?'':'<span class="day-empty">Open space</span>')+'</article>';
+      tasks.map(taskRow).join('')+''+'</article>';
     }).join('')+'</div>');
 }
 
@@ -545,7 +544,7 @@ function assessments() {
       (groups.length?groups.map(([label,list])=>'<div class="assess-group"><h3 class="ag-title">'+h(label)+' <span>'+list.length+'</span></h3>'+list.map(assessRow).join('')+'</div>').join('')
         :emptyCard('Nothing coming up','Add your next '+(assessmentFilter==='Trial'?'Trial':'assessment')+' with its date and the countdown starts.',button('+ Add '+(assessmentFilter==='Trial'?'Trial':'assessment'),assessmentFilter==='Trial'?'new-trial':'edit-assessment'))))+
     (past.length?'<details class="card assess-past"><summary><h2>Sat and returned</h2><span>'+past.length+'</span></summary>'+past.map(assessRow).join('')+'</details>':'')+
-    section('Marks by course','The average counts only tasks that have both a mark and a weighting.', '<div class="table-scroll"><table><thead><tr><th>Course</th><th>Weight logged</th><th>Weight marked</th><th>Marked average</th><th>Points earned</th></tr></thead><tbody>'+marks+'</tbody></table></div>');
+    section('Marks by course','', '<div class="table-scroll"><table><thead><tr><th>Course</th><th>Weight logged</th><th>Weight marked</th><th>Marked average</th><th>Points earned</th></tr></thead><tbody>'+marks+'</tbody></table></div>');
 }
 function topicsFor(c) {
   return c.modules.flatMap(([module,...topics],i)=>topics.map((title,j)=>({id:c.id+'-'+i+'-'+j,title,module,course:c.id})))
@@ -595,7 +594,6 @@ function topicsPage() {
     section('Priorities','',flagged.length?'<div class="focus-list">'+flagged.map(t=>'<div class="focus-row"><div><div class="line">'+subject(t.course)+badge(topicState(t.id).priority,topicState(t.id).priority==='Urgent'?'alert':'gold')+'</div><strong>'+h(t.title)+'</strong><small>'+h(t.module)+'</small></div>'+button('Plan practice','plan-topic',t.id,'text')+'</div>').join('')+'</div>':emptyCard('Nothing flagged','Set a topic to High or Urgent with its Update button.'))+
     section(c.name,'Year 12 · '+c.year+' syllabus · '+all.filter(t=>topicState(t.id).stage==='Retested').length+' of '+all.length+' topics retested',courseTabs+
     '<div class="topic-tools"><label><input type="checkbox" id="priority-only" '+(priorityOnly?'checked':'')+'> Priorities only</label><a class="subtle-link" href="'+h(c.url)+'" target="_blank" rel="noopener">Official NESA syllabus ↗</a></div>'+
-    '<p class="note">Module titles follow NESA. The smaller checklist items are starter revision prompts. Add class-specific texts, dot points or skills as custom topics.</p>'+
     [...new Set(all.map(t=>t.module))].map(module=>{
       const subset=all.filter(t=>t.module===module);
       const shown=priorityOnly?subset.filter(t=>topicState(t.id).priority!=='Normal'):subset;
@@ -609,7 +607,7 @@ function topicsPage() {
 function errorRow(e) {
   const tone=e.stage==='Passed'?'green':e.retest&&e.retest<=today()?'alert':'gold';
   const label=e.retest?(e.retest<today()&&e.stage!=='Passed'?'Overdue · ':'Retest ')+pretty(e.retest):'No retest date yet';
-  return '<article class="record"><div class="record-head"><div><div class="line">'+subject(e.course)+badge(e.stage,tone)+badge(e.cause)+'</div><h3>'+h(e.title)+'</h3><p>'+h(e.source||'Source unspecified')+' · '+h(label)+'</p></div><div class="line">'+button('Edit','edit-error',e.id)+(e.stage!=='Passed'?button('Plan repair','plan-error',e.id)+button('Record retest','retest',e.id,'primary'):'')+'</div></div>'+
+  return '<article class="record"><div class="record-head"><div><div class="line">'+subject(e.course)+(e.stage!=='Logged'?badge(e.stage,tone):'')+'</div><h3>'+h(e.title)+'</h3><p>'+(e.source?h(e.source)+' · ':'')+h(e.cause)+' · '+h(label)+'</p></div><div class="line">'+button('Edit','edit-error',e.id)+(e.stage!=='Passed'?button('Plan repair','plan-error',e.id)+button('Record retest','retest',e.id,'primary'):'')+'</div></div>'+
     (e.repair?'<p class="record-detail"><strong>Repair</strong> '+br(e.repair)+'</p>':'')+
     ((e.attempts||[]).length?'<details class="attempts"><summary>'+e.attempts.length+' retest'+(e.attempts.length===1?'':'s')+' · latest '+h(e.attempts.at(-1).outcome)+'</summary>'+e.attempts.map(at=>'<p>'+h(pretty(at.date))+' · '+h(at.outcome)+' · '+br(at.evidence)+'</p>').join('')+'</details>':'')+'</article>';
 }
@@ -617,7 +615,7 @@ function practice() {
   const items=dated(data.errors.filter(e=>practiceFilter==='All'||(practiceFilter==='Passed'?e.stage==='Passed':e.stage!=='Passed')),'retest');
   const sessions=dated(data.tasks.filter(t=>Object.hasOwn(templates,t.kind))).reverse();
   return pageHead('','Practice & repair','',button('+ Log error','edit-error','','primary'))+
-    '<div class="template-grid">'+Object.entries(templates).map(([key,t])=>'<section class="card template"><span class="template-icon">'+icon(key==='Active retrieval'?'bolt':key==='Timed practice'?'calendar':'check')+'</span><h2>'+h(key)+'</h2><p>'+br(t.text)+'</p>'+button('Use template · '+t.minutes+'m','template',key)+'</section>').join('')+'</div>'+
+    '<div class="template-row" role="group" aria-label="Start from a template">'+Object.entries(templates).map(([key,t])=>'<button type="button" class="template-pick" data-action="template" data-id="'+h(key)+'" title="'+h(t.text)+'">'+icon(key==='Active retrieval'?'bolt':key==='Timed practice'?'clock':'check')+'<span>'+h(key)+'</span><small>'+t.minutes+'m</small></button>').join('')+'</div>'+
     section('Error log','',tabGroup('Error status','practice-filter',practiceFilter,['Open','Passed','All'])+
     (items.length?'<div class="record-list">'+items.map(errorRow).join('')+'</div>':emptyCard('No '+practiceFilter.toLowerCase()+' errors here','When a question costs you marks, log the specific error and set a date to test the fix.')))+
     section('Practice history','',sessions.length?'<div class="record-list">'+sessions.map(t=>'<article class="record compact"><div><div class="line">'+subject(t.course)+badge(t.status,t.status==='Done'?'green':'neutral')+'</div><h3>'+h(t.title)+'</h3><p>'+h(pretty(t.date))+' · '+h(t.kind)+(t.result?' · '+h(t.result):'')+'</p></div>'+button('Open session','edit-task',t.id)+'</article>').join('')+'</div>':emptyCard('No practice sessions yet','Start one from a template above.'));
@@ -635,9 +633,9 @@ function reviews() {
   return pageHead('','Weekly reviews','',button(review?'Edit review':'+ Write review','edit-review','','primary'))+
     '<div class="toolbar">'+weekPicker()+'</div><div class="metrics">'+
     metric('Blocks finished',done.length,open.length+' still open')+
-    metric('Time completed',minutes(done.reduce((n,t)=>n+spentMins(t),0)),'Actual time where logged')+
-    metric('Retests passed',data.errors.flatMap(e=>e.attempts||[]).filter(a=>monday(a.date)===week&&a.outcome==='Passed').length,'Fresh attempts this week')+
-    metric('Assessments due',data.assessments.filter(a=>a.date&&monday(a.date)===week).length,'School tasks and Trials')+'</div>'+
+    metric('Time completed',minutes(done.reduce((n,t)=>n+spentMins(t),0)),'')+
+    metric('Retests passed',data.errors.flatMap(e=>e.attempts||[]).filter(a=>monday(a.date)===week&&a.outcome==='Passed').length,'')+
+    metric('Assessments due',data.assessments.filter(a=>a.date&&monday(a.date)===week).length,'')+'</div>'+
     section('This week’s review',weekLabel(),review?'<div class="review-notes">'+[['Marks protected',review.win],['What cost marks or time',review.gap],['Adjustment for next week',review.adjust]].map(([label,value])=>'<div><h3>'+h(label)+'</h3><p>'+br(value||'—')+'</p></div>').join('')+'</div>':emptyCard('Not written yet','Write it at the end of the week.'))+
     (open.length?section('Unfinished','','<div class="record-list">'+open.map(t=>'<div class="record compact"><div><strong>'+h(t.title)+'</strong><p>'+h(pretty(t.date))+' · '+minutes(t.minutes)+'</p></div>'+button('Triage','carry-task',t.id)+'</div>').join('')+'</div>'):'')+
     section('Past reviews','',history.length?'<div class="record-list">'+history.map(([key,w])=>'<div class="record compact"><div><strong>'+h(pretty(key,{day:'numeric',month:'short',year:'numeric'}))+'</strong><p>'+h(w.review.adjust||w.review.win)+'</p></div>'+button('Open week','open-week',key)+'</div>').join('')+'</div>':emptyCard('No earlier reviews','Saved reviews are listed here.'));
@@ -887,7 +885,7 @@ let quickCount = 0;
 function quickAdd(where, defaults={}, short=false) {
   const id='quick-'+(quickCount++);
   return '<form class="quick" data-defaults="'+h(JSON.stringify(defaults))+'"><span class="quick-plus" aria-hidden="true">+</span>'+
-    '<input id="'+id+'" name="q" autocomplete="off" aria-label="Add a task to '+h(where)+'" placeholder="'+(short?'Add a task':'Add to '+h(where)+' · try “Chem prac fri 4pm #che !high 45m”')+'">'+
+    '<input id="'+id+'" name="q" autocomplete="off" aria-label="Add a task to '+h(where)+'" placeholder="Add a task" title="Dates, times, #subject, #tags and !priority are picked up as you type">'+
     (short?'':'<kbd class="quick-key" aria-hidden="true" title="Press q to add">q</kbd>')+'<button class="button primary quick-go" type="submit">Add</button><div class="quick-preview" aria-live="polite"></div></form>';
 }
 function previewChips(text) {
@@ -1037,7 +1035,7 @@ function calendarPage() {
     tabGroup('Calendar view','cal-mode',calMode,[['week','Week'],['month','Month']])+
     '<button type="button" class="button text" data-action="calendars">'+icon('calendar')+'Calendars</button></div></div>'+
     '<div class="cal-wrap">'+(calMode==='month'?monthGrid():weekGrid())+
-    '<aside class="cal-side"><h2>Unscheduled</h2><p class="note">Drag onto the grid to plan it.</p>'+(unscheduled.length?sortTasks(unscheduled).map(chip).join(''):'<p class="note quiet">Everything has a date.</p>')+'</aside></div>';
+    '<aside class="cal-side"><h2 title="Drag onto the grid to plan it">Unscheduled</h2>'+(unscheduled.length?sortTasks(unscheduled).map(chip).join(''):'<p class="note quiet">Everything has a date.</p>')+'</aside></div>';
 }
 function monthGrid() {
   const monthStart=calAnchor.slice(0,8)+'01', start=monday(monthStart), month=monthStart.slice(0,7), t0=today();
@@ -1799,7 +1797,6 @@ function focusPage() {
       '<p class="tt-info">'+h(info)+'</p>'+
       (lengths?'<div class="tt-lengths">'+lengths+'</div>':'')+
       '<div class="tt-buttons">'+controls+'</div>'+
-      '<p class="timer-keys"><kbd>s</kbd> start / pause &nbsp; <kbd>f</kbd> full screen</p>'+
     '</section>'+
     '<aside class="tt-side">'+
       '<h2>Overview</h2><div class="tt-cards">'+overview.map(([v,l])=>'<div class="tt-card"><small>'+h(l)+'</small><b>'+h(v)+'</b></div>').join('')+'</div>'+
@@ -1895,7 +1892,7 @@ function dashPage() {
   const due=dueTopics();
   const retestsDue=data.errors.filter(e=>e.stage!=='Passed'&&e.retest&&e.retest<=addDays(t0,7)).sort((a,b)=>a.retest.localeCompare(b.retest));
   const newFeedback=data.feedback.filter(f=>f.status==='New');
-  const rows=subjectBalance(), maxMonth=Math.max(1,...rows.map(r=>r.month));
+  const rows=subjectBalance();
   const hasRecords=data.tasks.length||data.assessments.length||data.focus.length||data.papers.length;
   const staleBackup=localMode&&hasRecords&&(!set.lastExport||daysFrom(t0,set.lastExport)>=7);
   return '<div class="list-head"><div><div class="eyebrow">'+h(pretty(t0,{weekday:'long',day:'numeric',month:'long'}))+'</div><h1>Overview</h1></div><div class="list-stats">'+button('Exam dates','settings','','text')+button('Start studying','go-study','','primary')+'</div></div>'+
@@ -1922,14 +1919,10 @@ function dashPage() {
         '<a class="subtle-link" href="#practice">Errors →</a>')+
     '</div></div>'+
     section('Subjects','',
-      '<div class="table-scroll"><table class="balance"><thead><tr><th>Course</th><th title="Study in the last 7 days">7 days</th><th title="Study in the last 28 days">28 days</th><th title="Syllabus topics practised">Syllabus</th><th title="Reviews due">Reviews</th><th title="Open errors">Errors</th><th title="Past papers">Papers</th><th>Next task</th></tr></thead><tbody>'+
+      '<div class="table-scroll"><table class="balance"><thead><tr><th>Course</th><th title="Study in the last 7 days">This week</th><th title="Syllabus topics practised">Syllabus</th><th>Next task</th></tr></thead><tbody>'+
       rows.map(r=>'<tr'+(r.flag?' class="flag"':'')+'><th scope="row"><a href="#list/'+r.c.id+'">'+subject(r.c.id)+'</a>'+(r.flag?' '+badge('Needs time','alert'):'')+'</th>'+
         '<td>'+(r.week?minutes(r.week):'—')+'</td>'+
-        '<td>'+(r.month?'<span class="cell-bar"><span>'+minutes(r.month)+'</span><span class="mini-bar"><i style="width:'+(r.month/maxMonth*100)+'%;background:'+r.c.colour+'"></i></span></span>':'—')+'</td>'+
         '<td>'+r.covered+'<small> / '+r.topics+'</small></td>'+
-        '<td>'+(r.due?'<b class="due">'+r.due+'</b>':'—')+'</td>'+
-        '<td>'+(r.errors||'—')+'</td>'+
-        '<td>'+(r.papers?r.papers+' · avg '+percent(r.avg):'—')+'</td>'+
         '<td>'+(r.next?h(r.next.title)+' <small>'+(daysFrom(r.next.date,t0)===0?'today':'in '+daysFrom(r.next.date,t0)+'d')+'</small>':'—')+'</td></tr>').join('')+
       '</tbody></table></div>');
 }
@@ -1953,7 +1946,7 @@ function papersPage() {
     const recent=pcts.slice(-3), earlier=pcts.slice(-6,-3);
     const trend=earlier.length?recent.reduce((a,b)=>a+b,0)/recent.length-earlier.reduce((a,b)=>a+b,0)/earlier.length:null;
     return '<section class="card paper-card" style="--c:'+c.colour+'"><div class="line">'+subject(c.id)+'<span class="note">'+list.length+' marked</span></div><div class="paper-nums"><div><span>Latest</span><strong>'+percent(last)+'</strong></div><div><span>Average</span><strong>'+percent(avg)+'</strong></div><div><span>Best</span><strong>'+percent(Math.max(...pcts))+'</strong></div></div>'+spark(pcts.slice(-12))+
-      (trend!=null?'<small class="trend '+(trend>=0?'up':'down')+'">'+(trend>=0?'▲ ':'▼ ')+Math.abs(trend).toFixed(1)+' points, last 3 vs previous 3</small>':'<small class="trend">Trend shows after 4 marked papers</small>')+'</section>';
+      (trend!=null?'<small class="trend '+(trend>=0?'up':'down')+'">'+(trend>=0?'▲ ':'▼ ')+Math.abs(trend).toFixed(1)+' points, last 3 vs previous 3</small>':'')+'</section>';
   }).join('');
   return pageHead('','Past papers','',button('+ Log paper','edit-paper','','primary'))+
     (cards?'<div class="paper-grid">'+cards+'</div>':'')+
@@ -1961,7 +1954,7 @@ function papersPage() {
       tabGroup('Course','paper-filter',paperFilter,[['all','All'],...courses.map(c=>[c.id,c.short])])+
       (shown.length?'<div class="record-list">'+shown.map(p=>{
         const pct=paperPct(p), over=p.minutes&&p.limit&&Number(p.minutes)>Number(p.limit);
-        return '<article class="record"><div class="record-head"><div><div class="line">'+subject(p.course)+badge(p.source||'Paper',p.source==='HSC'?'gold':'neutral')+(over?badge('Over time','alert'):'')+'</div><h3>'+h(p.title)+'</h3><p>'+(p.date?h(pretty(p.date,{day:'numeric',month:'short',year:'numeric'})):'Undated')+' · '+(pct!=null?h(p.mark)+' / '+h(p.outOf)+' ('+percent(pct)+')':'Not marked yet')+(p.minutes?' · '+minutes(Number(p.minutes))+(p.limit?' of '+minutes(Number(p.limit)):''):'')+'</p></div>'+
+        return '<article class="record"><div class="record-head"><div><div class="line">'+subject(p.course)+badge(p.source&&p.source!=='Paper'?p.source:'',p.source==='HSC'?'gold':'neutral')+(over?badge('Over time','alert'):'')+'</div><h3>'+h(p.title)+'</h3><p>'+(p.date?h(pretty(p.date,{day:'numeric',month:'short',year:'numeric'})):'Undated')+' · '+(pct!=null?h(p.mark)+' / '+h(p.outOf)+' ('+percent(pct)+')':'Not marked yet')+(p.minutes?' · '+minutes(Number(p.minutes))+(p.limit?' of '+minutes(Number(p.limit)):''):'')+'</p></div>'+
           '<div class="line">'+button('Log error','paper-error',p.id)+button('Edit','edit-paper',p.id)+'</div></div>'+(p.notes?'<p class="record-detail">'+br(p.notes)+'</p>':'')+'</article>';
       }).join('')+'</div>':emptyCard('No papers logged'+(paperFilter==='all'?'':' for '+course(paperFilter).short),'Log each past paper you sit with its mark and time. Trends per course appear above once you have two.',button('+ Log paper','edit-paper'))));
 }
