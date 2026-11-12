@@ -2740,7 +2740,7 @@ function contextFor(target, event) {
   ]]; }
   // An empty part of the calendar.
   if ((el=idOf('.wk-col'))) { const m=Math.min(DAY_MINS-60,Math.floor(minuteAt(el,event.clientY)/30)*30), day=el.dataset.day; return [pretty(day,{weekday:'long',day:'numeric',month:'short'})+' · '+hm(m), [
-    {label:'New block at '+hm(m),icon:'calendar',run:()=>modal('New block · '+pretty(day,{weekday:'short',day:'numeric',month:'short'})+', '+hm(m),field('q','What is it for?','',{full:true,required:true,placeholder:'e.g. Chem prac write-up #che !high'}),'Add',v=>{ createFromQuick(v.q,{date:day,time:fromMin(m),minutes:60}); })},
+    {label:'New block at '+hm(m),icon:'calendar',run:()=>modal('New block · '+pretty(day,{weekday:'short',day:'numeric',month:'short'})+', '+hm(m),field('q','What is it for?','',{full:true,required:true,placeholder:'e.g. Physics prac write-up #phy !high'}),'Add',v=>{ createFromQuick(v.q,{date:day,time:fromMin(m),minutes:60}); })},
     {label:'Add an all-day task',icon:'sun',run:()=>runAction('cal-add',day)}
   ]]; }
   if ((el=idOf('.cal-cell,.wk-allcell'))) { const day=el.dataset.dropDate; if (day) return [pretty(day,{weekday:'long',day:'numeric',month:'short'}), [

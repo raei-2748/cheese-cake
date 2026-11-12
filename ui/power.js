@@ -600,7 +600,7 @@ export function initPower(api) {
     if (!palOpen()) palFrom = document.activeElement;
     palMode = mode; palAt = 0; palIndex = buildIndex();
     pal.innerHTML = '<div class="pal-box" role="dialog" aria-modal="true" aria-label="' + (mode === 'add' ? 'New task' : 'Search and commands') + '"><div class="pal-top">' + (mode === 'add' ? ICO.plus : ICO.search) +
-      '<input class="pal-input" type="text" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="pal-list" placeholder="' + (mode === 'add' ? 'New task: Chem prac fri 4pm #che !high 1h' : 'Search tasks, pages and commands') + '"><kbd>esc</kbd></div>' +
+      '<input class="pal-input" type="text" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="true" aria-controls="pal-list" placeholder="' + (mode === 'add' ? 'New task: Physics prac fri 4pm #phy !high 1h' : 'Search tasks, pages and commands') + '"><kbd>esc</kbd></div>' +
       '<div class="pal-list" id="pal-list" role="listbox"></div>' +
       '<div class="pal-foot">' + (mode === 'add' ? '<span><kbd>#</kbd> subject or tag</span><span><kbd>^</kbd> list</span><span><kbd>!</kbd> priority</span>' : '<span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↩</kbd> open</span><span><kbd>&gt;</kbd> commands only</span>') + '</div></div>';
     pal.hidden = false;
