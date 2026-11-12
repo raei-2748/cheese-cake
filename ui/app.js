@@ -43,6 +43,7 @@ const icons = {
   shape:'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
   text:'<path d="M5 6h14M5 12h14M5 18h9"/>',
   paper:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7M9 8h3"/>',
+  sliders:'<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
   // Subject icons (data.js names one per course).
   graph:'<path d="M4 4v16h16"/><path d="M7 16c3 0 3.5-9 6.5-9S16.5 13 20 8"/>',
   pi:'<path d="M5 7h14M9 7v11M15 7v9a2 2 0 0 0 2 2h1"/>',
@@ -1688,8 +1689,11 @@ const editSession = s => sessionForm(s,'Edit session','Save',{label:'Delete',tit
   data.focus=data.focus.filter(f=>f.id!==s.id);
 })});
 
+// Ring fill: elapsed share of a timed phase; the stopwatch sweeps once an hour.
+const ringFrac = secs => countsUp() ? (secs%3600)/3600 : 1-secs/phaseSecs(timer.phase);
 function updateTimerDom() {
   const secs=shownSecs();
+  const ring=$('timer-ring'); if (ring) ring.style.strokeDashoffset=String(2*Math.PI*92*(1-ringFrac(secs)));
   const text=$('timer-text'); if (text) text.textContent=clock(secs);
   const bar=$('timer-bar'); if (bar) bar.style.width=(countsUp()?0:100*(1-secs/phaseSecs(timer.phase)))+'%';
   const fsText=$('fs-text'); if (fsText) fsText.textContent=clock(secs);
@@ -1775,26 +1779,36 @@ function focusPage() {
     ? '<span class="lengths" role="group" aria-label="Round length">'+[...new Set([...focusLengths,pomo().focus])].sort((a,b)=>a-b).map(m=>'<button type="button" aria-pressed="'+(pomo().focus===m)+'" data-action="focus-length" data-id="'+m+'">'+m+'</button>').join('')+'<button type="button" data-action="focus-custom" title="Pick any length">Custom</button><small>min</small></span>'
     : timer.mode==='exam' && !active
     ? '<span class="lengths exam-pick"><label><span class="sr">Exam paper</span><select data-exam-preset>'+examPresets.map(e=>'<option value="'+e.id+'" '+(examCfg().id===e.id?'selected':'')+'>'+h(e.name)+' · '+e.reading+'+'+hrs(e.writing)+'</option>').join('')+(examCfg().id==='custom'?'<option value="custom" selected>'+h(examCfg().name)+' · '+examCfg().reading+'+'+hrs(examCfg().writing)+'</option>':'')+'</select></label><button type="button" data-action="exam-custom">Custom</button></span>' : '';
-  return '<div class="list-head"><div><h1>Study</h1></div><div class="list-stats">'+button('Timer settings','settings','','text')+'</div></div>'+
-    '<section class="timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'#787774')+'">'+
-      (onBreak?'<p class="timer-break">Stand up, look away from the screen, drink some water.</p>'
-        :'<div class="subjects" role="group" aria-label="Subject">'+subjects+'</div>'+
-         '<label class="timer-task"><span class="sr">Task</span><select data-timer-task><option value="">No task, just the subject</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+'</option>').join('')+'</select></label>')+
-      '<div id="timer-text" class="timer-clock" role="timer" aria-live="off">'+clock(secs)+'</div>'+
-      (countsUp()?'':'<div class="timer-bar"><i id="timer-bar" style="width:'+(100*(1-secs/phaseSecs(timer.phase)))+'%"></i></div>')+
-      '<p class="timer-meta"><span class="timer-state">'+(timer.running?'<i></i>':'')+h(state)+'</span><span>'+h(info)+'</span></p>'+
-      '<div class="timer-row"><div class="timer-buttons">'+controls+'</div>'+
-        '<div class="timer-opts"><span class="modes" role="group" aria-label="Timer type">'+[['open','Open'],['timed','Timed'],['exam','Exam']].map(([k,l])=>'<button type="button" aria-pressed="'+(timer.mode===k)+'" data-action="study-mode" data-id="'+k+'">'+l+'</button>').join('')+'</span>'+lengths+
-        '<button type="button" class="full-btn" data-action="timer-full" title="Full screen (f)" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div></div>'+
+  const R=92, C=2*Math.PI*R;
+  const modeTabs='<div class="tt-modes" role="group" aria-label="Timer type">'+[['open','Stopwatch'],['timed','Pomo'],['exam','Exam']].map(([k,l])=>'<button type="button" aria-pressed="'+(timer.mode===k)+'" data-action="study-mode" data-id="'+k+'">'+l+'</button>').join('')+'</div>';
+  const focusOn = onBreak
+    ? '<p class="tt-break">Stand up, look away from the screen, drink some water.</p>'
+    : '<div class="tt-focus-on">'+
+        '<label class="tt-pick"><span class="sr">Subject</span>'+subjectIcon(timer.course)+'<select data-study-course>'+[['','General'],...courses.map(x=>[x.id,x.short])].map(([id,l])=>'<option value="'+id+'" '+((timer.course||'')===id?'selected':'')+'>'+h(l)+'</option>').join('')+'</select></label>'+
+        '<label class="tt-pick task"><span class="sr">Task</span><select data-timer-task><option value="">No task, just the subject</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+'</option>').join('')+'</select></label>'+
+      '</div>';
+  const overview = [[minutes(s.today),'Today'],[String(s.todayCount),'Sessions today'],[minutes(s.week),'This week'],[s.streak+(s.streak===1?' day':' days'),'Streak']];
+  return '<div class="tt">'+
+    '<section class="tt-main timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'#787774')+'">'+
+      '<div class="tt-top"><h1 class="sr">Study</h1>'+modeTabs+'<div class="tt-top-tools">'+
+        '<button type="button" class="icon-btn" data-action="settings" title="Timer settings" aria-label="Timer settings">'+icon('sliders')+'</button>'+
+        '<button type="button" class="icon-btn" data-action="timer-full" title="Full screen (f)" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div></div>'+
+      focusOn+
+      '<div class="tt-ring"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="tt-track" cx="100" cy="100" r="'+R+'"/><circle id="timer-ring" class="tt-prog" cx="100" cy="100" r="'+R+'" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-ringFrac(secs))).toFixed(2)+'"/></svg>'+
+        '<div class="tt-centre"><div id="timer-text" class="tt-clock" role="timer" aria-live="off">'+clock(secs)+'</div><span class="tt-state">'+(timer.running?'<i></i>':'')+h(state)+'</span></div></div>'+
+      '<p class="tt-info">'+h(info)+'</p>'+
+      (lengths?'<div class="tt-lengths">'+lengths+'</div>':'')+
+      '<div class="tt-buttons">'+controls+'</div>'+
       '<p class="timer-keys"><kbd>s</kbd> start / pause &nbsp; <kbd>f</kbd> full screen</p>'+
     '</section>'+
-    '<div class="today-line"><div><span>Today</span><strong>'+minutes(s.today)+'</strong><small>of '+minutes(goal)+(s.today>=goal?', goal met':'')+'</small></div><div class="goal-bar"><i style="width:'+pct+'%"></i></div>'+
-      '<p><span><b>'+s.streak+'</b> day streak</span><span><b>'+minutes(s.week)+'</b> this week</span><span><b>'+s.todayCount+'</b> session'+(s.todayCount===1?'':'s')+' today</span></p></div>'+
-    '<div class="study-grid">'+
-      section('This week','','<div class="bars">'+s.days.map(([d,m])=>'<div class="bar-col'+(d===today()?' today':'')+(m>=goal?' hit':'')+'"><i style="height:'+(m/s.dmax*100)+'%"></i><span>'+pretty(d,{weekday:'narrow'})+'</span><small>'+(m?minutes(m):'')+'</small></div>').join('')+'</div>')+
-      section('By subject','This week',s.bySubject.length?s.bySubject.map(([x,m])=>'<div class="hbar"><span>'+h(x.short)+'</span><div><i style="width:'+(m/s.max*100)+'%;background:'+x.colour+'"></i></div><b>'+minutes(m)+'</b></div>').join(''):'<p class="note">Nothing logged this week yet.</p>')+
-    '</div>'+
-    '<section class="study-log"><div class="log-head"><h2>Log</h2>'+button('+ Log a past session','log-past','','text')+'</div>'+studyLog()+'</section>';
+    '<aside class="tt-side">'+
+      '<h2>Overview</h2><div class="tt-cards">'+overview.map(([v,l])=>'<div class="tt-card"><small>'+h(l)+'</small><b>'+h(v)+'</b></div>').join('')+'</div>'+
+      '<div class="tt-goal"><div><span>Daily goal</span><b>'+minutes(s.today)+' / '+minutes(goal)+'</b></div><div class="goal-bar"><i style="width:'+pct+'%"></i></div></div>'+
+      '<div class="tt-week"><h3>This week</h3><div class="bars">'+s.days.map(([d,m])=>'<div class="bar-col'+(d===today()?' today':'')+(m>=goal?' hit':'')+'"><i style="height:'+(m/s.dmax*100)+'%"></i><span>'+pretty(d,{weekday:'narrow'})+'</span><small>'+(m?minutes(m):'')+'</small></div>').join('')+'</div>'+
+        (s.bySubject.length?'<div class="tt-subjects">'+s.bySubject.map(([x,m])=>'<div class="hbar"><span>'+h(x.short)+'</span><div><i style="width:'+(m/s.max*100)+'%;background:'+x.colour+'"></i></div><b>'+minutes(m)+'</b></div>').join('')+'</div>':'')+'</div>'+
+      '<section class="study-log tt-log"><div class="log-head"><h2>Focus record</h2>'+button('+ Add','log-past','','text')+'</div>'+studyLog()+'</section>'+
+    '</aside>'+
+  '</div>';
 }
 
 // ───────────────────────── Habits ─────────────────────────
@@ -1969,7 +1983,7 @@ function navHtml(r) {
   const count=fn=>data.tasks.filter(t=>taskOpen(t)&&fn(t)).length;
   const t0=today();
   const cur=(name,arg='')=>r.name===name&&r.arg===arg;
-  const link=(href,label,glyph,current,n)=>'<a href="#'+href+'" '+(current?'aria-current="page"':'')+'>'+glyph+'<span>'+h(label)+'</span>'+(n?'<b>'+n+'</b>':'')+'</a>';
+  const link=(href,label,glyph,current,n)=>'<a href="#'+href+'" title="'+h(label)+'" '+(current?'aria-current="page"':'')+'>'+glyph+'<span>'+h(label)+'</span>'+(n?'<b>'+n+'</b>':'')+'</a>';
   const sec=(title,body,extra='')=>{ const shut=navClosed.has(title); return '<div class="nav-sec'+(shut?' closed':'')+'"><div class="nav-title"><button type="button" class="nav-toggle" data-action="nav-toggle" data-id="'+h(title)+'" aria-expanded="'+!shut+'"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 3l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>'+title+'</span></button>'+extra+'</div><div class="nav-body">'+body+'</div></div>'; };
   const counts={today:count(t=>t.date&&t.date<=t0),next7:count(t=>t.date&&t.date<=addDays(t0,6)),inbox:count(t=>!t.course&&!t.list),all:count(()=>true)};
   const tags=allTags();
@@ -2091,6 +2105,7 @@ function stackChange(el) {
   if (el.id==='import-file') { if (el.files[0]) importData(el.files[0]); return true; }
   if (el.id==='ics-file') { if (el.files[0]) icsImport(el.files[0]); return true; }
   if (el.matches('[data-exam-preset]')) { if (el.value!=='custom') { const ex=examPresets.find(e=>e.id===el.value); timer.exam={...ex}; timer.course=ex.course; resetTimer({phase:'reading',warned:[]}); render(); } return true; }
+  if (el.matches('[data-study-course]')) { const id=el.value; timer.course=id; if (timer.mode==='exam' && !sessionActive() && timer.exam?.id!=='custom') timer.exam={...examFor(id)}; const t=row('tasks',timer.taskId); if (t&&(t.course||'')!==id) timer.taskId=null; storeTimer(); render(); return true; }
   if (el.matches('[data-timer-task]')) { timer.taskId=el.value||null; const t=row('tasks',timer.taskId); if (t) timer.course=t.course||''; storeTimer(); render(); return true; }
   const t=selected&&row('tasks',selected);
   if (el.dataset.subToggle && t) { change(()=>{ t.subtasks.find(x=>x.id===el.dataset.subToggle).done=el.checked; }); return true; }
