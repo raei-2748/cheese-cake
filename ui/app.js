@@ -866,7 +866,7 @@ function editReview() {
 
 
 // ───────────────────────── Task core ─────────────────────────
-let selected = null, showDone = false, calMode = 'week', calAnchor = today(), habitOpen = null, dragging = null, grabY = 0;
+let selected = null, showDone = false, calMode = (()=>{ try { const m=localStorage.getItem('stacky-cal-mode'); return ['day','3day','week','month'].includes(m)?m:'week'; } catch { return 'week'; } })(), calAnchor = today(), habitOpen = null, dragging = null, grabY = 0;
 const pad2 = n => String(n).padStart(2,'0');
 const parseCtx = () => ({ today: today(), courses, lists: data.lists });
 const doneDay = t => t.completedAt ? sydney.format(new Date(t.completedAt)) : '';
@@ -1066,14 +1066,18 @@ const toMin = t => { const [hh,mm]=String(t||'0:0').split(':').map(Number); retu
 const fromMin = m => pad2(Math.floor(m/60))+':'+pad2(m%60);
 const hm = m => { const hh=Math.floor(m/60)%24, mm=m%60; return (hh%12||12)+(mm?':'+pad2(mm):'')+(hh<12?'am':'pm'); };
 const blockLen = t => Math.max(SNAP, Number(t.minutes)||30);
-const calDays = () => matchMedia('(max-width:760px)').matches ? 3 : 7;
-const calStart = () => calDays()===7 ? monday(calAnchor) : calAnchor;
+// Views: Day, 3 Days, Week (3 days on a phone) and Month. The choice is remembered on this device.
+const calDays = () => calMode==='day' ? 1 : calMode==='3day' ? 3 : matchMedia('(max-width:760px)').matches ? 3 : 7;
+let calFirst=null;   // first visible day after scrolling; null = start of the week (or the anchor day)
+const calStart = () => calMode!=='month' && calFirst ? calFirst : calMode==='week' && calDays()===7 ? monday(calAnchor) : calAnchor;
+const setCalMode = m => { calMode=m; calFirst=null; try { localStorage.setItem('stacky-cal-mode',m); } catch {} render(); };
 const chip = t => '<div class="cal-chip'+(t.status==='Done'?' done':'')+'" draggable="true" data-drag="'+h(t.id)+'" data-select="'+h(t.id)+'" style="--c:'+listColour(t.course||t.list)+'">'+(t.time?'<b>'+hm(toMin(t.time))+'</b>':'')+'<span>'+h(t.title||'Untitled')+'</span></div>';
 const assessChip = a => '<a class="cal-chip assess" href="#assess" style="--c:'+(course(a.course)?.colour??'#795922')+'"><b>⚑</b><span>'+h(a.title)+'</span></a>';
 const extChip = e => '<a class="cal-chip ext"'+(e.link?' href="'+h(e.link)+'" target="_blank" rel="noopener"':'')+' style="--c:'+h(e.colour)+'" title="'+h(e.title+' · '+e.calName)+'">'+(e.time?'<b>'+hm(toMin(e.time))+'</b>':'')+'<span>'+h(e.title)+'</span></a>';
 function calTitle() {
   if (calMode==='month') return pretty(calAnchor.slice(0,8)+'01',{month:'long',year:'numeric'});
   const s=calStart(), e=addDays(s,calDays()-1);
+  if (calMode==='day') return pretty(s,{weekday:'long',day:'numeric',month:'long'});
   return s.slice(0,7)===e.slice(0,7) ? pretty(s,{month:'long',year:'numeric'}) : pretty(s,{month:'short'})+' – '+pretty(e,{month:'short',year:'numeric'});
 }
 // Calendar list beside the grid, like Notion Calendar: tick a calendar to show or hide it.
@@ -1098,6 +1102,8 @@ function calendarList() {
 // a finger swipe on a touch screen, and the ← → arrow keys.
 const calGrid = () => main.querySelector('.wk,.month');
 function calShift(n) {
+  const sc=calMode!=='month'&&main.querySelector('.wk-scroll'), col=sc&&sc.querySelector('.wk-col');
+  if (sc && col) { sc.scrollBy({left:n*calDays()*col.offsetWidth,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}); return; }
   calAnchor=calMode==='month'?addMonth(calAnchor.slice(0,8)+'01',n):addDays(calAnchor,calDays()*n); render();
   const g=calGrid();   // slide the new week in from the side it comes from, like a scrolling panel
   if (g && !matchMedia('(prefers-reduced-motion: reduce)').matches) g.animate([{transform:'translateX('+(n>0?56:-56)+'px)',opacity:.35},{transform:'none',opacity:1}],{duration:300,easing:'cubic-bezier(.2,.8,.2,1)'});
@@ -1109,7 +1115,7 @@ function calDragTo(px,settle) {   // the grid follows a sideways swipe a little 
 }
 let swipeAcc=0, swipeLock=0, swipeTimer;
 document.addEventListener('wheel',event=>{
-  if (!data || route().name!=='calendar' || !event.target.closest('.cal-wrap')) return;
+  if (!data || route().name!=='calendar' || calMode!=='month' || !event.target.closest('.cal-wrap')) return;
   if (Math.abs(event.deltaX)<=Math.abs(event.deltaY)) return;          // vertical scrolling stays scrolling
   event.preventDefault();
   if (Date.now()<swipeLock) return;                                   // one move per swipe gesture
@@ -1119,7 +1125,7 @@ document.addEventListener('wheel',event=>{
 },{passive:false});
 let touchFrom=null;
 document.addEventListener('touchstart',event=>{
-  if (route().name!=='calendar' || event.touches.length!==1 || !event.target.closest('.cal-wrap') || event.target.closest('.wk-event,.cal-chip,.cal-span')) { touchFrom=null; return; }
+  if (route().name!=='calendar' || calMode!=='month' || event.touches.length!==1 || !event.target.closest('.cal-wrap') || event.target.closest('.wk-event,.cal-chip,.cal-span')) { touchFrom=null; return; }
   const t=event.touches[0]; touchFrom={x:t.clientX,y:t.clientY,at:Date.now()};
 },{passive:true});
 document.addEventListener('touchend',event=>{
@@ -1128,18 +1134,13 @@ document.addEventListener('touchend',event=>{
   if (Date.now()-touchFrom.at<700 && Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)*1.5) calShift(dx<0?1:-1);
   touchFrom=null;
 },{passive:true});
-document.addEventListener('keydown',event=>{
-  if (!data || route().name!=='calendar' || dialog.open || event.metaKey || event.ctrlKey || event.altKey || event.target.closest?.('input,textarea,select,[contenteditable]')) return;
-  if (event.key==='ArrowRight') { event.preventDefault(); calShift(1); }
-  else if (event.key==='ArrowLeft') { event.preventDefault(); calShift(-1); }
-});
 function calendarPage() {
   const unscheduled=data.tasks.filter(t=>taskOpen(t)&&!t.date);
-  const range = calMode==='month' ? [monday(calAnchor.slice(0,8)+'01'), addDays(monday(calAnchor.slice(0,8)+'01'),41)] : [calStart(), addDays(calStart(),calDays()-1)];
+  const range = calMode==='month' ? [monday(calAnchor.slice(0,8)+'01'), addDays(monday(calAnchor.slice(0,8)+'01'),41)] : [addDays(calStart(),-calDays()), addDays(calStart(),2*calDays()-1)];
   extEnsure(range[0], range[1]);
   return '<div class="cal-head"><div class="cal-title"><h1>'+h(calTitle())+'</h1>'+extStatus()+'</div><div class="cal-tools">'+
     '<div class="week-picker"><button type="button" aria-label="Previous" data-action="cal-shift" data-id="-1">‹</button>'+button('Today','cal-today','','text')+'<button type="button" aria-label="Next" data-action="cal-shift" data-id="1">›</button></div>'+
-    tabGroup('Calendar view','cal-mode',calMode,[['week','Week'],['month','Month']])+
+    tabGroup('Calendar view','cal-mode',calMode,[['day','Day'],['3day','3 Days'],['week','Week'],['month','Month']])+
     '<button type="button" class="icon-btn cal-panel-btn" data-action="cal-side" aria-pressed="'+!calSide.closed+'" title="'+(calSide.closed?'Show':'Hide')+' calendars and unscheduled tasks" aria-label="'+(calSide.closed?'Show':'Hide')+' side panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M15 4.5v15"/>'+(calSide.closed?'':'<path d="M15 4.5h3a2.5 2.5 0 0 1 2.5 2.5v10a2.5 2.5 0 0 1-2.5 2.5h-3z" fill="currentColor" stroke="none" opacity=".35"/>')+'</svg></button></div></div>'+
     '<div class="cal-wrap'+(calSide.closed?' side-closed':'')+'">'+(calMode==='month'?monthGrid():weekGrid())+
     (calSide.closed?'':'<aside class="cal-side">'+calendarList()+(unscheduled.length?calSec('Unscheduled',sortTasks(unscheduled).map(chip).join('')):'')+'</aside>')+'</div>';
@@ -1180,13 +1181,14 @@ function allDayRow(days,ext) {
   '</div>';
 }
 function weekGrid() {
-  const n=calDays(), start=calStart(), days=Array.from({length:n},(_,i)=>addDays(start,i)), t0=today();
+  // One horizontal strip: the visible days plus a screen either side, scrolled continuously.
+  const vis=calDays(), n=vis*3, start=addDays(calStart(),-vis), days=Array.from({length:n},(_,i)=>addDays(start,i)), t0=today();
   const ext=extFor(days[0],days[n-1],true);
   const now=new Date(), nowMins=Number(new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',hour:'numeric',hourCycle:'h23'}).format(now))*60+now.getMinutes();
-  return '<div class="wk" style="--days:'+n+';--hour:'+HOUR_PX+'px">'+
+  return '<div class="wk" style="--days:'+n+';--vis:'+vis+';--hour:'+HOUR_PX+'px" data-start="'+start+'"><div class="wk-scroll"><div class="wk-top">'+
     '<div class="wk-head"><span class="wk-gutter"></span>'+days.map(d=>'<div class="wk-day'+(d===t0?' today':'')+(d<t0?' past':'')+'"><small>'+pretty(d,{weekday:'short'})+'</small><strong>'+Number(d.slice(8))+'</strong></div>').join('')+'</div>'+
-    allDayRow(days,ext)+
-    '<div class="wk-scroll"><div class="wk-body"><div class="wk-gutter">'+Array.from({length:23},(_,i)=>'<span style="top:'+((i+1)*HOUR_PX)+'px">'+hm((i+1)*60)+'</span>').join('')+'</div>'+
+    allDayRow(days,ext)+'</div>'+
+    '<div class="wk-body"><div class="wk-gutter">'+Array.from({length:23},(_,i)=>'<span style="top:'+((i+1)*HOUR_PX)+'px">'+hm((i+1)*60)+'</span>').join('')+'</div>'+
     days.map(d=>{
       const items=[...calTasks(d).filter(t=>t.time).map(t=>({t,s:toMin(t.time),e:Math.min(DAY_MINS,toMin(t.time)+blockLen(t))})),
                    ...ext.filter(e=>!e.allDay&&e.date===d).map(x=>({x,s:toMin(x.time),e:Math.min(DAY_MINS,toMin(x.time)+Math.max(SNAP,x.minutes))}))].sort((a,b)=>a.s-b.s||b.e-a.e);
@@ -1212,8 +1214,19 @@ function weekGrid() {
 function calAfterRender() {
   const sc=main.querySelector('.wk-scroll');
   if (!sc) return;
+  const wk=sc.closest('.wk'), vis=calDays(), col=()=>sc.querySelector('.wk-col')?.offsetWidth||1;
   sc.scrollTop = calScroll ?? 6.5*HOUR_PX;   // open at 6:30, so the 7am line and its label are in full view
-  sc.addEventListener('scroll',()=>{ calScroll=sc.scrollTop; },{passive:true});
+  sc.scrollLeft = vis*col();                 // the middle screen of the strip is the one you asked for
+  let settle;
+  const recentre = () => {                   // after a scroll stops, the strip is rebuilt around where you stopped
+    const idx=Math.round(sc.scrollLeft/col());
+    calScroll=sc.scrollTop;
+    if (idx===vis) return;
+    calFirst=addDays(wk.dataset.start,idx); calAnchor=calFirst;
+    render();
+  };
+  sc.addEventListener('scroll',()=>{ calScroll=sc.scrollTop; clearTimeout(settle); settle=setTimeout(recentre,180); },{passive:true});
+  if ('onscrollend' in sc) sc.addEventListener('scrollend',()=>{ clearTimeout(settle); recentre(); });
 }
 // Drawing, moving and resizing blocks with the mouse, pen or a finger.
 const minuteAt = (col,y) => Math.max(0,Math.min(DAY_MINS,(y-col.getBoundingClientRect().top)/HOUR_PX*60));
@@ -1867,6 +1880,7 @@ const FI = {
   stop:svgIcon('<rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor"/>'),
   skip:svgIcon('<path d="M6 6l8 6-8 6zM16 6h2v12h-2z" fill="currentColor"/>'),
   popout:svgIcon('<path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'),
+  close:svgIcon('<path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
   full:svgIcon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>')
 };
 // Float the timer outside the window: a native always-on-top panel in the Mac app,
@@ -1905,7 +1919,7 @@ function renderFloat() {
       : ib('timer-start', FI.play, (brk?'Start break':'Start studying')+' (s)', true))+
     '<a class="ft-body" href="#focus" title="Open the Study page"><span class="ft-what"><i></i>'+h(what)+'</span>'+
       (active ? '<span id="float-time" class="ft-time">'+clock(shownSecs())+'</span>' : '<span class="ft-mode">'+h(mode)+'</span>')+'</a>'+
-    (MINI ? (active&&brk ? ib('timer-skip', FI.skip, 'Skip break') : '')
+    (MINI ? (active&&brk ? ib('timer-skip', FI.skip, 'Skip break') : '')+ib('float-close', FI.close, 'Close floating timer')
       : (active ? (brk ? ib('timer-skip', FI.skip, 'Skip break') : ib('timer-finish', FI.stop, timer.mode==='exam'?'End exam':'Finish and log')) : '')+
         ib('timer-popout', FI.popout, 'Float on top of other windows')+ib('timer-full', FI.full, 'Full screen (f)'));
 }
@@ -2341,7 +2355,7 @@ function stackActions(id, el) {
     'nav-toggle':()=>{ navClosed.has(id)?navClosed.delete(id):navClosed.add(id); try { localStorage.setItem('stacky:nav-closed',JSON.stringify([...navClosed])); } catch {} render(); },
     'delete-list':()=>modal('Delete this list?','<p>Its tasks stay and move to the Inbox (or their subject).</p>','Delete list',()=>{change(()=>{data.lists=data.lists.filter(l=>l.id!==id);data.tasks.forEach(t=>{if(t.list===id)t.list='';});});location.hash='#inbox';}),
     'cal-shift':()=>calShift(Number(id)),
-    'cal-today':()=>{calAnchor=today();calScroll=null;render();},
+    'cal-today':()=>{calAnchor=today();calFirst=null;calScroll=null;render();},
     'calendars':calendarsModal,
     'cal-side':()=>{ calSide.closed=!calSide.closed; storeCalSide(); render(); const p=main.querySelector('.cal-side'); if (p && !matchMedia('(prefers-reduced-motion: reduce)').matches) p.animate([{opacity:0,transform:'translateX(12px)'},{opacity:1,transform:'none'}],{duration:200,easing:'cubic-bezier(.2,.8,.2,1)'}); },
     'cal-sec':()=>{ const s=new Set(calSide.shut||[]); s.has(id)?s.delete(id):s.add(id); calSide.shut=[...s]; storeCalSide(); render(); },
@@ -2355,14 +2369,15 @@ function stackActions(id, el) {
     'g-connect':gConnect,
     'g-forget':()=>{ const c=calCfg(); if (gToken && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(gToken.t,()=>{}); gToken=null; gClient=null; try { sessionStorage.removeItem(GTOKEN_KEY); } catch {} extCache.google=null; storeExt(); change(()=>{ c.google={clientId:'',show:{},pushTo:'primary',push:true,list:[]}; }); calendarsModal(); notify('Google Calendar disconnected. Blocks already sent stay in Google.'); },
     'ics-remove':()=>{ const c=calCfg(); change(()=>{ c.ics=c.ics.filter(x=>x.id!==id); }); if (extCache.ics) delete extCache.ics[id]; storeExt(); calendarsModal(); },
-    'cal-mode':()=>{calMode=id;render();},
-    'cal-open-day':()=>{calMode='week';calAnchor=id;render();},
+    'cal-mode':()=>setCalMode(id),
+    'cal-open-day':()=>{calAnchor=id;setCalMode('day');},
     'cal-add':()=>modal('Add task · '+pretty(id,{weekday:'long',day:'numeric',month:'short'}),field('q','Task','',{full:true,required:true,placeholder:'e.g. Physics depth study 4pm 1h #phy'}),'Add',v=>{ createFromQuick(v.q,{date:id}); }),
     'timer-start':()=>{startTimer();render();},
     'timer-pause':()=>{pauseTimer();render();},
     'timer-finish':finishSession,
     'timer-full':openFull,
     'timer-popout':popOutTimer,
+    'float-close':()=>{ if (window.webkit?.messageHandlers?.stackyFloat) window.webkit.messageHandlers.stackyFloat.postMessage('close'); else window.close(); },
     'timer-full-exit':closeFull,
     'timer-skip':()=>{resetTimer({phase:'focus'});render();},
     'focus-length':()=>{ if (sessionActive()) { notify('Finish this round to change its length.'); return; } change(()=>{ data.settings.pomo={...pomo(),focus:Number(id)}; }); },
@@ -2504,12 +2519,13 @@ document.addEventListener('keydown',event=>{
     if (!event.shiftKey && k==='enter') { event.preventDefault(); toggleTimer(); return; }
     if (event.shiftKey && k==='f') { event.preventDefault(); fullTimer?closeFull():openFull(); return; }
   }
-  // Calendar: arrows change week or month, T jumps to today, W and M switch view.
+  // Calendar: arrows change week or month, T jumps to today, D 3 W M switch view.
   if (route().name==='calendar' && data && !dialog.open && !event.metaKey && !event.ctrlKey && !event.altKey && !el.closest('input,textarea,select,[contenteditable]')) {
     const k=event.key;
     if (k==='ArrowLeft'||k==='ArrowRight') { event.preventDefault(); calShift(k==='ArrowLeft'?-1:1); return; }
-    if (k==='t'||k==='T') { event.preventDefault(); calAnchor=today(); calScroll=null; render(); return; }
-    if (k==='w'||k==='m') { event.preventDefault(); calMode=k==='w'?'week':'month'; render(); return; }
+    if (k==='t'||k==='T') { event.preventDefault(); calAnchor=today(); calFirst=null; calScroll=null; render(); return; }
+    const views={d:'day','3':'3day',w:'week',m:'month'};
+    if (views[k]) { event.preventDefault(); setCalMode(views[k]); return; }
   }
   if (event.key==='?' && !el.closest('input,textarea,select,[contenteditable]') && !dialog.open) { event.preventDefault(); shortcutsSheet(); return; }
   if (el.id==='search' && event.key==='Escape') { el.value=''; el.blur(); history.replaceState(null,'','#today'); render(); return; }

@@ -92,10 +92,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     if let p = floatPanel { p.orderFrontRegardless(); return }
     let config = WKWebViewConfiguration()
     config.websiteDataStore = .default()   // same storage as the main window, so they share one timer
+    config.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('in-float-panel')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    config.userContentController.add(self, name: "stackyFloat")
     let mini = WKWebView(frame: .zero, configuration: config)
     mini.customUserAgent = safariUA
     mini.setValue(false, forKey: "drawsBackground")
-    let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 76),
+    let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 78),
                     styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel, .utilityWindow],
                     backing: .buffered, defer: false)
     p.title = "Stacky timer"
@@ -106,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     p.hidesOnDeactivate = false
     p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     p.isMovableByWindowBackground = true
+    for b in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] { p.standardWindowButton(b)?.isHidden = true }   // the page has its own close button
     p.backgroundColor = window.backgroundColor
     p.contentView = mini
     p.isReleasedWhenClosed = false

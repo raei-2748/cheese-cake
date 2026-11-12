@@ -1923,3 +1923,8 @@ html.mini-mode #float-timer{position:static!important;inset:auto!important;left:
   transform:none!important;width:100%;max-width:none;box-shadow:none!important;border:0!important;background:transparent!important;animation:none!important}
 html.mini-mode .ft-body{pointer-events:none}
 html.mini-mode #toast{left:8px;right:8px;bottom:6px;font-size:11px}
+html.mini-mode .ft-body{display:grid!important;flex:1;min-width:0}
+html.mini-mode .ft-btn[data-action=float-close]{margin-left:auto;opacity:.6}
+html.mini-mode .ft-btn[data-action=float-close]:hover{opacity:1}
+/* Mac app panel: the top strip is for dragging the window */
+html.mini-mode.in-float-panel body{padding-top:16px}
