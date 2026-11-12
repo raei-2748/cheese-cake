@@ -1660,3 +1660,10 @@ body.nav-open .float-timer{display:none}
 .cal-more{white-space:nowrap}
 @media(max-width:760px){.cal-more{font-size:10px;padding-left:0;padding-right:0;letter-spacing:-.02em}}
 .hero-then b{white-space:nowrap}
+.topic-row strong,.topic-row small{line-height:1.4}
+.topic-row>div:first-child{min-width:0}
+@media(max-width:560px){
+  .topic-row{flex-wrap:wrap;row-gap:2px;padding-left:16px}
+  .topic-row>div:first-child{flex:1 1 100%}
+  .topic-row .line{flex:1 1 100%;justify-content:flex-start;flex-wrap:nowrap}
+}
