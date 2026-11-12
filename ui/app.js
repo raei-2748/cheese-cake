@@ -2542,4 +2542,136 @@ dialog.addEventListener('submit',event=>{
   const result=currentEditor.onSubmit?.(values);
   if(result!==false) dialog.close();
 });
+
+// ───────────────────────── Right-click menus ─────────────────────────
+// Right-click (or long-press on a touch screen) a task, a calendar block or day, a study
+// session, a habit, an assessment or a sidebar list for the things you would otherwise open
+// it to do. Text fields, links and selected text keep the browser's own menu.
+const ctxEl = (()=>{ const el=document.createElement('div'); el.id='ctx-menu'; el.className='ctx-menu'; el.setAttribute('role','menu'); el.hidden=true; document.body.append(el); return el; })();
+let ctxItems = [];
+const closeCtx = () => { if (!ctxEl.hidden) { ctxEl.hidden=true; ctxEl.innerHTML=''; ctxItems=[]; } };
+// Runs one of the page's ordinary button actions, so the menu and the buttons can never disagree.
+function runAction(action, id='', extra={}) {
+  const b=document.createElement('button'); b.hidden=true; b.dataset.action=action; b.dataset.id=id; Object.assign(b.dataset,extra);
+  document.body.append(b); b.click(); b.remove();
+}
+function openCtx(x, y, title, items) {
+  ctxItems = items.filter(Boolean);
+  if (!ctxItems.length) return false;
+  ctxEl.innerHTML = (title?'<div class="ctx-title">'+h(title)+'</div>':'')+ctxItems.map((it,i)=>
+    it.sep ? '<div class="ctx-sep" role="separator"></div>'
+    : it.row ? '<div class="ctx-row" role="group" aria-label="'+h(it.label)+'"><span>'+h(it.label)+'</span>'+it.row.map((r,j)=>'<button type="button" role="menuitemradio" aria-checked="'+!!r.on+'" data-ctx="'+i+'.'+j+'" title="'+h(r.label)+'" style="--c:'+r.colour+'"><i></i><span class="sr">'+h(r.label)+'</span></button>').join('')+'</div>'
+    : '<button type="button" role="menuitem" class="ctx-item'+(it.danger?' danger':'')+'" data-ctx="'+i+'">'+(it.icon?icon(it.icon):'<svg aria-hidden="true"></svg>')+'<span>'+h(it.label)+'</span>'+(it.hint?'<small>'+h(it.hint)+'</small>':'')+'</button>').join('');
+  ctxEl.hidden=false;
+  const w=ctxEl.offsetWidth, ht=ctxEl.offsetHeight, pad=8;
+  ctxEl.style.left=Math.max(pad,Math.min(x,innerWidth-w-pad))+'px';
+  ctxEl.style.top=Math.max(pad,Math.min(y,innerHeight-ht-pad))+'px';
+  ctxEl.querySelector('button')?.focus({preventScroll:true});
+  return true;
+}
+function taskMenu(t) {
+  const t0=today(), setDate=d=>()=>change(()=>{ t.date=d; if (!d) t.time=''; });
+  const nextMon=addDays(monday(t0),7);
+  return [
+    {label:'Open',icon:'notes',run:()=>selectTask(t.id)},
+    {label:taskDone(t)?'Mark as not done':'Mark as done',icon:'done',run:()=>change(()=>setDone(t,!taskDone(t)))},
+    taskDone(t)?null:{label:'Study this now',icon:'play',run:()=>runAction('focus-task',t.id)},
+    {sep:true},
+    t.date===t0?null:{label:'Move to today',icon:'sun',run:setDate(t0)},
+    {label:'Move to tomorrow',icon:'week7',hint:pretty(addDays(t0,1),{weekday:'short'}),run:setDate(addDays(t0,1))},
+    {label:'Move to next week',icon:'calendar',hint:pretty(nextMon,{weekday:'short',day:'numeric',month:'short'}),run:setDate(nextMon)},
+    t.date?{label:'Remove the date',icon:'close',run:setDate('')}:null,
+    {sep:true},
+    {label:'Priority',row:[...PRI].reverse().map(([k,l,col])=>({label:l,colour:col,on:Number(t.priority||0)===Number(k),run:()=>change(()=>{t.priority=Number(k);})}))},
+    {sep:true},
+    {label:'Duplicate',icon:'layers',run:()=>change(()=>{ data.tasks.push({...structuredClone(t),id:uid(),status:'Planned',completedAt:null,actual:'',subtasks:(t.subtasks||[]).map(x=>({...x,id:uid(),done:false}))}); })},
+    {label:'Delete',icon:'close',danger:true,run:()=>runAction('delete-task',t.id)}
+  ];
+}
+function contextFor(target, event) {
+  const idOf = sel => target.closest(sel);
+  let el;
+  // Tasks: list rows, calendar chips and blocks, weekly-plan rows.
+  if ((el=idOf('[data-task],[data-select],.task-row'))) {
+    const id=el.dataset.task||el.dataset.select||el.querySelector('[data-action=edit-task]')?.dataset.id, t=id&&row('tasks',id);
+    if (t) return [t.title||'Untitled', taskMenu(t)];
+  }
+  if ((el=idOf('[data-action=edit-session]'))) { const f=row('focus',el.dataset.id); if (f) return [(course(f.course)?.short??'General')+' · '+minutes(f.minutes), [
+    {label:'Edit session',icon:'notes',run:()=>runAction('edit-session',f.id)},
+    f.taskId&&row('tasks',f.taskId)?{label:'Open its task',icon:'check',run:()=>selectTask(f.taskId)}:null,
+    {label:'Delete',icon:'close',danger:true,run:()=>modal('Delete this session?','<p>It is removed from your log and its minutes come off the task.</p>','Delete',()=>change(()=>{ const t=row('tasks',f.taskId); if (t) t.actual=Math.max(0,(Number(t.actual)||0)-f.minutes); data.focus=data.focus.filter(x=>x.id!==f.id); }))}
+  ]]; }
+  // An empty part of the calendar.
+  if ((el=idOf('.wk-col'))) { const m=Math.min(DAY_MINS-60,Math.floor(minuteAt(el,event.clientY)/30)*30), day=el.dataset.day; return [pretty(day,{weekday:'long',day:'numeric',month:'short'})+' · '+hm(m), [
+    {label:'New block at '+hm(m),icon:'calendar',run:()=>modal('New block · '+pretty(day,{weekday:'short',day:'numeric',month:'short'})+', '+hm(m),field('q','What is it for?','',{full:true,required:true,placeholder:'e.g. Chem prac write-up #che !high'}),'Add',v=>{ createFromQuick(v.q,{date:day,time:fromMin(m),minutes:60}); })},
+    {label:'Add an all-day task',icon:'sun',run:()=>runAction('cal-add',day)}
+  ]]; }
+  if ((el=idOf('.cal-cell,.wk-allcell'))) { const day=el.dataset.dropDate; if (day) return [pretty(day,{weekday:'long',day:'numeric',month:'short'}), [
+    {label:'Add a task on this day',icon:'calendar',run:()=>runAction('cal-add',day)},
+    el.matches('.cal-cell')?{label:'Open this week',icon:'week7',run:()=>runAction('cal-open-day',day)}:null
+  ]]; }
+  if ((el=idOf('.habit-row'))) { const id=el.querySelector('[data-action=habit-open]')?.dataset.id, hb=id&&data.habits.find(x=>x.id===id); if (hb) return [hb.name, [
+    {label:habitDone(hb,today())?'Untick today':'Tick today',icon:'done',run:()=>runAction('habit-toggle',hb.id,{date:today()})},
+    {label:'Show history',icon:'grid',run:()=>runAction('habit-open',hb.id)},
+    {label:'Edit habit',icon:'notes',run:()=>runAction('edit-habit',hb.id)}
+  ]]; }
+  if ((el=idOf('.assess-row,.assess-hero,.rw-dot'))) { const id=(el.matches('[data-id]')?el:el.querySelector('[data-action=edit-assessment]'))?.dataset.id, a=id&&row('assessments',id); if (a) return [a.title, [
+    {label:'Edit',icon:'notes',run:()=>runAction('edit-assessment',a.id)},
+    assessDone(a)?null:{label:'Plan a prep block',icon:'calendar',run:()=>runAction('prep-assessment',a.id)},
+    {label:'Study '+(course(a.course)?.short??'this')+' now',icon:'play',run:()=>{ runAction('study-course',a.course||''); location.hash='#focus'; }}
+  ]]; }
+  // Sidebar: subjects, your own lists, tags.
+  if ((el=idOf('#nav a[href^="#list/"]'))) { let id=el.getAttribute('href').slice(6); try { id=decodeURIComponent(id); } catch {} const c=course(id), l=customList(id);
+    if (c) return [c.name, [
+      {label:'Study '+c.short+' now',icon:'play',run:()=>{ runAction('study-course',c.id); location.hash='#focus'; }},
+      {label:'Open syllabus',icon:'layers',run:()=>runAction('open-topics',c.id)},
+      {label:'Add a task',icon:'check',run:()=>editTask(null,{course:c.id,kind:'Homework'})}
+    ]];
+    if (l) return [l.name, [
+      {label:'Rename or recolour',icon:'notes',run:()=>runAction('edit-list',l.id)},
+      {label:'Delete list',icon:'close',danger:true,run:()=>runAction('delete-list',l.id)}
+    ]]; }
+  if ((el=idOf('#nav a[href^="#tag/"]'))) { let g=el.getAttribute('href').slice(5); try { g=decodeURIComponent(g); } catch {} return ['#'+g, [
+    {label:'Remove this tag from every task',icon:'close',danger:true,run:()=>modal('Remove #'+g+'?','<p>The tag comes off every task. The tasks themselves stay.</p>','Remove tag',()=>{ change(()=>{ data.tasks.forEach(t=>{ t.tags=(t.tags||[]).filter(x=>x!==g); }); }); if (route().name==='tag'&&route().arg===g) location.hash='#all'; })}
+  ]]; }
+  return null;
+}
+document.addEventListener('contextmenu',event=>{
+  if (!data || event.shiftKey) return;                       // Shift + right-click always gives the browser's menu
+  const target=event.target;
+  if (!(target instanceof Element) || target.closest('#ctx-menu')) { event.preventDefault(); return; }
+  if (target.closest('input,textarea,select,[contenteditable],dialog,a[target=_blank]') || String(getSelection()).trim()) { closeCtx(); return; }
+  const found=contextFor(target,event);
+  closeCtx();
+  if (found && openCtx(event.clientX,event.clientY,found[0],found[1])) event.preventDefault();
+});
+ctxEl.addEventListener('click',event=>{
+  const b=event.target.closest('[data-ctx]'); if (!b) return;
+  event.stopPropagation();
+  const [i,j]=b.dataset.ctx.split('.').map(Number), it=ctxItems[i], run=(j==null||Number.isNaN(j)?it:it.row[j])?.run;
+  closeCtx(); run?.();
+});
+ctxEl.addEventListener('keydown',event=>{
+  const items=[...ctxEl.querySelectorAll('button')], at=items.indexOf(document.activeElement);
+  if (event.key==='Escape') { event.preventDefault(); event.stopPropagation(); closeCtx(); }
+  else if (event.key==='ArrowDown' || event.key==='ArrowUp') { event.preventDefault(); items[(at+(event.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus(); }
+  else if (event.key==='Tab') { event.preventDefault(); closeCtx(); }
+  else if (event.key.length===1) event.stopPropagation();   // typing a letter must not fire the page's shortcuts (s, f, q)
+},true);
+document.addEventListener('pointerdown',event=>{ if (!ctxEl.hidden && !event.target.closest?.('#ctx-menu')) closeCtx(); },true);
+for (const type of ['scroll','resize','blur','hashchange']) addEventListener(type,closeCtx,type==='scroll'?{capture:true,passive:true}:false);
+// iPhone and iPad never send `contextmenu`, so a long press stands in for it there.
+let pressTimer=0, pressAt=null;
+document.addEventListener('touchstart',event=>{
+  clearTimeout(pressTimer);
+  if (event.touches.length!==1) return;
+  const touch=event.touches[0], target=event.target; pressAt=[touch.clientX,touch.clientY];
+  pressTimer=setTimeout(()=>{
+    if (!data || !(target instanceof Element) || target.closest('input,textarea,select,dialog,#ctx-menu')) return;
+    const found=contextFor(target,{clientX:pressAt[0],clientY:pressAt[1]});
+    if (found && openCtx(pressAt[0],pressAt[1],found[0],found[1])) { swallowClick=true; setTimeout(()=>{swallowClick=false;},700); navigator.vibrate?.(8); }
+  },520);
+},{passive:true});
+document.addEventListener('touchmove',event=>{ const t=event.touches[0]; if (pressAt && t && Math.hypot(t.clientX-pressAt[0],t.clientY-pressAt[1])>9) clearTimeout(pressTimer); },{passive:true});
+for (const type of ['touchend','touchcancel']) document.addEventListener(type,()=>clearTimeout(pressTimer),{passive:true});
 open();
