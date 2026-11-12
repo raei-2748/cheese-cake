@@ -1,0 +1,22 @@
+{
+  "name": "Stacky",
+  "short_name": "Stacky",
+  "description": "Study timer, tasks, calendar and HSC tracking.",
+  "id": "./",
+  "start_url": "./#dash",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#191919",
+  "theme_color": "#191919",
+  "icons": [
+    {"src": "icons/stacky-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/stacky-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/stacky-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Study", "url": "./#focus"},
+    {"name": "Today", "url": "./#today"},
+    {"name": "Calendar", "url": "./#calendar"}
+  ]
+}

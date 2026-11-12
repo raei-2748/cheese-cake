@@ -1544,3 +1544,12 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 #nav a[aria-current] span,.hl,.cal-cell.today .cal-num,.wk-day.today strong,
 .page-head h1,.list-head h1,.cal-title h1,.goal-bar i{background-image:linear-gradient(var(--hl),var(--hl))!important}
 #nav a[aria-current] span,.hl{border-radius:2px!important}
+
+/* ═════════════ Sidebar highlight glides between pages (12 Nov) ═════════════ */
+.sidebar>.nav-glide{position:absolute;left:0;top:0;z-index:0;pointer-events:none;border-radius:2px;opacity:0;
+  background:linear-gradient(var(--hl),var(--hl)) 0 62%/100% 70% no-repeat;
+  transition:transform .34s cubic-bezier(.3,.9,.3,1),width .34s cubic-bezier(.3,.9,.3,1),height .34s cubic-bezier(.3,.9,.3,1)}
+.sidebar.has-glide #nav a[aria-current] span{background:none!important;position:relative;z-index:2}
+#nav{position:relative;z-index:1}
+#nav a[aria-current]{background-color:transparent}
+@media(prefers-reduced-motion:reduce){.sidebar>.nav-glide{transition:none}}

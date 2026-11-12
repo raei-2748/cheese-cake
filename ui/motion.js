@@ -84,28 +84,38 @@ grip.addEventListener('keydown', event => {
 wide.addEventListener('change', labelMenu);
 labelMenu();
 
-// Highlighter micro-animation: whatever you just clicked gets "drawn on" with the marker.
-// The app re-renders after most clicks, so the stroke is drawn on whatever is highlighted
-// in the next ~half second (the new current page, the chosen pill, today's date…).
-let markTimer;
-document.addEventListener('click', event => {
-  // Only highlighter marks animate; switching pills, tabs and filters is instant.
-  if (!event.target.closest('#nav a, .cal-num, .wk-day, [data-action=toggle-task]')) return;
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  root.classList.remove('hl-draw');
-  void root.offsetWidth;   // restart the animation if you click again quickly
-  root.classList.add('hl-draw');
-  clearTimeout(markTimer);
-  markTimer = setTimeout(() => root.classList.remove('hl-draw'), 520);
-}, true);
-
-// Moving to another page draws its title's highlighter once.
-let titleTimer;
-addEventListener('hashchange', () => {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  root.classList.remove('hl-title');
-  void root.offsetWidth;
-  root.classList.add('hl-title');
-  clearTimeout(titleTimer);
-  titleTimer = setTimeout(() => root.classList.remove('hl-title'), 700);
-});
+// Sidebar highlight glides to the page you open. Highlights elsewhere appear instantly.
+// The marker lives beside the nav list (the list is re-rendered often), and slides
+// from the previous current item to the new one.
+const rail = document.querySelector('.sidebar');
+const liveNav = () => document.getElementById('nav');
+const glide = document.createElement('i');
+glide.className = 'nav-glide'; glide.setAttribute('aria-hidden', 'true');
+rail.prepend(glide);
+let glideAt = null;
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function placeGlide(animate = true) {
+  const nav = liveNav(); if (!nav) return;
+  const cur = nav.querySelector('a[aria-current] span');
+  if (!cur || !cur.offsetWidth) { glide.style.opacity = '0'; rail.classList.remove('has-glide'); glideAt = null; return; }
+  const s = rail.getBoundingClientRect(), r = cur.getBoundingClientRect(), n = nav.getBoundingClientRect();
+  const box = { x: r.left - s.left, y: r.top - s.top, w: r.width, h: r.height };
+  const hidden = r.bottom < n.top || r.top > n.bottom;   // scrolled out of the list
+  const moved = glideAt && (Math.abs(glideAt.y - box.y) > 1 || Math.abs(glideAt.x - box.x) > 1 || Math.abs(glideAt.w - box.w) > 1);
+  // Re-placing at the same spot must not touch the transition, or a slide in progress snaps.
+  if (!glideAt || moved) {
+    glide.style.transition = animate && moved && !reduceMotion() ? '' : 'none';
+    glide.style.transform = 'translate(' + box.x + 'px,' + box.y + 'px)';
+    glide.style.width = box.w + 'px'; glide.style.height = box.h + 'px';
+  }
+  glide.style.opacity = hidden ? '0' : '1';
+  rail.classList.add('has-glide');
+  glideAt = box;
+}
+let glideQueued = false;
+new MutationObserver(() => { if (glideQueued) return; glideQueued = true; setTimeout(() => { glideQueued = false; placeGlide(true); }, 0); })
+  .observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-current', 'class'] });
+addEventListener('hashchange', () => setTimeout(() => placeGlide(true), 0));
+rail.addEventListener('scroll', () => placeGlide(false), { passive: true, capture: true });
+addEventListener('resize', () => placeGlide(false));
+placeGlide(false);
