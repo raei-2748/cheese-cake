@@ -1207,7 +1207,7 @@ const calCfg = () => {
 let extCache=(()=>{ try { return JSON.parse(localStorage.getItem(EXT_KEY))||{}; } catch { return {}; } })();   // {google:{from,to,at,events}, ics:{id:{at,vevents,error}}}
 const storeExt = () => { try { localStorage.setItem(EXT_KEY,JSON.stringify(extCache)); } catch {} };
 let gToken=(()=>{ try { const x=JSON.parse(sessionStorage.getItem(GTOKEN_KEY)); return x&&x.exp>Date.now()?x:null; } catch { return null; } })();
-let gClient=null, gScript=null, gBusy=false, gError='', gPushTimer, gPushing=false, gPushAgain=false;
+let gNeedConsent=false, gClient=null, gScript=null, gBusy=false, gError='', gPushTimer, gPushing=false, gPushAgain=false;
 const gOn = () => !!calCfg().google.clientId;
 const gReady = () => !!(gToken && gToken.exp>Date.now());
 
@@ -1246,7 +1246,9 @@ function extFor(from,to,withSessions=false) {
 }
 function extStatus() {
   const cfg=calCfg(), bits=[];
-  if (gOn()) bits.push(gReady()?'<span class="ext-pill ok" title="Connected to Google Calendar">Google</span>':'<button type="button" class="ext-pill warn" data-action="g-connect" title="Sign in again to sync">Reconnect Google</button>');
+  if (gOn()) bits.push(!gReady()?'<button type="button" class="ext-pill warn" data-action="g-connect" title="Sign in again to sync">Reconnect Google</button>'
+    : gError?'<button type="button" class="ext-pill warn" data-action="g-connect" title="'+h(gError)+'">Google: '+h(gError.length>60?gError.slice(0,57)+'…':gError)+' · Fix</button>'
+    : '<span class="ext-pill ok" title="Connected to Google Calendar">Google'+(extCache.google?.events?' · '+extCache.google.events.length+' events':'')+'</span>');
   if (cfg.ics.length) bits.push('<span class="ext-pill ok">'+cfg.ics.length+' iCal</span>');
   if (gBusy) bits.push('<span class="ext-pill">Syncing…</span>');
   return bits.length?'<div class="ext-status">'+bits.join('')+'</div>':'';
@@ -1272,12 +1274,14 @@ function gConnect() {   // must run from a click, so the Google window is allowe
   if (!window.google?.accounts?.oauth2) { gPreload()?.then(()=>notify('Google is ready. Press Connect again.')).catch(e=>notify(e.message)); return; }
   gClient ??= google.accounts.oauth2.initTokenClient({client_id:calCfg().google.clientId,scope:G_SCOPE,callback:r=>{
     if (r.error) { gError='Google did not connect ('+r.error+').'; notify(gError); render(); return; }
+    if (google.accounts.oauth2.hasGrantedAllScopes && !google.accounts.oauth2.hasGrantedAllScopes(r,...G_SCOPE.split(' '))) { gToken=null; gError='Calendar access was not allowed. Press Fix and tick both calendar boxes on Google’s screen.'; gNeedConsent=true; notify(gError); render(); return; }
+    gNeedConsent=false;
     gToken={t:r.access_token,exp:Date.now()+(Number(r.expires_in)-60)*1000};
     try { sessionStorage.setItem(GTOKEN_KEY,JSON.stringify(gToken)); } catch {}
     gError=''; notify('Connected to Google Calendar.');
     gPull(extWant?.[0]??addDays(today(),-14), extWant?.[1]??addDays(today(),60), true).then(()=>gQueuePush(300));
   }});
-  gClient.requestAccessToken({prompt:gToken?'':undefined});
+  gClient.requestAccessToken({prompt:gNeedConsent?'consent':gToken?'':undefined});
 }
 async function gApi(path,options={}) {
   if (!gReady()) throw new Error('Not signed in to Google.');
@@ -1285,7 +1289,8 @@ async function gApi(path,options={}) {
   if (r.status===401) { gToken=null; try { sessionStorage.removeItem(GTOKEN_KEY); } catch {} if (data) render(); throw new Error('Google sign-in expired. Press Reconnect Google.'); }
   if (r.status===204) return null;
   const body=await r.json().catch(()=>null);
-  if (!r.ok) throw new Error('Google Calendar: '+(body?.error?.message||r.status));
+  if (r.status===403 && /insufficient/i.test(body?.error?.message||'')) { gNeedConsent=true; throw new Error('Calendar access was not allowed. Press Fix and tick both calendar boxes.'); }
+  if (!r.ok) throw new Error((body?.error?.message||('Google error '+r.status)).replace(/\s+/g,' '));
   return body;
 }
 const gTime = d => encodeURIComponent(new Date(zoneToMs(+d.slice(0,4),+d.slice(5,7),+d.slice(8,10),0,0,TZ)).toISOString());
