@@ -2659,7 +2659,9 @@ ctxEl.addEventListener('keydown',event=>{
   else if (event.key.length===1) event.stopPropagation();   // typing a letter must not fire the page's shortcuts (s, f, q)
 },true);
 document.addEventListener('pointerdown',event=>{ if (!ctxEl.hidden && !event.target.closest?.('#ctx-menu')) closeCtx(); },true);
-for (const type of ['scroll','resize','blur','hashchange']) addEventListener(type,closeCtx,type==='scroll'?{capture:true,passive:true}:false);
+// Scrolling the page closes the menu; scrolling inside a menu too tall for the window must not.
+addEventListener('scroll',event=>{ if (!(event.target instanceof Node && ctxEl.contains(event.target))) closeCtx(); },{capture:true,passive:true});
+for (const type of ['resize','blur','hashchange']) addEventListener(type,closeCtx);
 // iPhone and iPad never send `contextmenu`, so a long press stands in for it there.
 let pressTimer=0, pressAt=null;
 document.addEventListener('touchstart',event=>{
@@ -2669,7 +2671,8 @@ document.addEventListener('touchstart',event=>{
   pressTimer=setTimeout(()=>{
     if (!data || !(target instanceof Element) || target.closest('input,textarea,select,dialog,#ctx-menu')) return;
     const found=contextFor(target,{clientX:pressAt[0],clientY:pressAt[1]});
-    if (found && openCtx(pressAt[0],pressAt[1],found[0],found[1])) { swallowClick=true; setTimeout(()=>{swallowClick=false;},700); navigator.vibrate?.(8); }
+    if (found && openCtx(pressAt[0],pressAt[1],found[0],found[1])) { swallowClick=true; setTimeout(()=>{swallowClick=false;},700); calDrag=null;   // or lifting the finger would also start a new calendar block
+      navigator.vibrate?.(8); }
   },520);
 },{passive:true});
 document.addEventListener('touchmove',event=>{ const t=event.touches[0]; if (pressAt && t && Math.hypot(t.clientX-pressAt[0],t.clientY-pressAt[1])>9) clearTimeout(pressTimer); },{passive:true});
