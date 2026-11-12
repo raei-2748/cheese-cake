@@ -1960,8 +1960,8 @@ function focusPage() {
   const R=92, C=2*Math.PI*R;
   const modeTabs='<div class="tt-modes" role="group" aria-label="Timer type">'+[['open','Stopwatch'],['timed','Pomo'],['exam','Exam']].map(([k,l])=>'<button type="button" aria-pressed="'+(timer.mode===k)+'" data-action="study-mode" data-id="'+k+'">'+l+'</button>').join('')+'</div>';
   // One page, three parts: the timer, today's numbers beside it, and the log underneath.
-  const chips = '<div class="st-subjects" role="group" aria-label="Subject">'+[['','General','#787774'],...courses.map(x=>[x.id,x.short,x.colour])].map(([id,label,col])=>
-    '<button type="button" class="st-chip" style="--c:'+col+'" aria-pressed="'+((timer.course||'')===id)+'" data-action="study-course" data-id="'+id+'">'+subjectIcon(id)+'<span>'+h(label)+'</span></button>').join('')+'</div>';
+  // Subject and task are two dropdowns side by side; the subject's icon and colour show on its button.
+  const chips = '<label class="st-task st-subject" style="--c:'+(c?.colour??'#787774')+'"><span class="sr">Subject</span>'+subjectIcon(timer.course||'')+'<select data-study-course>'+[['','General'],...courses.map(x=>[x.id,x.short])].map(([id,label])=>'<option value="'+id+'" '+((timer.course||'')===id?'selected':'')+'>'+h(label)+'</option>').join('')+'</select></label>';
   const taskPick = '<label class="st-task"><span class="sr">Task</span>'+icon('check')+'<select data-timer-task><option value="">No task, just the subject</option>'+open.map(x=>'<option value="'+h(x.id)+'" '+(x.id===timer.taskId?'selected':'')+'>'+h(x.title)+'</option>').join('')+'</select></label>';
   const left = Math.max(0,goal-s.today);
   const facts = [['Sessions',String(s.todayCount)],['Streak',s.streak+(s.streak===1?' day':' days')],['This week',minutes(s.week)]];
@@ -1971,7 +1971,7 @@ function focusPage() {
       '<button type="button" class="icon-btn" data-action="timer-full" title="Full screen (f)" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div></header>'+
     '<div class="st-grid">'+
       '<section class="st-timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" aria-label="Timer">'+
-        (onBreak?'<p class="st-break">Stand up, look away from the screen, drink some water.</p>':chips+taskPick)+
+        (onBreak?'<p class="st-break">Stand up, look away from the screen, drink some water.</p>':'<div class="st-picks">'+chips+taskPick+'</div>')+
         '<div class="st-ring"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="st-track" cx="100" cy="100" r="'+R+'"/><circle id="timer-ring" class="st-prog" cx="100" cy="100" r="'+R+'" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-ringFrac(secs))).toFixed(2)+'"/></svg>'+
           '<div class="st-centre"><div id="timer-text" class="st-clock" role="timer" aria-live="off">'+clock(secs)+'</div><span class="st-state">'+(timer.running?'<i></i>':'')+h(state)+'</span></div></div>'+
         '<p class="st-info">'+h(info)+'</p>'+
