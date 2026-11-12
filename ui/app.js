@@ -1,5 +1,6 @@
 import { courses, templates } from './data.js?v=__V__';
 import { parseQuickAdd, nextRepeat, repeatLabels } from './parse.js?v=__V__';
+import { initPower } from './power.js?v=__V__';
 
 const smart = [['today','Today','sun'],['next7','Next 7 days','week7'],['inbox','Inbox','inbox'],['all','All tasks','list'],['done','Completed','done']];
 const tools = [['calendar','Calendar','grid'],['matrix','Matrix','matrix'],['habits','Habits','repeat']];
@@ -123,17 +124,24 @@ let pointerHeld = false, heldRender = 0;
 const flushHeld = () => { pointerHeld = false; if (heldRender) { clearTimeout(heldRender); heldRender = 0; render(); } };
 addEventListener('pointerdown',()=>{ pointerHeld = true; },true);
 for (const type of ['pointerup','pointercancel','dragend']) addEventListener(type,()=>setTimeout(flushHeld,0),true);
+let power;   // palette, undo, list views and keyboard lists (power.js); set up once the helpers below exist
 const change = fn => {
+  power?.before();
   fn(); dirty = true; queueSave();
   if (pointerHeld && window.event?.type==='change') { heldRender ||= setTimeout(flushHeld,700); return; }
   render();
 };
-function notify(message) {
-  toast.textContent = message;
+// A toast can carry one action (Undo, Open); it then stays a little longer.
+let toastAction = null;
+function notify(message, action) {
+  toastAction = action?.run ?? null;
+  toast.innerHTML = '<span>'+h(message)+'</span>'+(action?'<button type="button" class="toast-act">'+h(action.label)+'</button>':'');
+  toast.classList.toggle('has-act',!!action);
   toast.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>{toast.hidden=true;},3400);
+  toastTimer = setTimeout(()=>{toast.hidden=true;},action?7000:3400);
 }
+toast.addEventListener('click',event=>{ if (!event.target.closest('.toast-act')) return; const run=toastAction; toastAction=null; toast.hidden=true; run?.(); });
 const LOCAL_KEY = 'hsc-study-desk:state:v1'; // key kept so existing records carry over
 const SNAP_KEY = 'hsc-stack:snapshots:v1';
 let localMode = false;
@@ -358,6 +366,7 @@ async function syncNow() {
       const local = data;
       const merged = !base && !hasRecords(local) ? remote.data : merge3(base ?? undefined, local, remote.data);
       data = normalise(merged);
+      if (!same(local,data)) power?.reset();
       try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); } catch {}
       if (!same(local,data)) { if (selected && !row('tasks',selected)) selected=null; render(); }
     }
@@ -711,13 +720,13 @@ function render() {
   panel.innerHTML=selected?detailPanel(row('tasks',selected)):'';
   panel.hidden=!selected;
   document.querySelector('.panes').classList.toggle('with-detail',!!selected);
-  if (r.name!=='search' && document.activeElement!==$('search')) $('search').value='';
   if (focusKey) {
     const again=document.querySelector(focusKey);
     again?.focus();
     // A re-render nobody asked for (timer tick-over, sync, calendar pull) must not eat half-typed text.
     if (again && typed!=null && again!==active && 'value' in again && again.value==='' ) { again.value=typed; try { again.setSelectionRange(caret,caret); } catch {} again.dispatchEvent(new Event('input',{bubbles:true})); }
   }
+  power.afterRender();
   renderFull();
   renderFloat();
   updateTimerDom();
@@ -884,7 +893,7 @@ function setDone(t, done) {
     data.tasks.push({...structuredClone(t),id:uid(),date:next,status:'Planned',completedAt:null,actual:'',result:'',
       subtasks:(t.subtasks||[]).map(x=>({...x,id:uid(),done:false}))});
     t.repeat='';
-    notify('Done. Next one is on '+pretty(next,{weekday:'short',day:'numeric',month:'short'})+'.');
+    notify('Done. Next one is on '+pretty(next,{weekday:'short',day:'numeric',month:'short'})+'.',{label:'Undo',run:()=>power.undo()});
   }
 }
 function selectTask(id) {
@@ -991,20 +1000,28 @@ function todayStrip() {
   '</div>';
 }
 function taskPage(r) {
-  const spec=listSpec(r);
-  const open=data.tasks.filter(t=>taskOpen(t)&&spec.open(t));
+  const spec=listSpec(r), view=power.view(r);
+  const every=data.tasks.filter(t=>taskOpen(t)&&spec.open(t));
+  const open=power.applyFilter(every,view);
   const done=data.tasks.filter(t=>t.status==='Done'&&spec.done(t)).sort((a,b)=>(b.completedAt||'').localeCompare(a.completedAt||''));
   const mins=open.reduce((n,t)=>n+(t.minutes||0),0);
   let actions='';
   if (spec.course) actions=button('Syllabus','open-topics',spec.course.id,'text');
   if (spec.custom) actions=button('Rename','edit-list',spec.custom.id,'text')+button('Delete list','delete-list',spec.custom.id,'text');
-  const groups=groupTasks(open);
-  return '<div class="list-head"><div>'+(spec.eyebrow?'<div class="eyebrow">'+h(spec.eyebrow)+'</div>':'')+'<h1>'+h(spec.title)+'</h1></div><div class="list-stats"><span>'+open.length+' open</span>'+(mins?'<span>'+minutes(mins)+' planned</span>':'')+actions+'</div></div>'+
+  const search=r.name==='search', board=view.layout==='board';
+  const zero=search?['No matches','Try another word, tag or subject.']
+    : every.length?['Nothing matches these filters','Clear a filter above to see the '+every.length+' open task'+(every.length===1?'':'s')+' in this list.']
+    : r.name==='today'&&done.length?['All done for today',done.length+' task'+(done.length===1?'':'s')+' finished. Plan tomorrow from the calendar, or take the evening off.']
+    : r.name==='today'?['All clear','Nothing due today. Add something above or plan from the calendar.']
+    : ['All clear','Add a task above. Dates, times, #subject, #tags and !priority are picked up as you type.'];
+  return '<div class="list-head"><div>'+(spec.eyebrow?'<div class="eyebrow">'+h(spec.eyebrow)+'</div>':'')+'<h1>'+h(spec.title)+'</h1></div><div class="list-stats">'+
+      (r.name==='today'?power.progress(done.length,every.length):'')+'<span>'+open.length+' open</span>'+(mins?'<span>'+minutes(mins)+' planned</span>':'')+actions+(search?'':power.viewButton(r,view))+'</div></div>'+
     (r.name==='today'?todayStrip():'')+
-    (r.name==='search'?'':quickAdd(spec.where,spec.defaults))+
-    (groups.length?groups.map(g=>'<section class="group"><h2 class="group-title'+(g.label==='Overdue'?' overdue':'')+'">'+h(g.label)+'<span>'+g.items.length+'</span>'+(g.label==='Overdue'?button('Move all to today','postpone-overdue',r.name+'|'+r.arg,'text'):'')+'</h2>'+g.items.map(t=>stackRow(t)).join('')+'</section>').join('')
-      : '<div class="zero"><strong>'+(r.name==='search'?'No matches':'All clear')+'</strong><p>'+(r.name==='search'?'Try another word, tag or subject.':r.name==='today'?'Nothing due today. Add something above or plan from the calendar.':'Add a task above. Dates, times, #subject, #tags and !priority are picked up as you type.')+'</p></div>')+
-    (done.length?'<details class="done-group" '+(showDone?'open':'')+'><summary data-action="toggle-done">Completed <span>'+done.length+'</span></summary>'+done.slice(0,60).map(t=>stackRow(t)).join('')+'</details>':'');
+    power.filterBar(r,view,every.length-open.length)+
+    (search?'':quickAdd(spec.where,spec.defaults))+
+    (open.length||board&&!search&&!every.length ? power.body(r,spec,open,view)
+      : '<div class="zero'+(zero[0]==='All done for today'?' cheer':'')+'"><strong>'+zero[0]+'</strong><p>'+zero[1]+'</p></div>')+
+    (done.length&&!(board&&view.group==='status')?'<details class="done-group" '+(showDone?'open':'')+'><summary data-action="toggle-done">Completed <span>'+done.length+'</span></summary>'+done.slice(0,60).map(t=>stackRow(t)).join('')+'</details>':'');
 }
 function completedPage() {
   const list=data.tasks.filter(t=>['Done','Dropped'].includes(t.status)).sort((a,b)=>(b.completedAt||b.date||'').localeCompare(a.completedAt||a.date||''));
@@ -1684,7 +1701,9 @@ function pauseTimer() {
   storeTimer();
 }
 const sessionTitle = s => row('tasks',s.taskId)?.title ?? (s.title && s.title!=='Untitled focus' ? s.title : course(s.course)?.short ?? 'Study');
-const sessionStart = s => s.start ? Date.parse(s.start) : Date.parse(s.end)-s.minutes*60000;
+// A session from an old or hand-edited backup may have no usable start or end; it then sits at
+// about midday (Sydney) on its date, so the Study log and the calendar still open.
+const sessionStart = s => { const t=s.start ? Date.parse(s.start) : Date.parse(s.end)-s.minutes*60000; return Number.isFinite(t) ? t : Date.parse((/^\d{4}-\d{2}-\d{2}$/.test(s.date||'')?s.date:today())+'T02:00:00Z'); };
 function addSession(s) {
   const t=s.taskId&&row('tasks',s.taskId);
   data.focus.push({id:uid(),note:'',rating:'',...s,title:t?.title??s.title??''});
@@ -2330,7 +2349,7 @@ function stackActions(id, el) {
   return {
     'close-detail':()=>{selected=null;render();},
     'set-priority':()=>change(()=>{row('tasks',selected).priority=Number(id);}),
-    'delete-task':()=>modal('Delete this task?','<p>'+h(row('tasks',id)?.title)+'</p>','Delete',()=>{change(()=>{data.tasks=data.tasks.filter(t=>t.id!==id);});selected=null;}),
+    'delete-task':()=>power.remove([id]),
     'sub-delete':()=>change(()=>{const t=row('tasks',selected);t.subtasks=t.subtasks.filter(x=>x.id!==id);}),
     'focus-task':()=>{ const t=row('tasks',id); if (sessionActive() && timer.mode==='exam') { notify('An exam is in progress. Finish it first.'); location.hash='#focus'; return; }
       Object.assign(timer,{taskId:id,course:t?.course??timer.course}); if (timer.mode==='exam') resetTimer({mode:'open',phase:'focus'}); else if (timer.phase!=='focus') resetTimer({phase:'focus'}); storeTimer(); startTimer(); selected=null; location.hash='#focus'; render(); },
@@ -2422,11 +2441,6 @@ function stackChange(el) {
 document.addEventListener('input',event=>{
   const el=event.target;
   if (el.closest('.quick') && el.name==='q') el.closest('.quick').querySelector('.quick-preview').innerHTML=previewChips(el.value);
-  if (el.id==='search') {
-    const q=el.value.trim();
-    history.replaceState(null,'',q?'#search/'+encodeURIComponent(q):'#today');
-    if (data) render();
-  }
   if (el.classList.contains('detail-title')) { el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
 });
 document.addEventListener('submit',event=>{
@@ -2450,8 +2464,9 @@ function shortcutsSheet() {
   const group=(title,rows)=>'<section class="keys-group"><h3>'+h(title)+'</h3>'+rows.map(([keys,what])=>'<div class="keys-row"><span>'+h(what)+'</span><span class="keys">'+keys.map(keyCap).join('')+'</span></div>').join('')+'</section>';
   modal('Keyboard shortcuts','<div class="keys-sheet">'+
     group('Go to',Object.entries(GO_KEYS).map(([n,[,label]])=>[['Cmd',n],label]).concat([[['Cmd',','],'Settings']]))+
-    group('Anywhere',[[['Cmd','N'],'New task'],[['Cmd','K'],'Search'],[['Cmd','Enter'],'Start or pause the timer'],[['Cmd','Shift','F'],'Full-screen timer'],[['Cmd','\\'],'Show or hide the sidebar'],[['Cmd','/'],'This list']])+
-    group('Without ⌘',[[['Q'],'Add a task on this page'],[['S'],'Start or pause the timer'],[['F'],'Full-screen timer'],[['/'],'Search'],[['Esc'],'Close the open panel']])+
+    group('Anywhere',[[['Cmd','K'],'Search and commands'],[['Cmd','Shift','K'],'New task from anywhere'],[['Cmd','N'],'New task'],[['Cmd','Z'],'Undo'],[['Cmd','Shift','Z'],'Redo'],[['Cmd','Enter'],'Start or pause the timer'],[['Cmd','Shift','F'],'Full-screen timer'],[['Cmd','\\'],'Show or hide the sidebar'],[['Cmd','/'],'This list']])+
+    group('Without ⌘',[[['Q'],'Add a task'],[['S'],'Start or pause the timer'],[['F'],'Full-screen timer'],[['/'],'Search and commands'],[['Esc'],'Close the open panel']])+
+    group('In a task list',[[['J'],'Next task (or ↓)'],[['K'],'Previous task (or ↑)'],[['Enter'],'Open or close the task'],[['E'],'Complete'],[['T'],'Schedule'],[['1'],'High priority'],[['2'],'Medium priority'],[['3'],'Low priority'],[['4'],'No priority'],[['X'],'Select'],[['Cmd','A'],'Select all'],[['⌫'],'Delete (you can undo)']])+
     group('Calendar',[[['←'],'Previous week or month'],[['→'],'Next week or month'],[['T'],'Today'],[['W'],'Week view'],[['M'],'Month view']])+
   '</div>','',null);
   dialog.classList.add('keys-dialog');
@@ -2460,8 +2475,11 @@ function shortcutsSheet() {
 // Commands the Mac app's menus call.
 const stackyCmd = window.stackyCmd = {
   go:hash=>{ location.hash='#'+hash; },
-  newTask:()=>{ const q=main.querySelector('.quick input'); if (q) { q.focus(); return; } location.hash='#inbox'; setTimeout(()=>main.querySelector('.quick input')?.focus(),50); },
-  search:()=>{ $('search')?.focus(); $('search')?.select(); },
+  newTask:()=>{ const q=main.querySelector('.quick input'); if (q && !selected) { q.focus(); return; } power.palette('add'); },
+  search:()=>power.palette(),
+  palette:()=>power.palette(),
+  undo:()=>power.undo(),
+  redo:()=>power.redo(),
   toggleTimer:()=>toggleTimer(),
   fullTimer:()=>{ fullTimer?closeFull():openFull(); },
   shortcuts:()=>shortcutsSheet()
@@ -2488,12 +2506,6 @@ document.addEventListener('keydown',event=>{
     if (document.body.classList.contains('nav-open')) { document.body.classList.remove('nav-open'); return; }
     if (selected) { selected=null; render(); return; }
   }
-  // ⌘K (Ctrl+K elsewhere) jumps to the sidebar search, as in Notion.
-  if ((event.metaKey||event.ctrlKey) && !event.altKey && event.key.toLowerCase()==='k' && !dialog.open) {
-    event.preventDefault();
-    if (matchMedia('(max-width:760px)').matches) document.body.classList.add('nav-open');
-    $('search').focus(); $('search').select(); return;
-  }
   // ⌘ shortcuts (Ctrl on Windows). A browser keeps ⌘N and ⌘1–9 for itself; the Mac app has them in its menus.
   if ((event.metaKey||event.ctrlKey) && !event.altKey && data && !dialog.open) {
     const k=event.key.toLowerCase();
@@ -2512,10 +2524,9 @@ document.addEventListener('keydown',event=>{
     if (k==='w'||k==='m') { event.preventDefault(); calMode=k==='w'?'week':'month'; render(); return; }
   }
   if (event.key==='?' && !el.closest('input,textarea,select,[contenteditable]') && !dialog.open) { event.preventDefault(); shortcutsSheet(); return; }
-  if (el.id==='search' && event.key==='Escape') { el.value=''; el.blur(); history.replaceState(null,'','#today'); render(); return; }
-  if (el.closest('input,textarea,select,[contenteditable]') || event.metaKey || event.ctrlKey || event.altKey || dialog.open) return;
-  if (event.key==='q' || event.key==='n') { const q=main.querySelector('.quick input'); if (q) { event.preventDefault(); q.focus(); } }
-  if (event.key==='/') { event.preventDefault(); $('search').focus(); }
+    if (el.closest('input,textarea,select,[contenteditable]') || event.metaKey || event.ctrlKey || event.altKey || dialog.open) return;
+  if (event.key==='q' || event.key==='n') { event.preventDefault(); const q=main.querySelector('.quick input'); if (q) q.focus(); else power.palette('add'); }
+  if (event.key==='/') { event.preventDefault(); power.palette(); }
   if (event.key==='s' && data) { event.preventDefault(); toggleTimer(); }
 });
 document.addEventListener('dragstart',event=>{
@@ -2529,14 +2540,14 @@ document.addEventListener('dragstart',event=>{
 });
 document.addEventListener('dragend',event=>{ event.target.classList?.remove('dragging'); dragging=null; document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over')); });
 document.addEventListener('dragover',event=>{
-  const zone=dragging&&event.target.closest?.('[data-drop-date],[data-drop-priority]');
+  const zone=dragging&&event.target.closest?.('[data-drop-date],[data-drop-priority],[data-drop-course],[data-drop-status]');
   if (!zone) return;
   event.preventDefault();
   document.querySelectorAll('.drag-over').forEach(x=>{ if (x!==zone) x.classList.remove('drag-over'); });
   zone.classList.add('drag-over');
 });
 document.addEventListener('drop',event=>{
-  const zone=dragging&&event.target.closest?.('[data-drop-date],[data-drop-priority]');
+  const zone=dragging&&event.target.closest?.('[data-drop-date],[data-drop-priority],[data-drop-course],[data-drop-status]');
   if (!zone) return;
   event.preventDefault();
   const t=row('tasks',dragging);
@@ -2544,7 +2555,10 @@ document.addEventListener('drop',event=>{
   if (!t) return;
   change(()=>{
     if (zone.dataset.dropPriority!=null) { t.priority=Number(zone.dataset.dropPriority); return; }
+    if (zone.dataset.dropCourse!=null) { t.course=zone.dataset.dropCourse; return; }
+    if (zone.dataset.dropStatus!=null) { const v=zone.dataset.dropStatus; if (v==='Done') { if (t.status!=='Done') setDone(t,true); } else { t.status=v; t.completedAt=null; } return; }
     t.date=zone.dataset.dropDate;
+    if (!t.date) t.time='';
     if (zone.dataset.dropAllday) t.time='';
     if (zone.dataset.dropCol) {
       const y=event.clientY-grabY-zone.getBoundingClientRect().top;
@@ -2558,7 +2572,7 @@ window.addEventListener('storage',event=>{
   // Another tab saved. Pick up its records so this tab does not overwrite them.
   if (event.key===LOCAL_KEY && localMode && data && event.newValue) {
     if (dirty || saving || dialog.open) { notify('This workspace also changed in another tab. The tab that saves last wins.'); return; }
-    try { data=normalise(JSON.parse(event.newValue)); status('Updated from another tab'); render(); } catch {}
+    try { data=normalise(JSON.parse(event.newValue)); power?.reset(); status('Updated from another tab'); render(); } catch {}
   }
 });
 window.addEventListener('hashchange',()=>document.body.classList.remove('nav-open'));
@@ -2584,7 +2598,7 @@ document.addEventListener('click',event=>{
     'task-day':()=>editTask(null,{date:id}),
     'carry-task':()=>{const t=row('tasks',id);editTask(t,{date:t.date<week?startDay():addDays(week,7)},true);},
     'show-carry':()=>modal('Triage carry-over','<div class="record-list">'+carry().map(t=>'<div class="record compact"><div><strong>'+h(t.title)+'</strong><p>'+h(pretty(t.date))+' · '+minutes(t.minutes)+'</p></div>'+button('Move or drop','carry-task',t.id)+'</div>').join('')+'</div>','',null),
-    'toggle-task':()=>change(()=>{const t=row('tasks',id);setDone(t,t.status!=='Done');}),
+    'toggle-task':()=>{ const t=row('tasks',id); if (!t) return; const finishing=t.status!=='Done', repeats=!!t.repeat; change(()=>setDone(t,finishing)); if (finishing&&!repeats) power.undoable('“'+t.title+'” completed.'); },
     ...stackActions(id,el),
     'edit-commitment':()=>editCommitment(row('commitments',id)),
     'edit-assessment':()=>editAssessment(row('assessments',id)),
@@ -2665,12 +2679,13 @@ function taskMenu(t) {
     t.date===t0?null:{label:'Move to today',icon:'sun',run:setDate(t0)},
     {label:'Move to tomorrow',icon:'week7',hint:pretty(addDays(t0,1),{weekday:'short'}),run:setDate(addDays(t0,1))},
     {label:'Move to next week',icon:'calendar',hint:pretty(nextMon,{weekday:'short',day:'numeric',month:'short'}),run:setDate(nextMon)},
+    {label:'Pick a date…',icon:'calendar',hint:'T',run:()=>power.schedule([t.id])},
     t.date?{label:'Remove the date',icon:'close',run:setDate('')}:null,
     {sep:true},
     {label:'Priority',row:[...PRI].reverse().map(([k,l,col])=>({label:l,colour:col,on:Number(t.priority||0)===Number(k),run:()=>change(()=>{t.priority=Number(k);})}))},
     {sep:true},
     {label:'Duplicate',icon:'layers',run:()=>change(()=>{ data.tasks.push({...structuredClone(t),id:uid(),status:'Planned',completedAt:null,actual:'',subtasks:(t.subtasks||[]).map(x=>({...x,id:uid(),done:false}))}); })},
-    {label:'Delete',icon:'close',danger:true,run:()=>runAction('delete-task',t.id)}
+    {label:'Delete',icon:'close',danger:true,hint:'⌫',run:()=>runAction('delete-task',t.id)}
   ];
 }
 function contextFor(target, event) {
@@ -2759,4 +2774,16 @@ document.addEventListener('touchstart',event=>{
 },{passive:true});
 document.addEventListener('touchmove',event=>{ const t=event.touches[0]; if (pressAt && t && Math.hypot(t.clientX-pressAt[0],t.clientY-pressAt[1])>9) clearTimeout(pressTimer); },{passive:true});
 for (const type of ['touchend','touchcancel']) document.addEventListener(type,()=>clearTimeout(pressTimer),{passive:true});
+power = initPower({
+  data:()=>data, main, dialog, h, icon, courses, course, customList, subjectIcon, button, stackRow, PRI, priColour,
+  today, addDays, monday, pretty, minutes, daysFrom, dueLabel, taskOpen, sortTasks, listSpec, route, render, change, notify, setDone,
+  selected:()=>selected, selectTask, closeDetail:()=>{ selected=null; render(); },
+  // Undo and redo put a whole earlier copy of the records back.
+  replace:next=>{ data=normalise(next); dirty=true; queueSave(); if (selected && !row('tasks',selected)) selected=null; render(); },
+  removeTasks:ids=>{ change(()=>{ data.tasks=data.tasks.filter(t=>!ids.has(t.id)); }); },
+  parse:text=>parseQuickAdd(text,parseCtx()), previewChips, createFromQuick,
+  pages:[dash,study,...smart,...tools,...views,['settings','Settings','gear']],
+  topics:()=>courses.flatMap(topicsFor), openTopics:id=>{ courseId=id; location.hash='#topics'; render(); },
+  runAction, closeCtx, toggleTimer, timerRunning:()=>!!timer.running, fullTimer:()=>{ fullTimer?closeFull():openFull(); }, isFull:()=>fullTimer, shortcuts:shortcutsSheet
+});
 open();

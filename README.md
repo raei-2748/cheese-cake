@@ -23,6 +23,15 @@ A TickTick-style study system for the HSC, built around Year 12 school assessmen
 - **Study:** pick a subject (and optionally a task) and start. Open sessions count up until you finish; timed sessions run Pomodoro rounds with breaks. Finishing asks for the minutes, what you did and how it went, then saves it to the study log. The log is grouped by day with start and end times; click any entry to edit it, or log a session you did without the timer. Shows a daily goal, a streak, this week per day and per subject. The timer keeps running across tabs and reloads, and minutes go onto the linked task.
 - **Habits:** daily or chosen weekdays, with streaks, a 16-week heatmap and today's habits on the Today page.
 
+**Power tools** (in the spirit of Todoist and Notion)
+- **Command palette:** `⌘K` (or `/`, or the sidebar's Search) finds tasks, pages, subjects, lists, tags, assessments and syllabus topics as you type, and runs commands such as *Start the timer*, *Show this list as a board* or *Theme: Dark*. Start with `>` for commands only. `⌘⇧K` opens it as a new-task box from anywhere.
+- **Undo:** every edit can be taken back with `⌘Z` (redo with `⌘⇧Z`). Completing, deleting, moving and rescheduling show a toast with an **Undo** button, so deleting no longer asks first.
+- **Views:** each list has a **View** button: show it as rows or as a **board**, group by date, priority, subject or status, sort it, and filter by priority or subject. Drag a card or row to another column or group to change that field. Each list remembers its own view in this browser.
+- **Keyboard lists:** `J`/`K` (or the arrows) move down a list, `Enter` opens, `E` completes, `T` schedules, `1`–`4` set the priority, `⌫` deletes. `X`, `⌘`-click or Shift-click select several tasks; a bar then completes, reschedules, re-prioritises, moves or deletes them together.
+- **Scheduler:** hover a task for its calendar button (or press `T`): type a date such as `fri 4pm`, pick Today, Tomorrow, the weekend or next week, or pick a day from the month.
+- **Autocomplete:** typing `#`, `^` or `!` in any quick-add box suggests subjects and tags, lists, and priorities.
+- **Today** shows how much of the day's list is done.
+
 **Overview** (the home page)
 - Countdowns to the next assessment, the Trials and the first HSC exam. Set the Trial and HSC dates in **Backup & settings**.
 - Today's tasks, topics due for review, retests due this week and teacher feedback you have not acted on yet.
@@ -37,7 +46,7 @@ A TickTick-style study system for the HSC, built around Year 12 school assessmen
 
 **Full-screen timer:** press **Full screen** on the Study page (or `f`). It shows a large clock with the subject, task and round, keeps the screen awake, and fades the controls after a few seconds while the timer runs. `Space` starts or pauses, `Esc` exits. On iPhone it fills the browser window, because Safari there does not allow true full screen.
 
-**Keyboard:** `s` start or pause studying · `f` full-screen timer · `q` quick add · `/` search · `Esc` close details.
+**Keyboard:** `⌘K` search and commands · `q` quick add · `s` start or pause studying · `f` full-screen timer · `⌘Z` undo · `?` the full list.
 
 ## Data and sync
 
@@ -59,7 +68,9 @@ Requires Node.js 20 or later and Bash. There are no packages to install.
 npm run dev
 ```
 
-Open http://localhost:3000. Local preview uses an in-memory database that resets when the dev server stops.
+Open http://localhost:3000. Local preview uses an in-memory database that resets when the dev server stops. The preview reads `ui/` on every request, so an edit shows on reload.
+
+The UI is plain ES modules with no build step: `app.js` (records, pages, timer, calendar, sync), `power.js` (palette, undo, views, keyboard lists, scheduler, autocomplete), `parse.js` (quick-add parsing), `data.js` (courses) and `motion.js` (theme and sidebar).
 
 ## Deploy
 
