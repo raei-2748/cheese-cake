@@ -1608,3 +1608,8 @@ html.in-mac-app:not([data-side=collapsed]) .side-search{margin-right:34px}
 html.in-mac-app:not(.mac-fullscreen) .side-collapse{top:39px!important}
 html.in-mac-app.mac-fullscreen .side-collapse{top:7px!important}
 html.in-mac-app.mac-fullscreen .sidebar{padding-top:6px!important}
+
+/* ═════════════ No rubber-band bounce past the top or bottom (12 Nov) ═════════════ */
+html,body{overscroll-behavior:none}
+html{background:var(--bg)}
+#nav,.detail,.wk-scroll,dialog,.dialog-content,.fs-timer,.sidebar{overscroll-behavior:none}
