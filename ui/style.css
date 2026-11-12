@@ -1402,3 +1402,14 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .set-more summary{cursor:pointer;padding:6px 0}
 .set-more .set-actions{margin-top:4px}
 .set-input small{min-width:44px}
+
+/* ═════════════ Quieter everywhere (12 Nov) ═════════════ */
+.empty{padding:10px 2px}
+.empty strong{font-weight:400;color:var(--muted)}
+.empty .button{margin-top:8px}
+.template-row{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 32px}
+.template-pick{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px 0 12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg);font:inherit;font-size:14px;color:var(--ink);cursor:pointer;transition:background .15s,border-color .15s}
+.template-pick:hover{background:var(--hover)}
+.template-pick svg{width:16px;height:16px;color:var(--muted)}
+.template-pick small{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.save-status{opacity:.6}
