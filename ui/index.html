@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#191919" media="(prefers-color-scheme: dark)">
-<script>try{const t=localStorage.getItem("hsc-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}
+<script>try{const t=localStorage.getItem("hsc-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;const k=localStorage.getItem("stacky-hl");if(k&&k!=="yellow")document.documentElement.dataset.hl=k}catch(e){}
 try{const s=JSON.parse(localStorage.getItem("stacky-side"))||{};if(s.w)document.documentElement.style.setProperty("--side-w",s.w+"px");if(s.collapsed)document.documentElement.dataset.side="collapsed"}catch(e){}</script>
 <meta name="description" content="Stacky: study timer, tasks, calendar, habits and assessment tracking for the HSC.">
 <title>Stacky</title>

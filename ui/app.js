@@ -101,7 +101,7 @@ function weekData() {
 }
 const course = id => courses.find(c => c.id === id);
 const study = ['focus','Study','timer'];
-const routeNames = Object.fromEntries([dash,study,...smart,...tools,...views].map(([k,n])=>[k,n]));
+const routeNames = Object.fromEntries([dash,study,...smart,...tools,...views,['settings','Settings']].map(([k,n])=>[k,n]));
 function route() {
   const raw = location.hash.slice(1), cut = raw.indexOf('/');
   const name = cut<0 ? raw : raw.slice(0,cut);
@@ -273,6 +273,7 @@ async function readRemote() {
   if (!response.ok) throw new Error('GitHub sync failed ('+response.status+'). It will retry.');
   const etag = response.headers.get('ETag');
   const gist = await response.json();
+  if (gist.owner?.login && syncCfg.owner!==gist.owner.login) { syncCfg.owner=gist.owner.login; storeSync(); }
   const parsed = await parseRemote(gist);
   seen = etag && parsed ? {gistId:syncCfg.gistId, etag, rev:parsed.rev||0, json:JSON.stringify(parsed.data)} : null;
   return parsed;
@@ -284,7 +285,25 @@ async function parseRemote(gist) {
   const parsed = JSON.parse(text);
   return parsed?.data?.version===1 ? parsed : null;
 }
-const writeRemote = (rev) => gh('/gists/'+syncCfg.gistId,{method:'PATCH',body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify({rev,savedAt:new Date().toISOString(),device:syncCfg.device||'',data})}}})});
+// The same gist also carries stacky.ics, a calendar Apple and Google Calendar can subscribe to.
+const FEED_FILE='stacky.ics';
+function icsFeed() {
+  const esc=t=>String(t??'').replace(/\\/g,'\\\\').replace(/;/g,'\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');
+  const utc=ms=>new Date(ms).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
+  const day=d=>d.replace(/-/g,''), stamp=utc(Date.now());
+  const from=addDays(today(),-60), to=addDays(today(),180), ev=[];
+  const push=(uid,lines)=>ev.push('BEGIN:VEVENT\r\nUID:'+uid+'@stacky\r\nDTSTAMP:'+stamp+'\r\n'+lines.join('\r\n')+'\r\nEND:VEVENT');
+  for (const t of data.tasks) {
+    if (!t.date||t.date<from||t.date>to||t.status==='Dropped') continue;
+    const name=(t.status==='Done'?'✓ ':'')+t.title+(course(t.course)?' · '+course(t.course).short:'');
+    if (t.time) { const st=Date.parse(t.date+'T'+t.time); push('task-'+t.id,['DTSTART:'+utc(st),'DTEND:'+utc(st+Math.max(15,Number(t.minutes)||30)*60000),'SUMMARY:'+esc(name)]); }
+    else push('task-'+t.id,['DTSTART;VALUE=DATE:'+day(t.date),'DTEND;VALUE=DATE:'+day(addDays(t.date,1)),'SUMMARY:'+esc(name)]);
+  }
+  for (const a of data.assessments) if (a.date&&a.date>=from&&a.date<=to) push('assess-'+a.id,['DTSTART;VALUE=DATE:'+day(a.date),'DTEND;VALUE=DATE:'+day(addDays(a.date,1)),'SUMMARY:'+esc((a.kind==='Trial'?'Trial: ':'Due: ')+a.title)]);
+  if (data.settings.calSessions!==false) for (const f of data.focus) if (f.date>=from) { const st=sessionStart(f); push('study-'+f.id,['DTSTART:'+utc(st),'DTEND:'+utc(st+f.minutes*60000),'SUMMARY:'+esc('Studied '+(course(f.course)?.short??'')+(f.note?' · '+f.note.split('\n')[0]:'')),'TRANSP:TRANSPARENT']); }
+  return 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Stacky//HSC study//EN\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:Stacky\r\nX-PUBLISHED-TTL:PT15M\r\nREFRESH-INTERVAL;VALUE=DURATION:PT15M\r\n'+ev.join('\r\n')+'\r\nEND:VCALENDAR\r\n';
+}
+const writeRemote = (rev) => gh('/gists/'+syncCfg.gistId,{method:'PATCH',body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify({rev,savedAt:new Date().toISOString(),device:syncCfg.device||'',data})},[FEED_FILE]:{content:icsFeed()}}})});
 function readBase() { try { return JSON.parse(localStorage.getItem(BASE_KEY)); } catch { return null; } }
 function writeBase() { try { localStorage.setItem(BASE_KEY, JSON.stringify(data)); } catch {} }
 const hasRecords = d => !!(d.tasks.length||d.assessments.length||d.focus.length||d.papers.length||d.habits.length||Object.keys(d.topics).length);
@@ -647,6 +666,7 @@ function routeLabel(r) {
   return routeNames[r.name];
 }
 function render() {
+  if (data) applyHighlight();
   const r=route();
   quickCount=0;
   // Remember focus so typing in the detail panel or quick add survives a re-render.
@@ -656,7 +676,7 @@ function render() {
   nav.innerHTML=navHtml(r);
   const opened=[...main.querySelectorAll('details.module[open] summary strong')].map(x=>x.textContent);
   const pages={week:weekly,assess:assessments,topics:topicsPage,practice,feedback,review:reviews,
-    calendar:calendarPage,matrix:matrixPage,focus:focusPage,habits:habitsPage,done:completedPage,dash:dashPage,papers:papersPage};
+    calendar:calendarPage,matrix:matrixPage,focus:focusPage,habits:habitsPage,done:completedPage,dash:dashPage,papers:papersPage,settings:settingsPage};
   main.dataset.route=r.name;
   main.innerHTML=(pages[r.name]??taskPage)(r);
   if (r.name==='calendar') calAfterRender();
@@ -1049,7 +1069,7 @@ function monthGrid() {
 }
 function weekGrid() {
   const n=calDays(), start=calStart(), days=Array.from({length:n},(_,i)=>addDays(start,i)), t0=today();
-  const ext=extFor(days[0],days[n-1]);
+  const ext=extFor(days[0],days[n-1],true);
   const now=new Date(), nowMins=Number(new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',hour:'numeric',hourCycle:'h23'}).format(now))*60+now.getMinutes();
   return '<div class="wk" style="--days:'+n+';--hour:'+HOUR_PX+'px">'+
     '<div class="wk-head"><span class="wk-gutter"></span>'+days.map(d=>'<div class="wk-day'+(d===t0?' today':'')+(d<t0?' past':'')+'"><small>'+pretty(d,{weekday:'short'})+'</small><strong>'+Number(d.slice(8))+'</strong></div>').join('')+'</div>'+
@@ -1070,6 +1090,7 @@ function weekGrid() {
         items.map(it=>{
           const top=it.s/60*HOUR_PX, height=Math.max(18,(it.e-it.s)/60*HOUR_PX-2), pos='top:'+top+'px;height:'+height+'px;left:calc('+(it.lane*100/it.lanes)+'% + 1px);width:calc('+(100/it.lanes)+'% - 3px)';
           const short=it.e-it.s<=30?' short':'';
+          if (it.x?.kind==='session') return '<button type="button" class="wk-event session'+short+'" data-action="edit-session" data-id="'+h(it.x.id)+'" style="--c:'+h(it.x.colour)+';'+pos+'" title="Studied · '+h(it.x.title)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+' · '+minutes(it.x.minutes)+'</span></button>';
           if (it.x) return '<a class="wk-event ext'+short+'"'+(it.x.link?' href="'+h(it.x.link)+'" target="_blank" rel="noopener"':'')+' style="--c:'+h(it.x.colour)+';'+pos+'" title="'+h(it.x.title+' · '+it.x.calName)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span></a>';
           const t=it.t;
           return '<div class="wk-event'+(t.status==='Done'?' done':'')+(t.id===selected?' picked':'')+short+'" data-task="'+h(t.id)+'" data-select="'+h(t.id)+'" style="--c:'+listColour(t.course||t.list)+';'+pos+'"><b>'+h(t.title||'Untitled')+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span><i class="wk-resize" aria-hidden="true"></i></div>';
@@ -1092,7 +1113,7 @@ function paintBlock(el,s,e) {
 document.addEventListener('pointerdown',event=>{
   if (!data || event.button!==0 || calDrag) return;
   const col=event.target.closest('.wk-col');
-  if (!col || event.target.closest('.wk-new,a.wk-event')) return;
+  if (!col || event.target.closest('.wk-new,a.wk-event,.wk-event.session')) return;
   const block=event.target.closest('.wk-event[data-task]');
   const touch=event.pointerType!=='mouse';
   if (block) {
@@ -1206,8 +1227,16 @@ function zoneToMs(y,mo,d,hh,mm,zone) {
 }
 
 // ── Events shown on the calendar ──
-function extFor(from,to) {
-  const out=[], cfg=calCfg();
+// Logged study sessions appear on the week calendar as finished blocks (Settings can hide them).
+function sessionEvents(from,to) {
+  if (data.settings.calSessions===false) return [];
+  return data.focus.filter(f=>f.date>=from&&f.date<=to).map(f=>{
+    const st=sessionStart(f), c=course(f.course), day=sydney.format(new Date(st));
+    return {kind:'session',id:f.id,date:day,endDate:day,allDay:false,time:hhmm(st),minutes:Math.max(1,Number(f.minutes)||0),title:(c?.short??'Study')+(f.note?' · '+f.note.split('\n')[0]:''),colour:c?.colour??'#787774',calName:'Study log',link:''};
+  });
+}
+function extFor(from,to,withSessions=false) {
+  const out=withSessions?sessionEvents(from,to):[], cfg=calCfg();
   if (gOn()) for (const e of extCache.google?.events||[]) if (cfg.google.show[e.cal]!==false && e.date<=to && e.endDate>=from) out.push(e);
   for (const c of cfg.ics) {
     const vevents=c.vevents||extCache.ics?.[c.id]?.vevents||[];
@@ -2003,6 +2032,59 @@ function editList(l) {
 const setRow = (key,label,value,unit,min,max,step=1) => '<label class="set-row"><span>'+h(label)+'</span><span class="set-input"><input name="'+key+'" type="number" value="'+h(value)+'" min="'+min+'" max="'+max+'" step="'+step+'" required>'+(unit?'<small>'+h(unit)+'</small>':'')+'</span></label>';
 const setDate = (key,label,value) => '<label class="set-row"><span>'+h(label)+'</span><span class="set-input"><input name="'+key+'" type="date" value="'+h(value||'')+'"></span></label>';
 // scope 'timer' (from the Study page) shows only the timer; otherwise the full, still short, settings.
+// ───────────────────────── Settings page ─────────────────────────
+const HIGHLIGHTS=[['yellow','Yellow','#f5d547'],['green','Green','#7dd38d'],['blue','Blue','#74b9f0'],['pink','Pink','#f490c0'],['orange','Orange','#f7ac63'],['purple','Purple','#b99af2']];
+function applyHighlight() {
+  const k=data?.settings?.highlight||'yellow';
+  if (k==='yellow') delete document.documentElement.dataset.hl; else document.documentElement.dataset.hl=k;
+  try { localStorage.setItem('stacky-hl',k); } catch {}
+}
+function setTheme(t) {
+  const root=document.documentElement;
+  if (t==='auto') delete root.dataset.theme; else root.dataset.theme=t;
+  try { t==='auto' ? localStorage.removeItem('hsc-theme') : localStorage.setItem('hsc-theme',t); } catch {}
+  const b=document.getElementById('theme-toggle'); if (b) (b.querySelector('span')||b).textContent='Theme: '+t;
+  render();
+}
+const feedUrl = scheme => syncOn()&&syncCfg.owner ? (scheme==='webcal'?'webcal':'https')+'://gist.githubusercontent.com/'+syncCfg.owner+'/'+syncCfg.gistId+'/raw/'+FEED_FILE : '';
+function settingsPage() {
+  const p=pomo(), theme=document.documentElement.dataset.theme||'auto', hl=data.settings.highlight||'yellow', cal=calCfg();
+  const snaps=localMode?Object.keys(snapshots()).sort().reverse():[];
+  const group=(title,body,note='')=>'<section class="set-sec"><h2>'+h(title)+'</h2>'+(note?'<p class="set-note">'+note+'</p>':'')+'<div class="set-list">'+body+'</div></section>';
+  const choice=(label,body)=>'<div class="set-row"><span>'+h(label)+'</span>'+body+'</div>';
+  const feed=feedUrl('webcal');
+  return '<div class="list-head"><div><h1>Settings</h1></div></div><div class="settings-page">'+
+    group('Appearance',
+      choice('Theme','<span class="seg" role="group" aria-label="Theme">'+[['auto','Auto'],['light','Light'],['dark','Dark']].map(([k,l])=>'<button type="button" aria-pressed="'+(theme===k)+'" data-action="set-theme" data-id="'+k+'">'+l+'</button>').join('')+'</span>')+
+      choice('Highlighter','<span class="swatches" role="radiogroup" aria-label="Highlighter colour">'+HIGHLIGHTS.map(([k,l,c])=>'<button type="button" role="radio" aria-checked="'+(hl===k)+'" title="'+l+'" aria-label="'+l+'" data-action="set-hl" data-id="'+k+'" style="--sw:'+c+'"></button>').join('')+'</span>'))+
+    group('Study timer',
+      setRow('goal','Daily goal',studyGoal(),'min',15,720,15)+setRow('focus','Round length',p.focus,'min',5,240)+
+      setRow('short','Short break',p.short,'min',1,60)+setRow('long','Long break',p.long,'min',1,90)+setRow('every','Long break every',p.every,'rounds',2,12))+
+    group('Exam dates',setDate('trialStart','Trials start',data.settings.trialStart)+setDate('hscStart','First HSC exam',data.settings.hscStart),'The Overview counts down to these.')+
+    group('Calendar',
+      '<label class="set-row"><span>Show study sessions<small>Logged sessions appear as blocks on the week view</small></span><input type="checkbox" class="switch" name="calSessions" '+(data.settings.calSessions!==false?'checked':'')+'></label>'+
+      '<div class="set-row"><span>Google Calendar and iCloud<small>'+h(extStatusText())+'</small></span>'+button('Manage','calendars','','text')+'</div>'+
+      '<div class="set-row feed-row"><span>Show Stacky in Apple or Google Calendar<small>'+(feed?'Subscribe to this link. Tasks, assessments and study sessions update as Stacky syncs.':'Turn on sync first. Stacky then publishes a calendar link you can subscribe to.')+'</small></span>'+
+        (feed?'<span class="set-actions"><a class="button text" href="'+h(feed)+'">Open in Calendar</a>'+button('Copy link','copy-feed','','text')+'</span>':button('Set up sync','sync-setup','','text'))+'</div>')+
+    (localMode?group('Sync','<div class="set-row"><span>Across your devices<small>'+(syncOn()?'On'+(syncCfg.device?' · '+h(syncCfg.device):'')+(syncCfg.lastSync?' · last synced '+h(hhmm(Date.parse(syncCfg.lastSync))):''):'Off. Records stay in this browser.')+'</small></span>'+button(syncOn()?'Manage':'Set up','sync-setup','','text')+'</div>'):'')+
+    group('Backup',
+      '<div class="set-row"><span>Backup file'+(data.settings.lastExport?'<small>Last exported '+h(pretty(data.settings.lastExport,{day:'numeric',month:'short'}))+'</small>':'')+'</span><span class="set-actions">'+button('Export','export','','text')+'<label class="button text file-btn">Import<input type="file" id="import-file" accept="application/json,.json" hidden></label></span></div>'+
+      (snaps.length?'<div class="set-row"><span>Daily snapshots<small>Your records as they were each morning</small></span><span class="set-actions">'+snaps.slice(0,4).map(d=>button(pretty(d,{weekday:'short',day:'numeric'}),'restore-snap',d,'text')).join('')+'</span></div>':''))+
+  '</div>';
+}
+// Settings save as you change them.
+function saveSettingField(el) {
+  const v=el.type==='checkbox'?el.checked:el.value, n=el.name;
+  const num=k=>{ const x=Number(v); return Number.isFinite(x)&&x>0?x:pomo()[k]; };
+  change(()=>{
+    if (n==='goal') data.settings.studyGoal=num('goal')||120;
+    else if (['focus','short','long','every'].includes(n)) data.settings.pomo={...pomo(),[n]:num(n)};
+    else if (n==='trialStart'||n==='hscStart') data.settings[n]=v;
+    else if (n==='calSessions') data.settings.calSessions=!!v;
+  });
+  if (el.type!=='checkbox') notify('Saved.');
+}
+function extStatusText() { const c=calCfg(); const bits=[]; if (gOn()) bits.push('Google connected'); if (c.ics.length) bits.push(c.ics.length+' iCal'); return bits.join(' · ')||'Not connected'; }
 function settingsModal(scope) {
   const p=pomo(), timerOnly=scope==='timer';
   const timerRows='<div class="set-group">'+(timerOnly?'':'<h3>Study</h3>')+
@@ -2089,7 +2171,10 @@ function stackActions(id, el) {
     'habit-open':()=>{habitOpen=habitOpen===id?null:id;render();},
     'habit-toggle':()=>change(()=>{ const log=(data.habitLog[id]??={}); const d=el.dataset.date; if(log[d]) delete log[d]; else log[d]=1; }),
     'habit-suggest':()=>{ const [name,c]=id.split('|'); change(()=>data.habits.push({id:uid(),name,course:c,days:Array(7).fill(true),created:today()})); },
-    settings:()=>settingsModal(id),
+    settings:()=>{ if (id==='timer') settingsModal('timer'); else location.hash='#settings'; },
+    'set-theme':()=>setTheme(id),
+    'set-hl':()=>change(()=>{ data.settings.highlight=id; applyHighlight(); }),
+    'copy-feed':()=>{ navigator.clipboard?.writeText(feedUrl('https')).then(()=>notify('Link copied. Paste it into your calendar app.'),()=>notify(feedUrl('https'))); },
     export:exportData,
     'go-study':()=>{ location.hash='#focus'; },
     'review-topic':()=>{ const t=topicRecord(id); if (t) reviewTopic(t); },
@@ -2107,6 +2192,7 @@ function addMonth(value,n){ const d=date(value); d.setUTCMonth(d.getUTCMonth()+n
 function stackChange(el) {
   if (el.id==='import-file') { if (el.files[0]) importData(el.files[0]); return true; }
   if (el.id==='ics-file') { if (el.files[0]) icsImport(el.files[0]); return true; }
+  if (el.closest('.settings-page') && el.name) { saveSettingField(el); return true; }
   if (el.matches('[data-exam-preset]')) { if (el.value!=='custom') { const ex=examPresets.find(e=>e.id===el.value); timer.exam={...ex}; timer.course=ex.course; resetTimer({phase:'reading',warned:[]}); render(); } return true; }
   if (el.matches('[data-study-course]')) { const id=el.value; timer.course=id; if (timer.mode==='exam' && !sessionActive() && timer.exam?.id!=='custom') timer.exam={...examFor(id)}; const t=row('tasks',timer.taskId); if (t&&(t.course||'')!==id) timer.taskId=null; storeTimer(); render(); return true; }
   if (el.matches('[data-timer-task]')) { timer.taskId=el.value||null; const t=row('tasks',timer.taskId); if (t) timer.course=t.course||''; storeTimer(); render(); return true; }

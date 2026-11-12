@@ -1457,3 +1457,60 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .record-head .button.secondary:hover,.record .button.secondary:hover{background:var(--hover)!important;color:var(--ink)!important}
 .record h3{margin-top:4px}
 .card>.tabs:first-child{margin-bottom:6px}
+
+/* ═════════════ Highlighter colours (Settings → Appearance) ═════════════ */
+:root[data-hl=green]{--hl:#7dd38d;--hl-soft:#dcf2e0;--hl-faint:#f1faf3;--hl-deep:#2f9e57;--hl-ink:#1f5a32}
+:root[data-theme=dark][data-hl=green]{--hl:#5cbf72;--hl-soft:#22382a;--hl-faint:#1b2a20;--hl-deep:#4caf68;--hl-ink:#bfe8c9}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light])[data-hl=green]{--hl:#5cbf72;--hl-soft:#22382a;--hl-faint:#1b2a20;--hl-deep:#4caf68;--hl-ink:#bfe8c9}}
+:root[data-hl=blue]{--hl:#74b9f0;--hl-soft:#d9ebfb;--hl-faint:#eff6fd;--hl-deep:#2783de;--hl-ink:#1d4f80}
+:root[data-theme=dark][data-hl=blue]{--hl:#5aa6e6;--hl-soft:#1f3247;--hl-faint:#192633;--hl-deep:#4a9be6;--hl-ink:#c6e0f8}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light])[data-hl=blue]{--hl:#5aa6e6;--hl-soft:#1f3247;--hl-faint:#192633;--hl-deep:#4a9be6;--hl-ink:#c6e0f8}}
+:root[data-hl=pink]{--hl:#f490c0;--hl-soft:#fbe1ee;--hl-faint:#fdf2f8;--hl-deep:#d6336c;--hl-ink:#82224b}
+:root[data-theme=dark][data-hl=pink]{--hl:#e57aab;--hl-soft:#3d2532;--hl-faint:#2c1d25;--hl-deep:#e05c93;--hl-ink:#f6cce0}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light])[data-hl=pink]{--hl:#e57aab;--hl-soft:#3d2532;--hl-faint:#2c1d25;--hl-deep:#e05c93;--hl-ink:#f6cce0}}
+:root[data-hl=orange]{--hl:#f7ac63;--hl-soft:#fde8d3;--hl-faint:#fef5ec;--hl-deep:#e0700f;--hl-ink:#7f400b}
+:root[data-theme=dark][data-hl=orange]{--hl:#e8964d;--hl-soft:#3e2c1d;--hl-faint:#2d2219;--hl-deep:#e8863a;--hl-ink:#f8d9bb}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light])[data-hl=orange]{--hl:#e8964d;--hl-soft:#3e2c1d;--hl-faint:#2d2219;--hl-deep:#e8863a;--hl-ink:#f8d9bb}}
+:root[data-hl=purple]{--hl:#b99af2;--hl-soft:#ebe2fc;--hl-faint:#f6f1fe;--hl-deep:#7c4dff;--hl-ink:#4b2a99}
+:root[data-theme=dark][data-hl=purple]{--hl:#a184e6;--hl-soft:#30283f;--hl-faint:#241f2e;--hl-deep:#9b7bf0;--hl-ink:#ddd0fb}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light])[data-hl=purple]{--hl:#a184e6;--hl-soft:#30283f;--hl-faint:#241f2e;--hl-deep:#9b7bf0;--hl-ink:#ddd0fb}}
+
+/* ═════════════ Settings page ═════════════ */
+.settings-page{display:grid;gap:34px;max-width:680px}
+.set-sec h2{font-size:15px;font-weight:600;margin:0 0 4px}
+.set-note{font-size:13px;color:var(--muted);margin:0 0 6px}
+.settings-page .set-list{border-top:1px solid var(--rule-2)}
+.settings-page .set-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px;padding:8px 2px;border-bottom:1px solid var(--rule-2)}
+.settings-page .set-row>span:first-child{display:grid;gap:1px;font-size:14px;color:var(--ink)}
+.settings-page .set-row small{font-size:12.5px;color:var(--muted);font-weight:400;max-width:46ch}
+.settings-page .set-input{display:inline-flex;align-items:center;gap:6px}
+.settings-page .set-input input{width:84px;text-align:right;border:1px solid var(--rule);border-radius:6px;background:var(--sheet);color:var(--ink);padding:5px 8px;font:inherit;font-size:14px;font-variant-numeric:tabular-nums}
+.settings-page .set-input input[type=date]{width:auto;text-align:left}
+.settings-page .set-input input:focus{outline:0;border-color:var(--biro);box-shadow:0 0 0 3px color-mix(in srgb,var(--biro) 20%,transparent)}
+.settings-page .set-input small{min-width:44px;color:var(--muted)}
+.set-actions{display:inline-flex;gap:2px;flex-wrap:wrap;justify-content:flex-end}
+.seg{display:inline-flex;padding:2px;border-radius:7px;background:var(--hover);gap:2px}
+.seg button{border:0;background:none;border-radius:5px;padding:4px 12px;font:inherit;font-size:13px;color:var(--muted);cursor:pointer;transition:background-color .15s,color .15s}
+.seg button[aria-pressed=true]{background:var(--sheet);color:var(--ink);box-shadow:0 1px 2px rgba(15,15,15,.12)}
+.swatches{display:inline-flex;gap:8px}
+.swatches button{width:26px;height:26px;border-radius:50%;border:0;padding:0;background:var(--sw);cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);transition:transform .15s cubic-bezier(.2,.8,.2,1),box-shadow .15s}
+.swatches button:hover{transform:scale(1.1)}
+.swatches button[aria-checked=true]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--sw)}
+.switch{appearance:none;-webkit-appearance:none;width:34px;height:20px;border-radius:999px;background:var(--rule);position:relative;cursor:pointer;flex:none;transition:background-color .2s}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .2s cubic-bezier(.2,.8,.2,1)}
+.switch:checked{background:var(--biro)}.switch:checked::after{transform:translateX(14px)}
+@media(max-width:600px){.settings-page .set-row{flex-wrap:wrap}.settings-page .set-row small{max-width:none}}
+
+/* ═════════════ Study sessions on the calendar ═════════════ */
+/* finished time: a quiet striped block in the subject colour, separate from planned tasks */
+.wk-event.session{border:0;text-align:left;font:inherit;cursor:pointer;color:var(--ink);
+  background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) 16%,var(--bg)) 0 6px,color-mix(in srgb,var(--c) 10%,var(--bg)) 6px 12px);
+  box-shadow:inset 3px 0 var(--c);padding:3px 6px 3px 9px;display:flex;flex-direction:column;overflow:hidden}
+.wk-event.session b{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-event.session span{font-size:11px;color:var(--muted)}
+.wk-event.session:hover{filter:brightness(.97)}
+
+.wk-event.session{align-items:flex-start;justify-content:flex-start;text-align:left}
+.wk-event.session b,.wk-event.session span{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.wk-event.session.short{flex-direction:row;align-items:center;gap:6px}
+.settings-page .set-row{min-height:44px;padding:6px 2px}
