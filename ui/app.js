@@ -1072,14 +1072,21 @@ function calTitle() {
   return s.slice(0,7)===e.slice(0,7) ? pretty(s,{month:'long',year:'numeric'}) : pretty(s,{month:'short'})+' – '+pretty(e,{month:'short',year:'numeric'});
 }
 // Calendar list beside the grid, like Notion Calendar: tick a calendar to show or hide it.
+// The panel to the right of the calendar folds away (button in the toolbar), and each of
+// its sections folds on its own. Both are remembered on this device.
+const CAL_SIDE_KEY='stacky-cal-side';
+let calSide=(()=>{ try { return JSON.parse(localStorage.getItem(CAL_SIDE_KEY))||{}; } catch { return {}; } })();
+const storeCalSide = () => { try { localStorage.setItem(CAL_SIDE_KEY,JSON.stringify(calSide)); } catch {} };
+const calSec = (title,body) => { const shut=calSide.shut?.includes(title);
+  return '<section class="cal-sec'+(shut?' shut':'')+'"><button type="button" class="cal-side-h" data-action="cal-sec" data-id="'+h(title)+'" aria-expanded="'+!shut+'"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 3l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'+h(title)+'</button><div class="cal-sec-body">'+body+'</div></section>'; };
 function calendarList() {
   const cfg=calCfg(), row=(id,name,colour,on,sub='')=>'<button type="button" class="cal-layer" data-action="cal-layer" data-id="'+h(id)+'" aria-pressed="'+on+'" style="--c:'+h(colour)+'"><i aria-hidden="true"></i><span>'+h(name)+'</span>'+(sub?'<small>'+h(sub)+'</small>':'')+'</button>';
-  let out='<h2 class="cal-side-h">Stacky</h2>'+
+  let out=calSec('Stacky',
     row('tasks','Tasks','#787774',layerOn('tasks'))+
     row('sessions','Study sessions','#2783de',data.settings.calSessions!==false)+
-    row('assess','Assessments','#d8a32f',layerOn('assess'));
-  if (gOn()) out+='<h2 class="cal-side-h">Google</h2>'+(cfg.google.list.length?cfg.google.list.map(c=>row('g:'+c.id,c.name,c.colour,cfg.google.show[c.id]!==false)).join(''):'<p class="cal-side-note">'+(gReady()?'Loading…':'Reconnect Google to list your calendars.')+'</p>');
-  if (cfg.ics.length) out+='<h2 class="cal-side-h">Other calendars</h2>'+cfg.ics.map(c=>row('i:'+c.id,c.name,c.colour,!c.hidden)).join('');
+    row('assess','Assessments','#d8a32f',layerOn('assess')));
+  if (gOn()) out+=calSec('Google',(cfg.google.list.length?cfg.google.list.map(c=>row('g:'+c.id,c.name,c.colour,cfg.google.show[c.id]!==false)).join(''):'<p class="cal-side-note">'+(gReady()?'Loading…':'Reconnect Google to list your calendars.')+'</p>'));
+  if (cfg.ics.length) out+=calSec('Other calendars',cfg.ics.map(c=>row('i:'+c.id,c.name,c.colour,!c.hidden)).join(''));
   return '<div class="cal-list">'+out+'<button type="button" class="cal-side-link" data-action="calendars">Manage calendars</button></div>';
 }
 // Move the calendar by one week (or month). Also reached by a sideways trackpad swipe,
@@ -1128,9 +1135,9 @@ function calendarPage() {
   return '<div class="cal-head"><div class="cal-title"><h1>'+h(calTitle())+'</h1>'+extStatus()+'</div><div class="cal-tools">'+
     '<div class="week-picker"><button type="button" aria-label="Previous" data-action="cal-shift" data-id="-1">‹</button>'+button('Today','cal-today','','text')+'<button type="button" aria-label="Next" data-action="cal-shift" data-id="1">›</button></div>'+
     tabGroup('Calendar view','cal-mode',calMode,[['week','Week'],['month','Month']])+
-    '<button type="button" class="icon-btn cal-cals" data-action="calendars" title="Calendars" aria-label="Calendars">'+icon('calendar')+'</button></div></div>'+
-    '<div class="cal-wrap">'+(calMode==='month'?monthGrid():weekGrid())+
-    '<aside class="cal-side">'+calendarList()+(unscheduled.length?'<h2 class="cal-side-h" title="Drag onto the grid to plan it">Unscheduled</h2>'+sortTasks(unscheduled).map(chip).join(''):'')+'</aside></div>';
+    '<button type="button" class="icon-btn cal-panel-btn" data-action="cal-side" aria-pressed="'+!calSide.closed+'" title="'+(calSide.closed?'Show':'Hide')+' calendars and unscheduled tasks" aria-label="'+(calSide.closed?'Show':'Hide')+' side panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M15 4.5v15"/>'+(calSide.closed?'':'<path d="M15 4.5h3a2.5 2.5 0 0 1 2.5 2.5v10a2.5 2.5 0 0 1-2.5 2.5h-3z" fill="currentColor" stroke="none" opacity=".35"/>')+'</svg></button></div></div>'+
+    '<div class="cal-wrap'+(calSide.closed?' side-closed':'')+'">'+(calMode==='month'?monthGrid():weekGrid())+
+    (calSide.closed?'':'<aside class="cal-side">'+calendarList()+(unscheduled.length?calSec('Unscheduled',sortTasks(unscheduled).map(chip).join('')):'')+'</aside>')+'</div>';
 }
 function monthGrid() {
   const monthStart=calAnchor.slice(0,8)+'01', start=monday(monthStart), month=monthStart.slice(0,7), t0=today();
@@ -2310,6 +2317,8 @@ function stackActions(id, el) {
     'cal-shift':()=>calShift(Number(id)),
     'cal-today':()=>{calAnchor=today();calScroll=null;render();},
     'calendars':calendarsModal,
+    'cal-side':()=>{ calSide.closed=!calSide.closed; storeCalSide(); render(); const p=main.querySelector('.cal-side'); if (p && !matchMedia('(prefers-reduced-motion: reduce)').matches) p.animate([{opacity:0,transform:'translateX(12px)'},{opacity:1,transform:'none'}],{duration:200,easing:'cubic-bezier(.2,.8,.2,1)'}); },
+    'cal-sec':()=>{ const s=new Set(calSide.shut||[]); s.has(id)?s.delete(id):s.add(id); calSide.shut=[...s]; storeCalSide(); render(); },
     'cal-layer':()=>{
       const cfg=calCfg();
       if (id==='sessions') change(()=>{ data.settings.calSessions=data.settings.calSessions===false; });
