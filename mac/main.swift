@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
   var web: WKWebView!
   var popups: [NSWindow] = []
   var downloadDestinations: [ObjectIdentifier: URL] = [:]
+  var floatPanel: NSPanel?
 
   func applicationDidFinishLaunching(_ n: Notification) {
     buildMenu()
@@ -44,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     config.userContentController.addUserScript(WKUserScript(source: "document.documentElement.classList.add('in-mac-app')", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     config.userContentController.addUserScript(WKUserScript(source: dragScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
     config.userContentController.add(self, name: "stackyWindow")
+    config.userContentController.add(self, name: "stackyFloat")
     web = StackyWebView(frame: .zero, configuration: config)
     web.customUserAgent = safariUA
     web.uiDelegate = self
@@ -73,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
 
   // Window moves and double-click zoom requested by the page (see dragScript).
   func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
+    if message.name == "stackyFloat" { (message.body as? String) == "close" ? floatPanel?.close() : openFloat(); return }
     guard let what = message.body as? String, !window.styleMask.contains(.fullScreen) else { return }
     if what == "drag", let down = (web as? StackyWebView)?.lastMouseDown { window.performDrag(with: down) }
     if what == "zoom" {
@@ -83,6 +86,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
       }
     }
   }
+
+  // ── Floating timer: an always-on-top mini window that stays above other apps and desktops ──
+  @objc func openFloat() {
+    if let p = floatPanel { p.orderFrontRegardless(); return }
+    let config = WKWebViewConfiguration()
+    config.websiteDataStore = .default()   // same storage as the main window, so they share one timer
+    let mini = WKWebView(frame: .zero, configuration: config)
+    mini.customUserAgent = safariUA
+    mini.setValue(false, forKey: "drawsBackground")
+    let p = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 76),
+                    styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel, .utilityWindow],
+                    backing: .buffered, defer: false)
+    p.title = "Stacky timer"
+    p.titleVisibility = .hidden
+    p.titlebarAppearsTransparent = true
+    p.isFloatingPanel = true
+    p.level = .floating
+    p.hidesOnDeactivate = false
+    p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    p.isMovableByWindowBackground = true
+    p.backgroundColor = window.backgroundColor
+    p.contentView = mini
+    p.isReleasedWhenClosed = false
+    p.delegate = self
+    p.setFrameAutosaveName("StackyFloat")
+    if !p.setFrameUsingName("StackyFloat"), let v = NSScreen.main?.visibleFrame { p.setFrameOrigin(NSPoint(x: v.maxX - 380, y: v.maxY - 100)) }
+    mini.load(URLRequest(url: URL(string: homeURL.absoluteString + "#mini")!, cachePolicy: .reloadRevalidatingCacheData))
+    p.orderFrontRegardless()
+    floatPanel = p
+  }
+  func windowWillClose(_ n: Notification) { if (n.object as? NSPanel) === floatPanel { floatPanel = nil } }
 
   // In full screen there are no window buttons, so the page drops the top band.
   func windowDidEnterFullScreen(_ n: Notification) { web.evaluateJavaScript("document.documentElement.classList.add('mac-fullscreen')", completionHandler: nil) }
@@ -230,6 +264,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
 
     let winItem = NSMenuItem(); main.addItem(winItem)
     let win = NSMenu(title: "Window")
+    let ft = win.addItem(withTitle: "Floating Timer", action: #selector(openFloat), keyEquivalent: "t"); ft.keyEquivalentModifierMask = [.command, .option]
+    win.addItem(.separator())
     win.addItem(withTitle: "Minimise", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
     win.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
     winItem.submenu = win

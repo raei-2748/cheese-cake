@@ -102,6 +102,10 @@ function weekData() {
 const course = id => courses.find(c => c.id === id);
 const study = ['focus','Study','timer'];
 const routeNames = Object.fromEntries([dash,study,...smart,...tools,...views,['settings','Settings']].map(([k,n])=>[k,n]));
+// Mini mode: the same page shown as just the timer, for the floating window (Mac app panel or
+// Chrome picture-in-picture). It shares the timer with the main window through local storage.
+const MINI = location.hash==='#mini';
+if (MINI) document.documentElement.classList.add('mini-mode');
 function route() {
   const raw = location.hash.slice(1), cut = raw.indexOf('/');
   const name = cut<0 ? raw : raw.slice(0,cut);
@@ -326,6 +330,7 @@ function writeBase() { try { localStorage.setItem(BASE_KEY, JSON.stringify(data)
 const hasRecords = d => !!(d.tasks.length||d.assessments.length||d.focus.length||d.papers.length||d.habits.length||Object.keys(d.topics).length);
 function queueSync(delay=700) { if (!localMode || !syncOn()) return; clearTimeout(syncTimer); syncTimer=setTimeout(syncNow,delay); }
 async function syncNow() {
+  if (MINI) return;   // the floating window only shows the timer; the main window syncs
   if (!localMode || !syncOn() || !data) return;
   if (syncing) { syncAgain=true; return; }
   // Never swap the records out from under an open form or an unsaved edit.
@@ -1360,6 +1365,7 @@ function extStatus() {   // shown only when something needs your action
 }
 let extWant=null;
 function extEnsure(from,to) {
+  if (MINI) return;
   const cfg=calCfg(), now=Date.now();
   if (gOn()) gPreload();
   const g=extCache.google;
@@ -1860,10 +1866,29 @@ const FI = {
   pause:svgIcon('<path d="M8 5.5h2.6v13H8zM13.4 5.5H16v13h-2.6z" fill="currentColor"/>'),
   stop:svgIcon('<rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor"/>'),
   skip:svgIcon('<path d="M6 6l8 6-8 6zM16 6h2v12h-2z" fill="currentColor"/>'),
+  popout:svgIcon('<path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'),
   full:svgIcon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>')
 };
+// Float the timer outside the window: a native always-on-top panel in the Mac app,
+// Chrome's picture-in-picture window elsewhere, or a small pop-up as a last resort.
+async function popOutTimer() {
+  const url=location.pathname+'#mini';
+  if (window.webkit?.messageHandlers?.stackyFloat) { window.webkit.messageHandlers.stackyFloat.postMessage('open'); return; }
+  if ('documentPictureInPicture' in window) {
+    try {
+      const pip=await documentPictureInPicture.requestWindow({width:360,height:76});
+      pip.document.body.style.cssText='margin:0;background:#191919;overflow:hidden';
+      const f=pip.document.createElement('iframe');
+      f.src=url; f.style.cssText='border:0;width:100vw;height:100vh;display:block';
+      pip.document.body.append(f);
+      return;
+    } catch (e) { /* fall through */ }
+  }
+  window.open(url,'stacky-timer','popup,width=360,height=96');
+  notify('This browser cannot keep the timer on top. Use Chrome or the Stacky Mac app for that.');
+}
 function renderFloat() {
-  const show = data && data.settings.floatTimer!==false && route().name!=='focus' && !fullTimer;
+  const show = MINI || (data && data.settings.floatTimer!==false && route().name!=='focus' && !fullTimer);
   floatEl.hidden = !show;
   if (!show) { floatEl.innerHTML=''; return; }
   const active=sessionActive(), brk=isBreak(timer.phase), c=course(timer.course);
@@ -1880,8 +1905,9 @@ function renderFloat() {
       : ib('timer-start', FI.play, (brk?'Start break':'Start studying')+' (s)', true))+
     '<a class="ft-body" href="#focus" title="Open the Study page"><span class="ft-what"><i></i>'+h(what)+'</span>'+
       (active ? '<span id="float-time" class="ft-time">'+clock(shownSecs())+'</span>' : '<span class="ft-mode">'+h(mode)+'</span>')+'</a>'+
-    (active ? (brk ? ib('timer-skip', FI.skip, 'Skip break') : ib('timer-finish', FI.stop, timer.mode==='exam'?'End exam':'Finish and log')) : '')+
-    ib('timer-full', FI.full, 'Full screen (f)');
+    (MINI ? (active&&brk ? ib('timer-skip', FI.skip, 'Skip break') : '')
+      : (active ? (brk ? ib('timer-skip', FI.skip, 'Skip break') : ib('timer-finish', FI.stop, timer.mode==='exam'?'End exam':'Finish and log')) : '')+
+        ib('timer-popout', FI.popout, 'Float on top of other windows')+ib('timer-full', FI.full, 'Full screen (f)'));
 }
 function updateTimerDom() {
   const secs=shownSecs();
@@ -1900,7 +1926,7 @@ function updateTimerDom() {
   }
   document.title=timer.running?clock(secs)+' · '+(timer.phase==='focus'?(course(timer.course)?.short??'Study'):phaseName[timer.phase])+' · Stacky':'Stacky';
 }
-setInterval(()=>{ if (!data) return; if (timer.running && !countsUp() && elapsedSecs()>=phaseSecs(timer.phase)) finishPhase(); else { examWarnings(); updateTimerDom(); } },1000);
+setInterval(()=>{ if (!data) return; if (!MINI && timer.running && !countsUp() && elapsedSecs()>=phaseSecs(timer.phase)) finishPhase(); else { if (!MINI) examWarnings(); updateTimerDom(); } },1000);
 
 function studyStats() {
   const t0=today(), wk=monday(t0);
@@ -2336,6 +2362,7 @@ function stackActions(id, el) {
     'timer-pause':()=>{pauseTimer();render();},
     'timer-finish':finishSession,
     'timer-full':openFull,
+    'timer-popout':popOutTimer,
     'timer-full-exit':closeFull,
     'timer-skip':()=>{resetTimer({phase:'focus'});render();},
     'focus-length':()=>{ if (sessionActive()) { notify('Finish this round to change its length.'); return; } change(()=>{ data.settings.pomo={...pomo(),focus:Number(id)}; }); },

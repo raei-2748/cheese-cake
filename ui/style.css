@@ -1913,3 +1913,13 @@ button.cal-side-h svg{width:12px;height:12px;transform:rotate(90deg);transition:
 .cal-sec.shut button.cal-side-h svg{transform:none}
 .cal-sec.shut .cal-sec-body{display:none}
 .cal-sec-body{display:grid;gap:1px}
+
+/* ═════════════ Mini mode: the floating window shows only the timer (12 Nov) ═════════════ */
+html.mini-mode,html.mini-mode body{height:100%;overflow:hidden}
+html.mini-mode body{margin:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:0 8px}
+html.mini-mode body>*:not(#float-timer):not(#toast){display:none!important}
+html.mini-mode body::before{display:none!important}
+html.mini-mode #float-timer{position:static!important;inset:auto!important;left:auto!important;right:auto!important;bottom:auto!important;top:auto!important;
+  transform:none!important;width:100%;max-width:none;box-shadow:none!important;border:0!important;background:transparent!important;animation:none!important}
+html.mini-mode .ft-body{pointer-events:none}
+html.mini-mode #toast{left:8px;right:8px;bottom:6px;font-size:11px}
