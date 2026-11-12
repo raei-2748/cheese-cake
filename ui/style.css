@@ -1185,3 +1185,95 @@ table.balance tr.flag th{box-shadow:inset 2px 0 var(--red)}
 .subj[aria-pressed=true] .subj-ico{opacity:1}
 .fs-subject .subj-ico{width:1.05em;height:1.05em}
 #nav a svg.subj-ico{color:color-mix(in srgb,var(--c) 78%,var(--ink))}
+
+/* ═════════════ Assessments: countdown, runway, grouped list (12 Nov) ═════════════ */
+.assess-hero{--tint:color-mix(in srgb,var(--c) 12%,var(--bg));position:relative;border-radius:10px;padding:26px 28px 22px;margin:4px 0 36px;background:var(--tint);border:1px solid color-mix(in srgb,var(--c) 22%,var(--bg))}
+.hero-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px}
+.hero-eyebrow{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:color-mix(in srgb,var(--c) 75%,var(--ink));margin-right:4px}
+.assess-hero h2{font-size:30px;line-height:1.15;font-weight:700;margin:0 0 4px;letter-spacing:-.01em}
+.hero-when{margin:0 0 20px;color:var(--muted);font-size:14px}
+.countdown{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+.countdown span{display:flex;flex-direction:column;align-items:center;min-width:78px;padding:10px 8px 8px;border-radius:8px;background:var(--bg);box-shadow:0 1px 0 color-mix(in srgb,var(--c) 18%,transparent)}
+.countdown b{font-family:var(--mono);font-size:40px;line-height:1;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
+.countdown small{margin-top:6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.countdown span:first-child b{color:color-mix(in srgb,var(--c) 80%,var(--ink))}
+.countdown .cd-now{font-size:28px;font-weight:700;padding:14px 22px}
+.hero-prep{max-width:560px;margin-bottom:18px}
+.hero-prep-head{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px}.hero-prep-head b{font-family:var(--mono);font-weight:600;color:var(--ink)}
+.prep-bar{height:6px;border-radius:3px;background:color-mix(in srgb,var(--c) 14%,var(--bg));overflow:hidden;margin-bottom:10px}
+.prep-bar i{display:block;height:100%;border-radius:3px;background:var(--c);transition:width .3s var(--ease)}
+.prep-steps{display:flex;flex-wrap:wrap;gap:6px}
+.prep-step{position:relative;display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px 0 8px;border-radius:13px;font-size:12.5px;color:var(--muted);background:var(--bg);border:1px solid var(--rule);cursor:pointer;user-select:none;transition:background .15s,border-color .15s,color .15s}
+.prep-step input{position:absolute;opacity:0;pointer-events:none}
+.prep-step span::before{content:'';display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:50%;border:1.5px solid currentColor;vertical-align:-1px;opacity:.6}
+.prep-step:hover{border-color:var(--c,var(--muted));color:var(--ink)}
+.prep-step.on{background:color-mix(in srgb,var(--c,#448361) 16%,var(--bg));border-color:transparent;color:var(--ink)}
+.prep-step.on span::before{background:var(--c,#448361);border-color:var(--c,#448361);opacity:1;box-shadow:inset 0 0 0 2px var(--bg)}
+.prep-step:has(input:focus-visible){outline:2px solid var(--c);outline-offset:2px}
+.prep-steps.compact .prep-step{height:22px;font-size:11.5px;padding:0 8px 0 6px}
+.hero-actions{display:flex;gap:8px}
+.assess-hero .button.primary{background:var(--c)!important;border-color:var(--c)!important;color:#fff!important}
+.hero-then{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:18px;padding-top:14px;border-top:1px solid color-mix(in srgb,var(--c) 18%,var(--bg));font-size:13px;color:var(--muted)}
+.hero-then span{display:inline-flex;align-items:center;gap:5px}.hero-then b{font-weight:600;color:var(--ink);font-family:var(--mono);font-size:12px}
+/* runway */
+.runway{padding:28px 4px 8px}
+.rw-track{position:relative;height:44px;border-top:2px solid var(--rule)}
+.rw-week{position:absolute;top:-24px;font-size:11px;color:var(--faint,var(--muted));font-family:var(--mono);white-space:nowrap}
+.rw-week::after{content:'';position:absolute;left:0;top:22px;width:1px;height:8px;background:var(--rule)}
+.rw-today{position:absolute;top:-8px;bottom:0;width:2px;margin-left:-1px;background:var(--hl-deep,#e6c400)}
+.rw-today::before{content:'Today';position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:10.5px;font-style:normal;font-weight:600;color:var(--hl-ink,var(--ink))}
+.rw-flag{position:absolute;top:22px;transform:translateX(-50%);font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--hl-soft);color:var(--hl-ink)}
+.rw-dot{position:absolute;top:-14px;transform:translateX(-50%);width:26px;height:26px;display:grid;place-items:center;padding:0;border-radius:50%;border:2px solid var(--bg);background:color-mix(in srgb,var(--c) 22%,var(--bg));color:color-mix(in srgb,var(--c) 80%,var(--ink));cursor:pointer;transition:transform .15s}
+.rw-dot:hover{transform:translateX(-50%) scale(1.15);z-index:2}
+.rw-dot .subj-ico{width:14px;height:14px}
+.rw-dot.done{opacity:.45}
+/* grouped list */
+.assess-group{margin-top:18px}
+.ag-title{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 4px;padding-bottom:6px;border-bottom:1px solid var(--rule)}
+.ag-title span{font-weight:400;font-family:var(--mono);font-size:12px;margin-left:4px}
+.assess-row{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:16px;align-items:start;padding:14px 0;border-bottom:1px solid var(--rule)}
+.ar-date{display:flex;flex-direction:column;align-items:center;padding:6px 0 7px;border-radius:7px;background:color-mix(in srgb,var(--c) 13%,var(--bg));line-height:1.1}
+.ar-date b{font-size:21px;font-weight:700;font-family:var(--mono);color:color-mix(in srgb,var(--c) 80%,var(--ink))}
+.ar-date small{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.ar-date.none{background:var(--hover)}.ar-date.none b{color:var(--muted)}
+.ar-main h3{margin:6px 0 2px;font-size:16px;font-weight:600}
+.ar-main h3 button{all:unset;cursor:pointer}.ar-main h3 button:hover{text-decoration:underline;text-decoration-color:var(--rule)}
+.ar-main h3 button:focus-visible{outline:2px solid var(--c);outline-offset:2px;border-radius:2px}
+.ar-main p{margin:0 0 8px;font-size:13px;color:var(--muted)}
+.ar-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.ar-left{font-family:var(--mono);font-size:13px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap}
+.ar-left.urgent{background:color-mix(in srgb,#d44c47 15%,var(--bg));color:#c4413c}
+.ar-left.soon{background:color-mix(in srgb,#cb912f 18%,var(--bg));color:#a6721b}
+.ar-left.later{background:var(--hover);color:var(--muted)}
+.ar-mark{display:flex;flex-direction:column;align-items:flex-end}.ar-mark b{font-family:var(--mono);font-size:18px}.ar-mark small{font-size:12px;color:var(--muted)}
+.ar-actions{display:flex;gap:2px}
+.assess-row.past .ar-date{filter:grayscale(.6);opacity:.75}
+.assess-past{margin-bottom:32px}
+.assess-past summary{display:flex;align-items:baseline;gap:8px;cursor:pointer;list-style:none;padding-bottom:4px}
+.assess-past summary::-webkit-details-marker{display:none}
+.assess-past summary h2{margin:0}.assess-past summary span{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.assess-past summary::before{content:'›';display:inline-block;transition:transform .15s;color:var(--muted)}
+.assess-past[open] summary::before{transform:rotate(90deg)}
+:root[data-theme=dark] .ar-left.urgent{color:#ff8a85}:root[data-theme=dark] .ar-left.soon{color:#f0c06a}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .ar-left.urgent{color:#ff8a85}:root:not([data-theme=light]) .ar-left.soon{color:#f0c06a}}
+@media(max-width:640px){
+  .assess-hero{padding:20px 18px}
+  .assess-hero h2{font-size:24px}
+  .countdown{gap:6px}.countdown span{min-width:0;flex:1}.countdown b{font-size:28px}
+  .assess-row{grid-template-columns:44px minmax(0,1fr);gap:12px}
+  .ar-side{grid-column:2;flex-direction:row;align-items:center;justify-content:space-between}
+  .rw-week:nth-child(even){display:none}
+}
+
+/* Task checkbox: draw the tick in CSS so it sits dead centre at any size
+   (the ✓ glyph inherited a 24px line height and dropped to the corner). */
+.check{line-height:1}
+.check.on{font-size:0}
+.check.on::before{content:'';display:block;width:3.5px;height:7.5px;border:solid currentColor;border-width:0 1.7px 1.7px 0;transform:translate(0,-1px) rotate(45deg)}
+.check.big.on::before{width:5px;height:10px;border-width:0 2px 2px 0}
+.dot-label .subj-ico{width:12px;height:12px;color:color-mix(in srgb,var(--c) 78%,var(--ink))}
+/* runway: dots sit on the line, week labels stay clear above */
+.runway{padding-top:30px}
+.rw-week{top:-28px}
+.rw-dot{top:-13px}
+.rw-today{top:-4px}

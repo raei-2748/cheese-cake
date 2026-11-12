@@ -453,8 +453,82 @@ const assessmentSteps = ['Scope checked','Timed rehearsal','Errors retested','Re
 const trialSteps = ['Scope & timing checked','Timed paper completed','Paper marked','Errors retested'];
 const dated = (items,key='date') => [...items].sort((a,b)=>(a[key]||'9999').localeCompare(b[key]||'9999'));
 const hasMark = a => a.mark!=='' && a.outOf!=='' && a.outOf>0;
+// Epoch milliseconds for a wall-clock time in Sydney (handles daylight saving).
+function sydneyEpoch(day, time='09:00') {
+  const [y,m,d]=day.split('-').map(Number), [hh,mm]=(time||'09:00').split(':').map(Number);
+  const guess=Date.UTC(y,m-1,d,hh,mm);
+  const parts=t=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Australia/Sydney',hourCycle:'h23',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'}).formatToParts(t).map(x=>[x.type,x.value]));
+  const offset=t=>{const p=parts(t);return Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute)-t;};
+  return guess-offset(guess-offset(guess));
+}
+const assessDone = a => a.status==='Sat / submitted' || a.status==='Returned';
+const assessTime = a => sydneyEpoch(a.date, a.time);
+// Countdown text, refreshed every second by the ticker below.
+function countdownParts(ms) {
+  const s=Math.max(0,Math.floor(ms/1000));
+  return [['days',Math.floor(s/86400)],['hrs',Math.floor(s%86400/3600)],['min',Math.floor(s%3600/60)],['sec',s%60]];
+}
+const countdownHtml = ms => countdownParts(ms).map(([u,n])=>'<span><b>'+String(n).padStart(2,'0')+'</b><small>'+u+'</small></span>').join('');
+setInterval(()=>{ document.querySelectorAll('[data-countdown]').forEach(el=>{ const left=Number(el.dataset.countdown)-Date.now(); el.innerHTML=left>0?countdownHtml(left):'<span class="cd-now">Now</span>'; }); },1000);
+const daysLeftLabel = n => n===0?'Today':n===1?'Tomorrow':n<0?Math.abs(n)+'d ago':n+' days';
+const urgency = n => n<=3?'urgent':n<=7?'soon':'later';
+function assessSteps(a, compact) {
+  const steps=a.kind==='Trial'?trialSteps:assessmentSteps;
+  return '<div class="prep-steps'+(compact?' compact':'')+'">'+steps.map((step,i)=>'<label class="prep-step'+(a.checks?.[i]?' on':'')+'"><input type="checkbox" data-assess="'+h(a.id)+'" data-step="'+i+'" '+(a.checks?.[i]?'checked':'')+'><span>'+h(step)+'</span></label>').join('')+'</div>';
+}
+const prepCount = a => (a.kind==='Trial'?trialSteps:assessmentSteps).filter((_,i)=>a.checks?.[i]).length;
+function assessHero(a, rest) {
+  const c=course(a.course), steps=(a.kind==='Trial'?trialSteps:assessmentSteps).length, done=prepCount(a);
+  const settings=data.settings, extra=[['Trials',settings.trialStart],['HSC exams',settings.hscStart]].filter(([,d])=>d&&d>=today());
+  return '<section class="assess-hero" style="--c:'+(c?.colour||'#8b94a1')+'">'+
+    '<div class="hero-top"><span class="hero-eyebrow">Next up</span>'+subject(a.course)+(a.kind==='Trial'?badge('Trial','gold'):'')+'</div>'+
+    '<h2>'+h(a.title)+'</h2>'+
+    '<p class="hero-when">'+h(pretty(a.date,{weekday:'long',day:'numeric',month:'long'}))+' · '+(a.time?h(a.time):'9:00 am (set a time in Edit)')+(a.weight!==''?' · '+h(a.weight)+'% weighting':'')+'</p>'+
+    '<div class="countdown" role="timer" aria-label="Time until '+h(a.title)+'" data-countdown="'+assessTime(a)+'">'+countdownHtml(assessTime(a)-Date.now())+'</div>'+
+    '<div class="hero-prep"><div class="hero-prep-head"><span>Preparation</span><b>'+done+' / '+steps+'</b></div><div class="prep-bar"><i style="width:'+(done/steps*100)+'%"></i></div>'+assessSteps(a)+'</div>'+
+    '<div class="hero-actions">'+button('Plan prep','prep-assessment',a.id,'primary')+button('Edit','edit-assessment',a.id)+'</div>'+
+    (rest.length||extra.length?'<div class="hero-then">'+rest.slice(0,3).map(x=>'<span>'+subjectIcon(x.course)+h(course(x.course)?.short||'General')+' '+h(x.title)+' <b>'+daysLeftLabel(daysFrom(x.date,today()))+'</b></span>').join('')+extra.map(([l,d])=>'<span>'+h(l)+' <b>'+daysFrom(d,today())+' days</b></span>').join('')+'</div>':'')+
+  '</section>';
+}
+// Eight weeks from this Monday, with each assessment as a dot in its subject's colour.
+function assessRunway(list) {
+  const t0=today(), from=monday(t0), span=56, pos=d=>Math.min(100,Math.max(0,daysFrom(d,from)/span*100));
+  const marks=list.filter(a=>a.date&&daysFrom(a.date,from)>=0&&daysFrom(a.date,from)<span);
+  const settings=data.settings, flags=[['Trials',settings.trialStart],['HSC',settings.hscStart]].filter(([,d])=>d&&daysFrom(d,from)>=0&&daysFrom(d,from)<span);
+  return '<div class="runway" aria-label="Next eight weeks">'+
+    '<div class="rw-track">'+Array.from({length:8},(_,i)=>'<span class="rw-week" style="left:'+(i/8*100)+'%">'+h(pretty(addDays(from,i*7)))+'</span>').join('')+
+    '<i class="rw-today" style="left:'+pos(t0)+'%" title="Today"></i>'+
+    flags.map(([l,d])=>'<span class="rw-flag" style="left:'+pos(d)+'%">'+h(l)+'</span>').join('')+
+    marks.map(a=>'<button type="button" class="rw-dot'+(assessDone(a)?' done':'')+'" style="left:'+pos(a.date)+'%;--c:'+(course(a.course)?.colour||'#8b94a1')+'" data-action="edit-assessment" data-id="'+h(a.id)+'" title="'+h((course(a.course)?.short||'General')+' · '+a.title+' · '+pretty(a.date))+'">'+subjectIcon(a.course)+'</button>').join('')+
+    '</div></div>';
+}
+function assessRow(a) {
+  const c=course(a.course), n=a.date?daysFrom(a.date,today()):null, past=assessDone(a)||(n!==null&&n<0);
+  const steps=(a.kind==='Trial'?trialSteps:assessmentSteps).length, done=prepCount(a);
+  const right = past
+    ? (hasMark(a)?'<span class="ar-mark"><b>'+percent(a.mark/a.outOf*100)+'</b><small>'+h(a.mark)+' / '+h(a.outOf)+'</small></span>':'<span class="ar-mark pending"><small>'+h(a.status==='Scheduled'||a.status==='Preparing'?'Mark pending':a.status)+'</small></span>')
+    : (n!==null?'<span class="ar-left '+urgency(n)+'">'+daysLeftLabel(n)+'</span>':'');
+  return '<article class="assess-row'+(past?' past':'')+'" style="--c:'+(c?.colour||'#8b94a1')+'">'+
+    (a.date?'<div class="ar-date"><small>'+h(pretty(a.date,{weekday:'short'}))+'</small><b>'+h(pretty(a.date,{day:'numeric'}))+'</b><small>'+h(pretty(a.date,{month:'short'}))+'</small></div>':'<div class="ar-date none"><small>No</small><b>?</b><small>date</small></div>')+
+    '<div class="ar-main"><div class="line">'+subject(a.course)+(a.kind==='Trial'?badge('Trial','gold'):'')+(a.status!=='Scheduled'?badge(a.status,a.status==='Returned'?'green':'neutral'):'')+'</div>'+
+      '<h3><button type="button" data-action="edit-assessment" data-id="'+h(a.id)+'">'+h(a.title)+'</button></h3>'+
+      '<p>'+(a.time?h(a.time)+' · ':'')+(a.weight!==''?h(a.weight)+'% weighting':'Weight pending')+(past?'':' · Prep '+done+'/'+steps)+'</p>'+
+      (past?'':assessSteps(a,true))+'</div>'+
+    '<div class="ar-side">'+right+'<div class="ar-actions">'+(past?'':button('Plan prep','prep-assessment',a.id,'text'))+button('Edit','edit-assessment',a.id,'text')+'</div></div>'+
+  '</article>';
+}
 function assessments() {
-  const shown = dated(data.assessments.filter(a=>assessmentFilter==='All'||a.kind===assessmentFilter));
+  const t0=today(), thisWeekEnd=addDays(monday(t0),6), nextWeekEnd=addDays(thisWeekEnd,7);
+  const all=dated(data.assessments.filter(a=>assessmentFilter==='All'||a.kind===assessmentFilter));
+  const upcoming=all.filter(a=>a.date&&a.date>=t0&&!assessDone(a));
+  const live=upcoming.filter(a=>assessTime(a)>Date.now());
+  const groups=[
+    ['This week',upcoming.filter(a=>a.date<=thisWeekEnd)],
+    ['Next week',upcoming.filter(a=>a.date>thisWeekEnd&&a.date<=nextWeekEnd)],
+    ['Later',upcoming.filter(a=>a.date>nextWeekEnd)],
+    ['No date yet',all.filter(a=>!a.date&&!assessDone(a))]
+  ].filter(([,l])=>l.length);
+  const past=all.filter(a=>assessDone(a)||(a.date&&a.date<t0)).reverse();
   const marks = courses.map(c=>{
     const entries = data.assessments.filter(a=>a.course===c.id);
     const marked = entries.filter(a=>hasMark(a)&&a.weight!=='');
@@ -464,12 +538,12 @@ function assessments() {
     return '<tr><th scope="row">'+subject(c.id)+'</th><td>'+percent(loggedWeight)+(loggedWeight>100?' '+badge('Check weights','alert'):'')+'</td><td>'+percent(covered)+'</td><td>'+(covered?percent(points/covered*100):'—')+'</td><td>'+(covered?Number(points.toFixed(2))+' / 100':'—')+'</td></tr>';
   }).join('');
   return pageHead('','Assessments & Trials','',button('+ Assessment','edit-assessment','','primary'))+
-    section('Register','',tabGroup('Assessment type','assessment-filter',assessmentFilter,['All','Assessment','Trial'])+
-    (shown.length?'<div class="record-list">'+shown.map(a=>{
-      const steps=a.kind==='Trial'?trialSteps:assessmentSteps;
-      return '<article class="record"><div class="record-head"><div><div class="line">'+subject(a.course)+badge(a.kind,a.kind==='Trial'?'gold':'neutral')+badge(a.status,a.status==='Returned'?'green':'neutral')+'</div><h3>'+h(a.title)+'</h3><p>'+(a.date?h(pretty(a.date,{day:'numeric',month:'short',year:'numeric'})):'Date pending')+' · '+(a.weight!==''?h(a.weight)+'% weighting':'Weight pending')+' · '+(hasMark(a)?h(a.mark)+' / '+h(a.outOf)+' ('+percent(a.mark/a.outOf*100)+')':'Mark pending')+'</p></div><div class="line">'+button('Plan prep','prep-assessment',a.id)+button('Edit','edit-assessment',a.id)+'</div></div>'+
-      (a.scope?'<p class="record-detail">'+br(a.scope)+'</p>':'')+'<div class="check-strip">'+steps.map((step,i)=>'<label><input type="checkbox" data-assess="'+h(a.id)+'" data-step="'+i+'" '+(a.checks?.[i]?'checked':'')+'> '+h(step)+'</label>').join('')+'</div></article>';
-    }).join('')+'</div>':emptyCard('No '+(assessmentFilter==='Trial'?'Trials':'assessments')+' logged','Dates, marks and school weightings are ready for you to enter.',button('+ Add '+(assessmentFilter==='Trial'?'Trial':'assessment'),assessmentFilter==='Trial'?'new-trial':'edit-assessment'))))+
+    (live.length?assessHero(live[0],live.slice(1)):'')+
+    section('Next eight weeks','',assessRunway(all))+
+    section('Upcoming','',tabGroup('Assessment type','assessment-filter',assessmentFilter,['All','Assessment','Trial'])+
+      (groups.length?groups.map(([label,list])=>'<div class="assess-group"><h3 class="ag-title">'+h(label)+' <span>'+list.length+'</span></h3>'+list.map(assessRow).join('')+'</div>').join('')
+        :emptyCard('Nothing coming up','Add your next '+(assessmentFilter==='Trial'?'Trial':'assessment')+' with its date and the countdown starts.',button('+ Add '+(assessmentFilter==='Trial'?'Trial':'assessment'),assessmentFilter==='Trial'?'new-trial':'edit-assessment'))))+
+    (past.length?'<details class="card assess-past"><summary><h2>Sat and returned</h2><span>'+past.length+'</span></summary>'+past.map(assessRow).join('')+'</details>':'')+
     section('Marks by course','The average counts only tasks that have both a mark and a weighting.', '<div class="table-scroll"><table><thead><tr><th>Course</th><th>Weight logged</th><th>Weight marked</th><th>Marked average</th><th>Points earned</th></tr></thead><tbody>'+marks+'</tbody></table></div>');
 }
 function topicsFor(c) {
@@ -671,9 +745,9 @@ function editTask(record, prefill={}, triage=false) {
     },v);
 }
 function editAssessment(record, kind) {
-  const v=record??{title:'',course:courseDefault(),kind:kind||'Assessment',date:'',weight:'',mark:'',outOf:'',status:'Scheduled',scope:'',checks:{}};
+  const v=record??{title:'',course:courseDefault(),kind:kind||'Assessment',date:'',time:'',weight:'',mark:'',outOf:'',status:'Scheduled',scope:'',checks:{}};
   crud('assessments',record,required('title','Task name',v.title)+chooseCourse(v.course)+select('kind','Type',v.kind,['Assessment','Trial'])+
-    dateField('date','Due date / exam date',v.date)+number('weight','School weighting (%)',v.weight,{max:100,step:.01})+
+    dateField('date','Due date / exam date',v.date)+field('time','Start time (for the countdown)',v.time||'',{type:'time'})+number('weight','School weighting (%)',v.weight,{max:100,step:.01})+
     number('mark','Raw mark',v.mark,{max:1000,step:.01})+number('outOf','Out of',v.outOf,{min:.01,max:1000,step:.01})+
     select('status','Status',v.status,assessmentStatuses)+textArea('scope','Scope, conditions and preparation notes',v.scope),record?'Edit assessment':kind==='Trial'?'Add Trial':'Add assessment',x=>{
       asNumbers(x,['weight','mark','outOf']);
@@ -794,7 +868,7 @@ function stackRow(t, compact=false) {
   const done=t.status==='Done', dropped=t.status==='Dropped', subs=t.subtasks||[];
   const c=course(t.course);
   const meta=[
-    c?'<span class="dot-label" style="--c:'+c.colour+'"><i></i>'+h(c.short)+'</span>':'',
+    c?'<span class="dot-label" style="--c:'+c.colour+'">'+subjectIcon(c.id)+h(c.short)+'</span>':'',
     t.list&&customList(t.list)?'<span class="meta-chip" style="--c:'+listColour(t.list)+'">'+icon('folder')+h(customList(t.list).name)+'</span>':'',
     ...(t.tags||[]).map(g=>'<span class="tag-chip">#'+h(g)+'</span>'),
     subs.length?'<span class="meta-chip">'+icon('sub')+subs.filter(x=>x.done).length+'/'+subs.length+'</span>':'',
