@@ -267,7 +267,13 @@ function merge3(base, mine, theirs) {
 async function gh(path, options={}) {
   const response = await fetch('https://api.github.com'+path,{cache:'no-store',...options,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+syncCfg.token,'X-GitHub-Api-Version':'2022-11-28',...(options.body?{'Content-Type':'application/json'}:{})}});
   if (response.status===401) throw new Error('GitHub rejected the sync token. It may have expired. Reconnect in Backup & settings.');
-  if (response.status===403 || response.status===404) throw new Error(path.startsWith('/gists/') && response.status===404 ? 'The sync gist was not found. Reconnect in Backup & settings.' : 'GitHub refused access. Check the token has Gists read and write permission.');
+  if (response.status===404 && path.startsWith('/gists/')) throw new Error('The sync gist was not found. Reconnect in Settings → Sync.');
+  if (response.status===403 || response.status===404) {
+    const why=(await response.json().catch(()=>null))?.message||'';
+    const scopes=response.headers.get('X-OAuth-Scopes');   // classic tokens report what they were given
+    if (/rate limit/i.test(why)) throw new Error('GitHub is limiting requests for a moment. Sync will retry shortly.');
+    throw new Error('GitHub refused access'+(why?' ('+why+')':'')+'. '+(scopes!=null?'This token has: '+(scopes||'no permissions')+'. It needs the "gist" box ticked.':'The token needs Gists set to Read and write under Account permissions.')+' Make a new token and connect again.');
+  }
   if (!response.ok) throw new Error('GitHub sync failed ('+response.status+'). It will retry.');
   return response.json();
 }
