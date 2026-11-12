@@ -1316,7 +1316,7 @@ document.addEventListener('pointerup',event=>{
 });
 document.addEventListener('pointercancel',()=>{ if (calDrag) { calDrag=null; document.documentElement.classList.remove('cal-dragging'); render(); } });
 document.addEventListener('click',event=>{ if (swallowClick) { swallowClick=false; event.stopPropagation(); event.preventDefault(); } },true);
-// A drawn block asks what it is for. Quick-add words work here too: "Chem prac #che !high".
+// A drawn block asks what it is for. Quick-add words work here too: "Physics prac #phy !high".
 function nameBlock(d) {
   const g=d.ghost;
   g.classList.add('naming');
@@ -1680,7 +1680,6 @@ const examPresets = [
   {id:'mx1',name:'Maths Ext 1 paper',course:'mx1',reading:10,writing:120},
   {id:'mx2',name:'Maths Ext 2 paper',course:'mx2',reading:10,writing:180},
   {id:'phy',name:'Physics paper',course:'phy',reading:5,writing:180},
-  {id:'che',name:'Chemistry paper',course:'che',reading:5,writing:180},
   {id:'eco',name:'Economics paper',course:'eco',reading:5,writing:180},
   {id:'eng1',name:'English Adv Paper 1',course:'eng',reading:10,writing:90},
   {id:'eng2',name:'English Adv Paper 2',course:'eng',reading:5,writing:120}
