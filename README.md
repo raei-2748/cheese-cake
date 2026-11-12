@@ -46,7 +46,7 @@ A TickTick-style study system for the HSC, built around Year 12 school assessmen
 
 **Full-screen timer:** press **Full screen** on the Study page (or `f`). It shows a large clock with the subject, task and round, keeps the screen awake, and fades the controls after a few seconds while the timer runs. `Space` starts or pauses, `Esc` exits. On iPhone it fills the browser window, because Safari there does not allow true full screen.
 
-**Floating timer window:** the pop-out button on the corner timer (or **Window → Floating Timer** in the Mac app) opens a small always-on-top player. It shows the subject, the task, the clock and a progress bar, with play or pause in the middle. Before a session the side buttons change the subject; during one the left button finishes and opens the log form in the main window, and the right one skips a break.
+**Floating timer window:** the pop-out button on the corner timer (or **Window → Floating Timer** in the Mac app) opens a small always-on-top timer with the subject, the clock and the same Start, Pause and Finish buttons as the Study page. Finish opens the log form in the main window.
 
 **Keyboard:** `⌘K` search and commands · `q` quick add · `s` start or pause studying · `f` full-screen timer · `⌘Z` undo · `?` the full list.
 

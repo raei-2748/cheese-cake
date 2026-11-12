@@ -1902,7 +1902,6 @@ const FI = {
   pause:svgIcon('<path d="M8 5.5h2.6v13H8zM13.4 5.5H16v13h-2.6z" fill="currentColor"/>'),
   stop:svgIcon('<rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor"/>'),
   skip:svgIcon('<path d="M6 6l8 6-8 6zM16 6h2v12h-2z" fill="currentColor"/>'),
-  prev:svgIcon('<path d="M18 6l-8 6 8 6zM6 6h2v12H6z" fill="currentColor"/>'),
   popout:svgIcon('<path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'),
   close:svgIcon('<path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
   full:svgIcon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>')
@@ -1948,36 +1947,24 @@ function renderFloat() {
       : (active ? (brk ? ib('timer-skip', FI.skip, 'Skip break') : ib('timer-finish', FI.stop, timer.mode==='exam'?'End exam':'Finish and log')) : '')+
         ib('timer-popout', FI.popout, 'Float on top of other windows')+ib('timer-full', FI.full, 'Full screen (f)'));
 }
-// The floating window, laid out like a music mini player: the subject is the cover, the task
-// is the track, the bar is the round. Previous and next change the subject before a session.
+// The floating window: the normal timer, small. Subject, clock, state and the same buttons
+// as the Study page. Finish opens the log form in the main window.
 function renderPlayer() {
   const active=sessionActive(), brk=isBreak(timer.phase), c=course(timer.course), t=row('tasks',timer.taskId);
-  const up=countsUp(), total=phaseSecs(timer.phase), secs=shownSecs();
+  const up=countsUp(), secs=shownSecs();
   floatEl.className='float-timer player'+(timer.running?' running':'')+(active?' active':'');
   floatEl.style.setProperty('--c', brk ? 'var(--sky)' : c?.colour ?? '#787774');
-  const ib = (action,icon,label,cls,attrs) => '<button type="button" class="mp-btn'+(cls?' '+cls:'')+'" data-action="'+action+'" title="'+h(label)+'" aria-label="'+h(label)+'"'+(attrs||'')+'>'+icon+'</button>';
-  const ids=['',...courses.map(x=>x.id)], at=Math.max(0,ids.indexOf(timer.course||''));
-  const step=d=>' data-id="'+h(ids[(at+d+ids.length)%ids.length])+'"';
-  const left = active ? ib('timer-finish', FI.stop, timer.mode==='exam'?'End exam':'Finish and log', '', brk?' disabled':'')
-    : ib('study-course', FI.prev, 'Previous subject', '', step(-1));
-  const right = brk ? ib('timer-skip', FI.skip, 'Skip break')
-    : active ? ib('timer-skip', FI.skip, 'Skip (only on a break)', '', ' disabled')
-    : ib('study-course', FI.skip, 'Next subject', '', step(1));
-  const play = timer.running ? ib('timer-pause', FI.pause, 'Pause', 'mp-play') : ib('timer-start', FI.play, active?'Resume':brk?'Start break':'Start studying', 'mp-play');
   floatEl.innerHTML = '<div class="mp">'+
-    '<div class="mp-head"><span class="mp-art">'+(brk?FI.pause:h(c?.code ?? 'ST'))+'</span>'+
-      '<span class="mp-meta"><strong>'+h(brk ? phaseName[timer.phase] : t?.title ?? c?.short ?? 'General study')+'</strong>'+
-      '<small>'+(timer.running?'<i class="mp-eq"><b></b><b></b><b></b></i>':'')+h((t&&c&&!brk ? c.short+' · ' : '')+timerInfo())+'</small></span>'+
-      '<span id="float-time" class="mp-clock" role="timer" aria-live="off">'+clock(secs)+'</span></div>'+
-    '<div class="mp-prog"><span id="mini-elapsed">'+h(up ? timerState() : clock(total-secs))+'</span>'+
-      '<span class="mp-bar"><i id="mini-bar" style="width:'+(100*ringFrac(secs)).toFixed(2)+'%"></i></span>'+
-      '<span>'+(up ? 'Stopwatch' : clock(total))+'</span></div>'+
-    '<div class="mp-ctl"><span></span><span class="mp-mid">'+left+play+right+'</span>'+
-      '<span class="mp-end">'+ib('float-close', FI.close, 'Close floating timer', 'mp-close')+'</span></div></div>';
+    '<div class="mp-head"><span class="mp-what"><i></i><strong>'+h(brk ? phaseName[timer.phase] : c?.short ?? 'General')+'</strong>'+(t&&!brk?'<small>'+h(t.title)+'</small>':'')+'</span>'+
+      '<button type="button" class="mp-close" data-action="float-close" title="Close floating timer" aria-label="Close floating timer">'+FI.close+'</button></div>'+
+    '<div id="float-time" class="mp-clock" role="timer" aria-live="off">'+clock(secs)+'</div>'+
+    '<p class="mp-info">'+h(timerState()+' · '+timerInfo())+'</p>'+
+    '<div class="mp-ctl">'+timerControls('Start')+'</div>'+
+    (up?'':'<div class="mp-bar"><i id="mini-bar" style="width:'+(100*ringFrac(secs)).toFixed(2)+'%"></i></div>')+'</div>';
 }
 function updateTimerDom() {
   const secs=shownSecs();
-  const mb=$('mini-bar'); if (mb) { mb.style.width=(100*ringFrac(secs)).toFixed(2)+'%'; if (!countsUp()) $('mini-elapsed').textContent=clock(phaseSecs(timer.phase)-secs); }
+  const mb=$('mini-bar'); if (mb) mb.style.width=(100*ringFrac(secs)).toFixed(2)+'%';
   const ft=$('float-time'); if (ft) ft.textContent=clock(secs);
   const ring=$('timer-ring'); if (ring) ring.style.strokeDashoffset=String(2*Math.PI*92*(1-ringFrac(secs)));
   const text=$('timer-text'); if (text) text.textContent=clock(secs);
