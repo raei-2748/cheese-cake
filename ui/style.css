@@ -1850,6 +1850,21 @@ html{background:var(--bg)}
 .st-subject{background:color-mix(in srgb,var(--c) 16%,var(--hover))}
 .st-subject svg{color:var(--c)}
 .st-subject select{font-weight:500}
+@media(max-width:560px){.st-picks{grid-template-columns:1fr}}
+
+/* ═════════════ Workspace design pass (13 Nov) ═════════════
+   One accent (your highlighter; subject colour inside subject-specific panels),
+   one card (filled, hairline, 10px corners), one quiet sidebar. */
+:root{--card:var(--sheet-2);--card-line:color-mix(in srgb,var(--ink) 7%,transparent);--card-r:10px}
+.metric,.banner,.st-timer,.st-stats,.quad,.paper-card,.today-line{background:var(--card)!important;border:1px solid var(--card-line)!important;border-radius:var(--card-r)!important;box-shadow:none!important}
+.assess-hero{border-radius:var(--card-r)}
+/* Matrix: the quadrant's colour is a small square by its name, not a coloured frame */
+.quad{padding:14px 14px 10px!important}
+.quad h2{color:var(--ink)!important;font-size:15px!important;font-weight:600;display:flex;align-items:center;gap:8px}
+.quad h2::before{content:'';width:9px;height:9px;border-radius:2px;background:var(--p);flex:none}
+/* Sidebar: the theme switch lives in Settings, so the footer is one line */
+.rail-bottom #theme-toggle{display:none}
+.nav-sec{margin-top:8px}
 @media(max-width:560px){.st-picks{grid-template-columns:minmax(0,1fr)}}
 /* ═════════════ Right-click menus (Nov) ═════════════ */
 .ctx-menu{position:fixed;z-index:80;min-width:216px;max-width:min(300px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow-y:auto;padding:5px;border-radius:10px;
