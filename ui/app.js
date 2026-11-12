@@ -1067,13 +1067,30 @@ function monthGrid() {
       items.slice(0,4).join('')+(items.length>4?'<button type="button" class="cal-more" data-action="cal-open-day" data-id="'+day+'">'+(items.length-4)+' more</button>':'')+'</div>';
   }).join('')+'</div></div>';
 }
+// All-day row: events lasting several days are one bar across their days, stacked in lanes
+// above the single-day chips, as in Notion Calendar and Apple Calendar.
+function allDayRow(days,ext) {
+  const n=days.length, first=days[0], last=days[n-1];
+  const multi=ext.filter(e=>e.allDay&&e.endDate>e.date&&e.date<=last&&e.endDate>=first)
+    .map(e=>({e,a:Math.max(0,daysFrom(e.date,first)),b:Math.min(n-1,daysFrom(e.endDate,first))}))
+    .sort((x,y)=>x.a-y.a||(y.b-y.a)-(x.b-x.a));
+  const lanes=[];
+  multi.forEach(m=>{ let l=lanes.findIndex(end=>end<m.a); if (l<0) { l=lanes.length; lanes.push(m.b); } else lanes[l]=m.b; m.lane=l; });
+  const L=lanes.length, LANE=24;
+  return '<div class="wk-allday" style="grid-template-rows:'+(L?'repeat('+L+','+LANE+'px) ':'')+'minmax(30px,auto)">'+
+    '<span class="wk-gutter" style="grid-row:1/span '+(L+1)+'">all day</span>'+
+    days.map((d,i)=>'<div class="wk-allcell" data-drop-date="'+d+'" data-drop-allday="1" style="grid-column:'+(i+2)+';grid-row:1/span '+(L+1)+';padding-top:'+(L*LANE+3)+'px">'+
+      calAssess(d).map(assessChip).join('')+ext.filter(e=>e.allDay&&e.endDate<=e.date&&e.date===d).map(extChip).join('')+calTasks(d).filter(t=>!t.time).map(chip).join('')+'</div>').join('')+
+    multi.map(m=>'<a class="cal-span'+(m.e.endDate<today()?' past':'')+(m.e.date<first?' cont-l':'')+(m.e.endDate>last?' cont-r':'')+'"'+(m.e.link?' href="'+h(m.e.link)+'" target="_blank" rel="noopener"':'')+' style="grid-column:'+(m.a+2)+'/'+(m.b+3)+';grid-row:'+(m.lane+1)+';--c:'+h(m.e.colour)+'" title="'+h(m.e.title+' · '+m.e.calName)+'"><span>'+h(m.e.title)+'</span></a>').join('')+
+  '</div>';
+}
 function weekGrid() {
   const n=calDays(), start=calStart(), days=Array.from({length:n},(_,i)=>addDays(start,i)), t0=today();
   const ext=extFor(days[0],days[n-1],true);
   const now=new Date(), nowMins=Number(new Intl.DateTimeFormat('en-AU',{timeZone:'Australia/Sydney',hour:'numeric',hourCycle:'h23'}).format(now))*60+now.getMinutes();
   return '<div class="wk" style="--days:'+n+';--hour:'+HOUR_PX+'px">'+
     '<div class="wk-head"><span class="wk-gutter"></span>'+days.map(d=>'<div class="wk-day'+(d===t0?' today':'')+(d<t0?' past':'')+'"><small>'+pretty(d,{weekday:'short'})+'</small><strong>'+Number(d.slice(8))+'</strong></div>').join('')+'</div>'+
-    '<div class="wk-allday"><span class="wk-gutter">all day</span>'+days.map(d=>'<div class="wk-allcell" data-drop-date="'+d+'" data-drop-allday="1">'+calAssess(d).map(assessChip).join('')+ext.filter(e=>e.allDay&&e.date<=d&&e.endDate>=d).map(extChip).join('')+calTasks(d).filter(t=>!t.time).map(chip).join('')+'</div>').join('')+'</div>'+
+    allDayRow(days,ext)+
     '<div class="wk-scroll"><div class="wk-body"><div class="wk-gutter">'+Array.from({length:23},(_,i)=>'<span style="top:'+((i+1)*HOUR_PX)+'px">'+hm((i+1)*60)+'</span>').join('')+'</div>'+
     days.map(d=>{
       const items=[...calTasks(d).filter(t=>t.time).map(t=>({t,s:toMin(t.time),e:Math.min(DAY_MINS,toMin(t.time)+blockLen(t))})),
@@ -1089,9 +1106,9 @@ function weekGrid() {
         (d===t0?'<i class="now-line" style="top:'+(nowMins/60*HOUR_PX)+'px"></i>':'')+
         items.map(it=>{
           const top=it.s/60*HOUR_PX, height=Math.max(18,(it.e-it.s)/60*HOUR_PX-2), pos='top:'+top+'px;height:'+height+'px;left:calc('+(it.lane*100/it.lanes)+'% + 1px);width:calc('+(100/it.lanes)+'% - 3px)';
-          const short=it.e-it.s<=30?' short':'';
-          if (it.x?.kind==='session') return '<button type="button" class="wk-event session'+short+'" data-action="edit-session" data-id="'+h(it.x.id)+'" style="--c:'+h(it.x.colour)+';'+pos+'" title="Studied · '+h(it.x.title)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+' · '+minutes(it.x.minutes)+'</span></button>';
-          if (it.x) return '<a class="wk-event ext'+short+'"'+(it.x.link?' href="'+h(it.x.link)+'" target="_blank" rel="noopener"':'')+' style="--c:'+h(it.x.colour)+';'+pos+'" title="'+h(it.x.title+' · '+it.x.calName)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span></a>';
+          const short=it.e-it.s<=45?' short':'', past=(d<t0||(d===t0&&it.e<=nowMins))?' past':'';
+          if (it.x?.kind==='session') return '<button type="button" class="wk-event session'+short+past+'" data-action="edit-session" data-id="'+h(it.x.id)+'" style="--c:'+h(it.x.colour)+';'+pos+'" title="Studied · '+h(it.x.title)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+' · '+minutes(it.x.minutes)+'</span></button>';
+          if (it.x) return '<a class="wk-event ext'+short+past+'"'+(it.x.link?' href="'+h(it.x.link)+'" target="_blank" rel="noopener"':'')+' style="--c:'+h(it.x.colour)+';'+pos+'" title="'+h(it.x.title+' · '+it.x.calName)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span></a>';
           const t=it.t;
           return '<div class="wk-event'+(t.status==='Done'?' done':'')+(t.id===selected?' picked':'')+short+'" data-task="'+h(t.id)+'" data-select="'+h(t.id)+'" style="--c:'+listColour(t.course||t.list)+';'+pos+'"><b>'+h(t.title||'Untitled')+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span><i class="wk-resize" aria-hidden="true"></i></div>';
         }).join('')+'</div>';

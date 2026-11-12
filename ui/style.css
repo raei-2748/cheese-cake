@@ -1514,3 +1514,28 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .wk-event.session b,.wk-event.session span{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .wk-event.session.short{flex-direction:row;align-items:center;gap:6px}
 .settings-page .set-row{min-height:44px;padding:6px 2px}
+
+/* ═════════════ Calendar blocks, Notion Calendar style (12 Nov) ═════════════ */
+/* all-day: one bar per multi-day event; single-day chips sit below the bars */
+.wk-allday{position:relative;align-items:stretch}
+.wk-allday .wk-allcell{grid-row-end:auto}
+.cal-span{position:relative;z-index:2;align-self:center;display:flex;align-items:center;height:20px;margin:0 3px;padding:0 8px;border-radius:4px;
+  background:color-mix(in srgb,var(--c,#888) 22%,var(--bg));color:var(--ink);font-size:12px;font-weight:500;text-decoration:none;overflow:hidden;min-width:0}
+.cal-span span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-span:hover{background:color-mix(in srgb,var(--c,#888) 30%,var(--bg))}
+.cal-span.cont-l{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0}
+.cal-span.cont-r{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:0}
+.cal-span.past{opacity:.55}
+/* timed blocks: soft tint, coloured left edge, no outline */
+.wk-event,.wk-event.ext{border:0!important;border-radius:5px;padding:3px 6px 3px 8px;gap:0;color:var(--ink);
+  background:color-mix(in srgb,var(--c,#888) 20%,var(--bg))!important;box-shadow:inset 3px 0 var(--c,#888)!important;transition:filter .12s,opacity .12s}
+.wk-event.ext{background:color-mix(in srgb,var(--c,#888) 15%,var(--bg))!important}
+.wk-event b{font-size:12px;line-height:16px;font-weight:600}
+.wk-event.ext b{font-weight:500}
+.wk-event span{font-size:11px;line-height:15px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.wk-event.short{flex-direction:row;align-items:center;gap:6px;padding-top:0;padding-bottom:0}
+.wk-event.short b{flex:0 1 auto;min-width:0}.wk-event.short span{flex:1 1 auto;min-width:0}
+.wk-event:hover{filter:brightness(.97)}
+:root[data-theme=dark] .wk-event:hover{filter:brightness(1.12)}
+.wk-event.past{opacity:.55}
+.wk-event.session.past{opacity:.75}
