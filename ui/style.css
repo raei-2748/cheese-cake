@@ -1539,3 +1539,8 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 :root[data-theme=dark] .wk-event:hover{filter:brightness(1.12)}
 .wk-event.past{opacity:.55}
 .wk-event.session.past{opacity:.75}
+
+/* ═════════════ Straight highlighter (12 Nov): square ends, no slant ═════════════ */
+#nav a[aria-current] span,.hl,.cal-cell.today .cal-num,.wk-day.today strong,
+.page-head h1,.list-head h1,.cal-title h1,.goal-bar i{background-image:linear-gradient(var(--hl),var(--hl))!important}
+#nav a[aria-current] span,.hl{border-radius:2px!important}
