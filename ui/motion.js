@@ -91,6 +91,9 @@ labelMenu();
   const phone = matchMedia('(max-width:760px)');
   const isOpen = () => document.body.classList.contains('nav-open');
   const drawerW = () => Math.min(300, innerWidth * 0.82);
+  // The page shrinks around the part you are looking at, and is clipped to it with rounded corners.
+  const pinView = () => root.style.setProperty('--sy', scrollY + 'px');
+  new MutationObserver(() => { if (isOpen()) pinView(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   const scrollsSideways = el => { for (; el && el !== document.body; el = el.parentElement) { const c = getComputedStyle(el); if (/(auto|scroll)/.test(c.overflowX) && el.scrollWidth > el.clientWidth + 2) return true; } return false; };
   let sw = null;
   addEventListener('touchstart', e => {
@@ -106,7 +109,7 @@ labelMenu();
     if (!sw.active) {
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
       if (Math.abs(dy) > Math.abs(dx) * 0.8 || (!sw.open && dx < 0) || (sw.open && dx > 0)) { sw = null; return; }
-      sw.active = true; root.classList.add('drawer-drag');
+      sw.active = true; pinView(); root.classList.add('drawer-drag');
     }
     const now = performance.now(); sw.v = (t.clientX - sw.last) / Math.max(1, now - sw.lastT); sw.last = t.clientX; sw.lastT = now;
     sw.p = Math.max(0, Math.min(1, ((sw.open ? drawerW() : 0) + dx) / drawerW()));

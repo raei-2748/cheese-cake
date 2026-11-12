@@ -2200,3 +2200,18 @@ html.mini-mode.in-float-panel .mp{padding-top:20px}
   .sidebar{transition:opacity .38s!important}
 }
 @media (max-width:760px) and (prefers-reduced-motion:reduce){.work{transition:none}}
+
+/* ═════════════ Phone fixes: no surprise zoom, aligned two-layer card (13 Nov) ═════════════ */
+@media (max-width:760px){
+  /* iPhone zooms into any field under 16px and stays zoomed; 16px stops that */
+  input,select,textarea{font-size:16px!important}
+  /* nothing may push the page wider than the screen (iPhone would zoom out to fit) */
+  html,body{overflow-x:clip;max-width:100%}
+  /* shrink around the visible part of the page and clip the card to it, rounded on every corner */
+  html.drawer-drag .work,html:has(body.nav-open) .work{
+    transform-origin:0 calc(var(--sy,0px) + 50dvh);
+    clip-path:inset(var(--sy,0px) 0 calc(100% - var(--sy,0px) - 100dvh) 0 round calc(var(--drawer)*22px));
+    overflow:visible}
+  .sidebar{box-shadow:none!important;border-right:0!important}
+  .side-grip{display:none!important}
+}
