@@ -2047,7 +2047,7 @@ function focusPage() {
     '<div class="st-grid">'+
       '<section class="st-timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" aria-label="Timer">'+
         (onBreak?'<p class="st-break">Stand up, look away from the screen, drink some water.</p>':'<div class="st-picks">'+chips+taskPick+'</div>')+
-        '<div class="st-ring"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="st-track" cx="100" cy="100" r="'+R+'"/><circle id="timer-ring" class="st-prog" cx="100" cy="100" r="'+R+'" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-ringFrac(secs))).toFixed(2)+'"/></svg>'+
+        '<div class="st-ring'+(countsUp()?' bare':'')+'"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="st-track" cx="100" cy="100" r="'+R+'"/><circle id="timer-ring" class="st-prog" cx="100" cy="100" r="'+R+'" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-ringFrac(secs))).toFixed(2)+'"/></svg>'+
           '<div class="st-centre"><div id="timer-text" class="st-clock" role="timer" aria-live="off">'+clock(secs)+'</div><span class="st-state">'+(timer.running?'<i></i>':'')+h(state)+'</span></div></div>'+
         '<p class="st-info">'+h(info)+'</p>'+
         (lengths?'<div class="st-lengths">'+lengths+'</div>':'')+

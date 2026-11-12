@@ -2140,3 +2140,8 @@ main[data-route]:has(.board){max-width:none}
 html{background:var(--bg)}
 @media(display-mode:standalone){html,body{overscroll-behavior-y:none}}
 *{-webkit-tap-highlight-color:transparent}
+
+/* Stopwatch counts up with no end, so it has no ring: just the clock */
+.st-ring.bare svg{display:none}
+.st-ring.bare{aspect-ratio:auto;min-height:200px;display:grid;place-items:center}
+.st-ring.bare .st-centre{position:static}
