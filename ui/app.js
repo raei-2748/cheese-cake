@@ -1332,6 +1332,15 @@ function eventBody(t,sig) {
     start:{dateTime:t.date+'T'+t.time+':00',timeZone:TZ},end:{dateTime:endDate+'T'+fromMin(e%DAY_MINS)+':00',timeZone:TZ},
     extendedProperties:{private:{stacky:'1',stackyId:t.id,stackySig:sig}}});
 }
+// Logged study sessions go to Google as finished events (one way: Stacky's log is the record).
+const sessionSummary = f => 'Studied '+(course(f.course)?.short??'')+(f.note?' · '+f.note.split('\n')[0]:'');
+const sessionSig = f => [sessionSummary(f),sessionStart(f),f.minutes].join('|');
+function sessionBody(f,sig) {
+  const st=sessionStart(f);
+  return JSON.stringify({summary:sessionSummary(f),description:'Logged in Stacky'+(course(f.course)?' · '+course(f.course).name:''),
+    start:{dateTime:new Date(st).toISOString(),timeZone:TZ},end:{dateTime:new Date(st+f.minutes*60000).toISOString(),timeZone:TZ},
+    transparency:'transparent',extendedProperties:{private:{stacky:'1',stackyId:'s:'+f.id,stackySig:sig}}});
+}
 function gQueuePush(delay=2500) { if (!gOn() || !calCfg().google.push) return; clearTimeout(gPushTimer); gPushTimer=setTimeout(gPush,delay); }
 async function gPush() {
   if (!gReady() || !data) return;
@@ -1353,6 +1362,11 @@ async function gPush() {
       const now=eventSig(ev), sent=ev.extendedProperties.private.stackySig;
       if (now && now!==sent && now!==sig) fromGoogle.push([t,ev]);                         // changed in Google: copy it back
       else if (sig!==sent || now!==sig) await gApi('/calendars/'+cal+'/events/'+encodeURIComponent(ev.id),{method:'PATCH',body:eventBody(t,sig)});
+    }
+    if (data.settings.calSessions!==false) for (const f of data.focus.filter(f=>f.date>=from&&f.date<=to)) {
+      const sig=sessionSig(f), ev=ours.get('s:'+f.id); ours.delete('s:'+f.id);
+      if (!ev) await gApi('/calendars/'+cal+'/events',{method:'POST',body:sessionBody(f,sig)});
+      else if (ev.extendedProperties.private.stackySig!==sig) await gApi('/calendars/'+cal+'/events/'+encodeURIComponent(ev.id),{method:'PATCH',body:sessionBody(f,sig)});
     }
     for (const ev of ours.values()) await gApi('/calendars/'+cal+'/events/'+encodeURIComponent(ev.id),{method:'DELETE'});   // deleted or unscheduled here
     if (fromGoogle.length) {
@@ -2062,7 +2076,7 @@ function settingsPage() {
       setRow('short','Short break',p.short,'min',1,60)+setRow('long','Long break',p.long,'min',1,90)+setRow('every','Long break every',p.every,'rounds',2,12))+
     group('Exam dates',setDate('trialStart','Trials start',data.settings.trialStart)+setDate('hscStart','First HSC exam',data.settings.hscStart),'The Overview counts down to these.')+
     group('Calendar',
-      '<label class="set-row"><span>Show study sessions<small>Logged sessions appear as blocks on the week view</small></span><input type="checkbox" class="switch" name="calSessions" '+(data.settings.calSessions!==false?'checked':'')+'></label>'+
+      '<label class="set-row"><span>Show study sessions<small>Logged sessions show on the week view, in Google Calendar when it is connected, and in the subscribed calendar feed</small></span><input type="checkbox" class="switch" name="calSessions" '+(data.settings.calSessions!==false?'checked':'')+'></label>'+
       '<div class="set-row"><span>Google Calendar and iCloud<small>'+h(extStatusText())+'</small></span>'+button('Manage','calendars','','text')+'</div>'+
       '<div class="set-row feed-row"><span>Show Stacky in Apple or Google Calendar<small>'+(feed?'Subscribe to this link. Tasks, assessments and study sessions update as Stacky syncs.':'Turn on sync first. Stacky then publishes a calendar link you can subscribe to.')+'</small></span>'+
         (feed?'<span class="set-actions"><a class="button text" href="'+h(feed)+'">Open in Calendar</a>'+button('Copy link','copy-feed','','text')+'</span>':button('Set up sync','sync-setup','','text'))+'</div>')+
