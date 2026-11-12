@@ -42,6 +42,7 @@ const setCollapsed = on => {
   writeSide({ collapsed: on });
   labelMenu();
   labelCollapse();
+  setTimeout(() => placeGlide(false), 0);   // the highlight belongs to the wide sidebar only
 };
 // Collapsed, the sidebar becomes an icon rail; the same corner button opens it again.
 const labelCollapse = () => { const l = collapsed() ? 'Expand sidebar' : 'Collapse sidebar'; collapseButton.setAttribute('aria-label', l); collapseButton.title = l; };
