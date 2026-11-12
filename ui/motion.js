@@ -89,7 +89,8 @@ labelMenu();
 // in the next ~half second (the new current page, the chosen pill, today's date…).
 let markTimer;
 document.addEventListener('click', event => {
-  if (!event.target.closest('#nav a, [aria-pressed], .tabs button, .subj, .modes button, .lengths button, .pri-pick button, .cal-num, .wk-day, [data-action=toggle-task]')) return;
+  // Only highlighter marks animate; switching pills, tabs and filters is instant.
+  if (!event.target.closest('#nav a, .cal-num, .wk-day, [data-action=toggle-task]')) return;
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   root.classList.remove('hl-draw');
   void root.offsetWidth;   // restart the animation if you click again quickly
@@ -97,3 +98,14 @@ document.addEventListener('click', event => {
   clearTimeout(markTimer);
   markTimer = setTimeout(() => root.classList.remove('hl-draw'), 520);
 }, true);
+
+// Moving to another page draws its title's highlighter once.
+let titleTimer;
+addEventListener('hashchange', () => {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.classList.remove('hl-title');
+  void root.offsetWidth;
+  root.classList.add('hl-title');
+  clearTimeout(titleTimer);
+  titleTimer = setTimeout(() => root.classList.remove('hl-title'), 700);
+});
