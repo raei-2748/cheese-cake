@@ -42,9 +42,18 @@ const icons = {
   clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7v5h4"/>',
   shape:'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
   text:'<path d="M5 6h14M5 12h14M5 18h9"/>',
-  paper:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7M9 8h3"/>'
+  paper:'<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7M9 8h3"/>',
+  // Subject icons (data.js names one per course).
+  graph:'<path d="M4 4v16h16"/><path d="M7 16c3 0 3.5-9 6.5-9S16.5 13 20 8"/>',
+  pi:'<path d="M5 7h14M9 7v11M15 7v9a2 2 0 0 0 2 2h1"/>',
+  atom:'<circle cx="12" cy="12" r="1.1"/><ellipse cx="12" cy="12" rx="9.5" ry="3.9"/><ellipse cx="12" cy="12" rx="9.5" ry="3.9" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9.5" ry="3.9" transform="rotate(120 12 12)"/>',
+  flask:'<path d="M9 3h6M10 3v6L4.5 18.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7.5 15h9"/>',
+  trend:'<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  feather:'<path d="M20.2 12.2a6 6 0 0 0-8.5-8.5L5 10.5V19h8.5z"/><path d="M16 8 2 22M17.5 15H9"/>'
 };
 const icon = name => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+icons[name]+'</svg>';
+// A subject's own icon in its colour; General (or an unknown id) gets the book.
+const subjectIcon = id => icon(courses.find(c=>c.id===id)?.icon||'book').replace('<svg ','<svg class="subj-ico" ');
 const main = document.querySelector('#main');
 const dialog = document.querySelector('#editor');
 const indicator = document.querySelector('#save-status');
@@ -366,7 +375,7 @@ setInterval(()=>{ if (document.visibilityState==='visible' && syncOn() && !lastS
 
 const button = (label, action, id='', tone='secondary') => '<button type="button" class="button '+tone+'" data-action="'+action+'" data-id="'+h(id)+'">'+h(label)+'</button>';
 const badge = (label, tone='neutral') => '<span class="badge '+tone+'">'+h(label)+'</span>';
-const subject = id => id && course(id) ? '<span class="subject" style="--subject:'+course(id).colour+'"><i></i>'+h(course(id).short)+'</span>' : '<span class="subject general"><i></i>General</span>';
+const subject = id => id && course(id) ? '<span class="subject" style="--subject:'+course(id).colour+'">'+subjectIcon(id)+h(course(id).short)+'</span>' : '<span class="subject general">'+subjectIcon()+'General</span>';
 const emptyCard = (title, description, action='') => '<div class="empty"><strong>'+h(title)+'</strong><p>'+h(description)+'</p>'+action+'</div>';
 const pageHead = (eyebrow,title,copy,action='') => '<div class="page-head"><div>'+(eyebrow?'<div class="eyebrow">'+h(eyebrow)+'</div>':'')+'<h1>'+h(title)+'</h1>'+(copy?'<p>'+h(copy)+'</p>':'')+'</div><div class="head-action">'+action+'</div></div>';
 const section = (title, sub, body, action='') => '<section class="card"><div class="card-head"><div><h2>'+h(title)+'</h2>'+(sub?'<p>'+h(sub)+'</p>':'')+'</div>'+action+'</div>'+body+'</section>';
@@ -1577,7 +1586,7 @@ function renderFull() {
       '<button type="button" class="fs-exit" data-action="timer-full-exit" aria-label="Exit full screen" title="Exit (Esc)">'+icon('close')+'</button></div>'+
     '<div class="fs-centre">'+
       (onBreak?'<p class="fs-what">Stand up, look away from the screen, drink some water.</p>'
-        :'<p class="fs-what"><span class="fs-subject"><i></i>'+h(c?.short??'General')+'</span>'+(t?'<span class="fs-task">'+h(t.title)+'</span>':'')+'</p>')+
+        :'<p class="fs-what"><span class="fs-subject">'+subjectIcon(c?.id)+h(c?.short??'General')+'</span>'+(t?'<span class="fs-task">'+h(t.title)+'</span>':'')+'</p>')+
       '<div id="fs-text" class="fs-clock" role="timer" aria-live="off">'+clock(secs)+'</div>'+
       (countsUp()?'<p class="fs-sub">'+(active&&timer.startedAt?'Started '+hhmm(timer.startedAt):'Counts up until you finish')+'</p>'
         :'<div class="fs-bar"><i id="fs-bar" style="width:'+(100*(1-secs/phaseSecs(timer.phase)))+'%"></i></div><p class="fs-sub">'+h(timerInfo())+'</p>')+
@@ -1686,7 +1695,7 @@ function focusPage() {
   const goal=studyGoal(), pct=Math.min(100,s.today/goal*100);
   const c=course(timer.course);
   const subjects=[['','General','#787774'],...courses.map(x=>[x.id,x.short,x.colour])].map(([id,label,col])=>
-    '<button type="button" class="subj" style="--c:'+col+'" aria-pressed="'+((timer.course||'')===id)+'" data-action="study-course" data-id="'+id+'"><i></i>'+h(label)+'</button>').join('');
+    '<button type="button" class="subj" style="--c:'+col+'" aria-pressed="'+((timer.course||'')===id)+'" data-action="study-course" data-id="'+id+'">'+subjectIcon(id)+h(label)+'</button>').join('');
   const controls = timerControls('Start'), state = timerState(), info = timerInfo();
   const lengths = timer.mode==='timed' && !active && !onBreak
     ? '<span class="lengths" role="group" aria-label="Round length">'+[...new Set([...focusLengths,pomo().focus])].sort((a,b)=>a-b).map(m=>'<button type="button" aria-pressed="'+(pomo().focus===m)+'" data-action="focus-length" data-id="'+m+'">'+m+'</button>').join('')+'<button type="button" data-action="focus-custom" title="Pick any length">Custom</button><small>min</small></span>'
@@ -1893,7 +1902,7 @@ function navHtml(r) {
   const studied=data.focus.filter(f=>f.date===t0).reduce((n,f)=>n+f.minutes,0);
   const reviews=dueTopics().length;
   return link('dash','Overview',icon('home'),cur('dash'),reviews?reviews+' due':0)+link('focus','Study',icon('timer'),cur('focus'),studied?minutes(studied):0).replace('<a ','<a class="nav-study" ')+'<div class="nav-gap"></div>'+smart.map(([k,n,ic])=>link(k,n,icon(ic),cur(k),k==='done'?0:counts[k])).join('')+
-    sec('Subjects',courses.map(c=>link('list/'+c.id,c.short,'<i class="dot" style="--c:'+c.colour+'"></i>',cur('list',c.id),count(t=>t.course===c.id))).join(''))+
+    sec('Subjects',courses.map(c=>link('list/'+c.id,c.short,subjectIcon(c.id).replace('<svg ','<svg style="--c:'+c.colour+'" '),cur('list',c.id),count(t=>t.course===c.id))).join(''))+
     sec('Lists',data.lists.map(l=>link('list/'+encodeURIComponent(l.id),l.name,'<i class="dot" style="--c:'+(l.colour||'#8e978d')+'"></i>',cur('list',l.id),count(t=>t.list===l.id))).join('')||'<span class="nav-empty">No lists yet</span>','<button type="button" class="nav-add" data-action="edit-list" aria-label="New list">+</button>')+
     (tags.length?sec('Tags',tags.map(g=>link('tag/'+encodeURIComponent(g),g,icon('hash'),cur('tag',g),count(t=>(t.tags||[]).includes(g)))).join('')):'')+
     sec('Plan',[tools[0],views[0],tools[1],tools[2]].map(([k,n,ic])=>link(k,n,icon(ic),cur(k),0)).join(''))+
