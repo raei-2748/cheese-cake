@@ -659,7 +659,7 @@ export function initPower(api) {
     if (typing) return;
     if (mod && !event.altKey && key.toLowerCase() === 'z') { event.preventDefault(); event.stopPropagation(); event.shiftKey ? redo() : undo(); return; }
     if (mod && !event.altKey && !event.shiftKey && key.toLowerCase() === 'a' && api.listSpec(api.route()) && rows().length) { event.preventDefault(); event.stopPropagation(); rows().forEach(x => multi.add(x.dataset.select)); paint(); return; }
-    if (mod || event.altKey) return;
+    if (mod || event.altKey || api.route().name === 'calendar') return;   // the calendar has its own single-key shortcuts
     const used = () => { event.preventDefault(); event.stopPropagation(); };
     if (key === 'Escape' && multi.size) { used(); multi.clear(); paint(); return; }
     if (key === 'j' || key === 'ArrowDown') { if (moveCursor(1)) used(); return; }
