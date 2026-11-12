@@ -1089,7 +1089,7 @@ function weekGrid() {
         (d===t0?'<i class="now-line" style="top:'+(nowMins/60*HOUR_PX)+'px"></i>':'')+
         items.map(it=>{
           const top=it.s/60*HOUR_PX, height=Math.max(18,(it.e-it.s)/60*HOUR_PX-2), pos='top:'+top+'px;height:'+height+'px;left:calc('+(it.lane*100/it.lanes)+'% + 1px);width:calc('+(100/it.lanes)+'% - 3px)';
-          const short=it.e-it.s<=30?' short':'';
+          const short=height<38?' short':'';   // two lines of text need 38px
           if (it.x?.kind==='session') return '<button type="button" class="wk-event session'+short+'" data-action="edit-session" data-id="'+h(it.x.id)+'" style="--c:'+h(it.x.colour)+';'+pos+'" title="Studied · '+h(it.x.title)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+' · '+minutes(it.x.minutes)+'</span></button>';
           if (it.x) return '<a class="wk-event ext'+short+'"'+(it.x.link?' href="'+h(it.x.link)+'" target="_blank" rel="noopener"':'')+' style="--c:'+h(it.x.colour)+';'+pos+'" title="'+h(it.x.title+' · '+it.x.calName)+'"><b>'+h(it.x.title)+'</b><span>'+hm(it.s)+' – '+hm(it.e)+'</span></a>';
           const t=it.t;
@@ -1100,7 +1100,7 @@ function weekGrid() {
 function calAfterRender() {
   const sc=main.querySelector('.wk-scroll');
   if (!sc) return;
-  sc.scrollTop = calScroll ?? 7*HOUR_PX;
+  sc.scrollTop = calScroll ?? 7*HOUR_PX-14;   // leave room for the 7am label
   sc.addEventListener('scroll',()=>{ calScroll=sc.scrollTop; },{passive:true});
 }
 // Drawing, moving and resizing blocks with the mouse, pen or a finger.
@@ -1703,6 +1703,7 @@ function renderFull() {
   el.dataset.phase = timer.phase;
   el.classList.toggle('running', timer.running);
   el.style.setProperty('--c', onBreak ? 'var(--sky)' : c?.colour ?? '#787774');
+  el.classList.toggle('general', !c && !onBreak);
   el.innerHTML = '<div class="fs-top"><span class="fs-state">'+(timer.running?'<i></i>':'')+h(timerState())+'</span>'+
       '<button type="button" class="fs-exit" data-action="timer-full-exit" aria-label="Exit full screen" title="Exit (Esc)">'+icon('close')+'</button></div>'+
     '<div class="fs-centre">'+
@@ -1835,7 +1836,7 @@ function focusPage() {
       '</div>';
   const overview = [[minutes(s.today),'Today'],[String(s.todayCount),'Sessions today'],[minutes(s.week),'This week'],[s.streak+(s.streak===1?' day':' days'),'Streak']];
   return '<div class="tt">'+
-    '<section class="tt-main timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'#787774')+'">'+
+    '<section class="tt-main timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+(!c&&!onBreak?' general':'')+'" style="--c:'+(onBreak?'var(--sky)':c?.colour??'#787774')+'">'+
       '<div class="tt-top"><h1 class="sr">Study</h1>'+modeTabs+'<div class="tt-top-tools">'+
         '<button type="button" class="icon-btn" data-action="settings" data-id="timer" title="Timer settings" aria-label="Timer settings">'+icon('sliders')+'</button>'+
         '<button type="button" class="icon-btn" data-action="timer-full" title="Full screen (f)" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div></div>'+
@@ -1913,7 +1914,7 @@ const countdown = (label, day, empty) => {
 function reviewList(list) {
   return '<div class="focus-list">'+list.map(t=>{
     const st=topicState(t.id);
-    return '<div class="focus-row"><div><div class="line">'+subject(t.course)+(st.priority!=='Normal'?badge(st.priority,st.priority==='Urgent'?'alert':'gold'):'')+'</div><strong>'+h(t.title)+'</strong><small>'+h(t.module)+' · '+h(reviewLabel(st))+'</small></div>'+button('Review','review-topic',t.id,'text')+'</div>';
+    return '<div class="focus-row"><div><div class="line">'+subject(t.course)+(st.priority!=='Normal'?badge(st.priority,st.priority==='Urgent'?'alert':'gold'):'')+'</div><strong>'+h(t.title)+'</strong><small>'+h(reviewLabel(st))+' · '+h(t.module)+'</small></div>'+button('Review','review-topic',t.id,'text')+'</div>';
   }).join('')+'</div>';
 }
 const paperPct = p => hasMark(p) ? p.mark/p.outOf*100 : null;
@@ -1994,7 +1995,7 @@ function papersPage() {
     const recent=pcts.slice(-3), earlier=pcts.slice(-6,-3);
     const trend=earlier.length?recent.reduce((a,b)=>a+b,0)/recent.length-earlier.reduce((a,b)=>a+b,0)/earlier.length:null;
     return '<section class="card paper-card" style="--c:'+c.colour+'"><div class="line">'+subject(c.id)+'<span class="note">'+list.length+' marked</span></div><div class="paper-nums"><div><span>Latest</span><strong>'+percent(last)+'</strong></div><div><span>Average</span><strong>'+percent(avg)+'</strong></div><div><span>Best</span><strong>'+percent(Math.max(...pcts))+'</strong></div></div>'+spark(pcts.slice(-12))+
-      (trend!=null?'<small class="trend '+(trend>=0?'up':'down')+'">'+(trend>=0?'▲ ':'▼ ')+Math.abs(trend).toFixed(1)+' points, last 3 vs previous 3</small>':'')+'</section>';
+      (trend!=null?'<small class="trend '+(trend>=0?'up':'down')+'"><i>'+(trend>=0?'↑':'↓')+' '+Math.abs(trend).toFixed(1)+'</i> vs previous 3 papers</small>':'')+'</section>';
   }).join('');
   return pageHead('','Past papers','',button('+ Log paper','edit-paper','','primary'))+
     (cards?'<div class="paper-grid">'+cards+'</div>':'')+
