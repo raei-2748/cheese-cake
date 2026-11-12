@@ -1514,3 +1514,122 @@ dialog.set-dialog{width:min(420px,calc(100vw - 32px))}
 .wk-event.session b,.wk-event.session span{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .wk-event.session.short{flex-direction:row;align-items:center;gap:6px}
 .settings-page .set-row{min-height:44px;padding:6px 2px}
+
+/* ═════════════ House style — last word on type, figures, records ═════════════ */
+/* Figures line up wherever they appear. */
+body{font-variant-numeric:tabular-nums;text-rendering:optimizeLegibility}
+/* Titles: sized for a tool you open every day. */
+.page-head h1,.list-head h1{font-size:30px;line-height:38px;font-weight:700;letter-spacing:-.022em}
+.eyebrow{font-size:13px;line-height:18px;margin-bottom:2px}
+h2,.card-head h2,.log-head h2{font-size:17px;line-height:24px;font-weight:650;letter-spacing:-.01em}
+.page-head,.list-head{margin-bottom:22px}
+@media(max-width:760px){.page-head h1,.list-head h1{font-size:26px;line-height:32px}}
+/* Section heads: the count sits beside the heading, not on its own line. */
+.card-head>div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 8px;min-width:0}
+.card-head p{margin:0;font-size:13px;color:var(--faint)}
+
+/* Figures: one ruled strip, no tiles. */
+.metrics{gap:0;margin:2px 0 36px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.metric{background:none!important;border-radius:0!important;min-height:0;padding:14px 20px!important;border-left:1px solid var(--rule)!important;gap:0}
+.metric:first-child{border-left:0!important;padding-left:2px!important}
+.metric span{font-size:12px;line-height:16px;color:var(--muted)}
+.metric strong{font-size:24px;line-height:30px;margin-top:4px;font-weight:600;letter-spacing:-.02em}
+.metric small{margin-top:2px;font-size:12px;line-height:16px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.metric.unset strong{line-height:30px}
+@media(max-width:760px){
+  .metric{padding:12px 14px!important}
+  .metric:nth-child(odd){border-left:0!important;padding-left:2px!important}
+  .metric:nth-child(n+3){border-top:1px solid var(--rule)!important}
+}
+.tt-cards{gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.tt-card{background:none;border-radius:0;padding:12px 0 12px 16px}
+.tt-card:nth-child(odd){padding-left:2px;border-right:1px solid var(--rule)}
+.tt-card:nth-child(n+3){border-top:1px solid var(--rule)}
+.tt-card small{margin-bottom:2px}
+.tt-card b{font-family:inherit;font-size:19px;letter-spacing:-.015em}
+
+/* Records: the title leads; subject and status follow as one quiet line. */
+.focus-row>div:first-child,.record-head>div:first-child{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;min-width:0}
+.focus-row>div:first-child>strong,.record-head>div:first-child>h3{flex:0 0 100%;order:0;margin:0;font-size:14px;line-height:20px;font-weight:500}
+.focus-row>div:first-child>.line,.record-head>div:first-child>.line{order:1;gap:6px;flex-wrap:nowrap}
+.focus-row>div:first-child>small,.record-head>div:first-child>p{order:2;margin:0;font-size:12px;line-height:18px;color:var(--faint)}
+.focus-row{padding:9px 1px}
+.subject{background:none!important;padding:0;height:auto;font-size:12px;line-height:18px;color:var(--muted)!important}
+.subject .subj-ico{width:13px;height:13px;margin-right:5px;color:color-mix(in srgb,var(--subject,var(--muted)) 85%,var(--ink))}
+.badge{font-size:11px;line-height:17px;height:17px;padding:0 5px;border-radius:4px;font-weight:500}
+table.balance .subject{font-size:14px;line-height:20px;color:var(--ink)!important}
+table.balance .subject .subj-ico{width:15px;height:15px;margin-right:8px}
+.attempts summary{color:var(--muted);font-weight:500}
+
+/* Matrix: the quadrant is named by a small swatch, not a coloured lid. */
+.quad{border-top:1px solid var(--line)}
+.quad header{align-items:center;margin-bottom:8px}
+.quad h2{display:flex;align-items:center;gap:8px;font-size:15px;line-height:22px;color:var(--ink)}
+.quad h2::before{content:'';flex:none;width:8px;height:8px;border-radius:2px;background:var(--p)}
+.quad header span{font-size:12px;color:var(--faint)}
+
+/* Next assessment: a plain card and a countdown you can read in one glance. */
+.assess-hero{background:none;border-color:var(--rule);padding:22px 24px 18px}
+.hero-eyebrow{font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.hero-eyebrow::after{content:'·';margin-left:8px;color:var(--faint)}
+.assess-hero h2{font-size:22px;line-height:28px;letter-spacing:-.015em}
+.hero-when{font-size:13px;margin-bottom:16px}
+.countdown{gap:4px 18px;margin-bottom:20px}
+.countdown span{flex-direction:row;align-items:baseline;gap:3px;min-width:0;padding:0;border-radius:0;background:none;box-shadow:none}
+.countdown b{font-family:inherit;font-size:30px;line-height:36px;font-weight:600;letter-spacing:-.02em}
+.countdown span:first-child b{color:var(--ink)}
+.countdown small{margin:0;font-size:13px;letter-spacing:0;text-transform:lowercase}
+.countdown .cd-now{font-size:22px;padding:0}
+.hero-then{border-top-color:var(--rule)}
+.assess-hero .button.primary{background:var(--hl)!important;border-color:var(--hl)!important;color:var(--on-hl)!important}
+.assess-hero .button.primary:hover{background:var(--hl-deep)!important;border-color:var(--hl-deep)!important}
+@media(max-width:640px){.countdown span{flex:none}.countdown b{font-size:26px}}
+
+/* Past papers: each course is a ruled card with its own trend line. */
+.paper-grid{gap:12px;margin-bottom:28px}
+.paper-card{border:1px solid var(--rule)!important;border-radius:8px!important;padding:14px 16px 12px!important}
+.paper-card .line{justify-content:space-between}
+.paper-card .note{margin:0;color:var(--faint)!important}
+.paper-nums{margin:12px 0 8px}
+.paper-nums strong{font-size:20px;font-weight:600;letter-spacing:-.02em}
+.trend,.trend.up,.trend.down{color:var(--faint);font-size:12px}
+.trend i{font-style:normal;font-weight:600;color:var(--tag-green-ink)}
+.trend.down i{color:var(--red)}
+
+/* Habits: ticks in ink, so blue stays for links alone. */
+.hcheck.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.hcheck:hover{border-color:var(--ink)}
+.hd.today{color:var(--ink);font-weight:700}
+
+/* Study: with no subject chosen the timer is ink, not disabled-grey. */
+.timer.general,.fs-timer.general{--c:var(--ink)!important}
+.timer.general .button.primary,.fs-timer.general .button.primary{color:var(--bg)!important}
+.timer.general .tt-track{stroke:var(--hover)}
+
+/* Search: a field with a key hint. */
+.search-box{position:relative;display:flex;align-items:center;margin-left:auto}
+.search-box svg{position:absolute;left:8px;width:14px;height:14px;color:var(--faint);pointer-events:none}
+.search-box .search{margin:0;padding-left:28px;padding-right:26px}
+.search-box kbd{position:absolute;right:6px;min-width:16px;text-align:center;font-family:inherit;font-size:11px;line-height:14px;color:var(--faint);border:1px solid var(--rule);border-bottom-width:1px;border-radius:4px;background:var(--bg);pointer-events:none}
+.search-box:focus-within kbd{display:none}
+.search::-webkit-search-cancel-button{display:none}
+/* the text column takes the room; actions keep to one line beside it */
+.focus-row>div:first-child,.record-head>div:first-child{flex:1 1 0}
+.focus-row>div:first-child>small,.record-head>div:first-child>p{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.record-head>.line,.focus-row>.button{flex:none;flex-wrap:nowrap}
+.record .record-detail{border-top:0;padding-top:0;margin-top:4px}
+@media(max-width:760px){.focus-row>div:first-child>small,.record-head>div:first-child>p{flex-basis:100%;white-space:normal}}
+/* runway: week labels clear the markers */
+.runway{padding-top:40px}
+.rw-week{top:-36px}.rw-week::after{top:34px}
+/* trend line keeps its drawn proportions */
+.paper-card .spark{width:140px;max-width:100%;height:36px}
+/* calendar blocks: logged sessions use the same line height as planned ones, so the time fits */
+.wk-event.session{line-height:15px;gap:1px}
+.wk-event.short span{overflow:hidden;text-overflow:ellipsis;flex:none;max-width:60%}
+.wk-event.short b{flex:0 1 auto;min-width:0}
+.wk-event.short b{flex:0 0 auto;max-width:100%}
+.wk-event.short span{flex:1 1 0;min-width:0;max-width:none}
+.focus-list,.record-list{grid-template-columns:minmax(0,1fr)}
+.focus-row,.record{min-width:0}
+@media(max-width:760px){.record-head>div:first-child{flex:1 1 100%}.record-head>.line{flex-wrap:wrap}}
