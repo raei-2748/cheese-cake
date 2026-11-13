@@ -2252,7 +2252,8 @@ html::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
              radial-gradient(30% 40% at 30% 70%,var(--wash-c),transparent 75%)}
 
 /* chrome: sidebar, top bar, detail pane */
-.sidebar{background:var(--glass-soft)!important;-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);box-shadow:inset -1px 0 var(--glass-rim),inset -2px 0 var(--glass-edge)!important}
+/* the sidebar stays solid; only the top bar is see-through */
+.sidebar{background:var(--side)!important;box-shadow:inset -1px 0 var(--glass-rim)!important}
 .topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--wash-base) 55%,transparent)!important;-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);box-shadow:0 1px 0 var(--glass-rim)}
 .detail{background:var(--glass-strong)!important;-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);box-shadow:-1px 0 0 var(--glass-rim),-12px 0 40px rgba(20,30,60,.08)!important}
 #nav a:hover,.rail-link:hover{background:var(--glass-hover)}
@@ -2276,11 +2277,10 @@ dialog::backdrop{background:rgba(15,18,28,.28);-webkit-backdrop-filter:blur(6px)
 .toast{border-radius:12px}
 .fs-timer{background:color-mix(in srgb,var(--wash-base) 72%,transparent)!important;-webkit-backdrop-filter:saturate(160%) blur(40px);backdrop-filter:saturate(160%) blur(40px)}
 
-/* Mac app: the window itself is frosted (NSVisualEffectView behind the page), so the sidebar
-   and the top band let it through and the workspace stays a lightly tinted pane. */
+/* Mac app: the window itself is frosted (NSVisualEffectView behind the page); the top band lets it
+   through and the workspace stays a lightly tinted pane. */
 html.in-mac-app,html.in-mac-app body{background:transparent}
 html.in-mac-app::before{opacity:.55}
-html.in-mac-app .sidebar{background:transparent!important;-webkit-backdrop-filter:none;backdrop-filter:none}
 html.in-mac-app .work{background:color-mix(in srgb,var(--wash-base) 72%,transparent);box-shadow:-1px 0 0 var(--glass-rim)}
 html.in-mac-app:not(.mac-fullscreen) body::before{background:transparent!important}
 /* floating timer panel: the native HUD material is the background */
