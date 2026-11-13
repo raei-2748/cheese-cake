@@ -4,8 +4,9 @@ import Cocoa
 import WebKit
 import UniformTypeIdentifiers
 
-let homeURL = URL(string: "https://raei-2748.github.io/cheese-cake/")!
-let appHost = "raei-2748.github.io"
+// STACKY_URL=http://localhost:4319/ points the app at a local preview for development.
+let homeURL = URL(string: ProcessInfo.processInfo.environment["STACKY_URL"] ?? "https://raei-2748.github.io/cheese-cake/")!
+let appHost = homeURL.host ?? "raei-2748.github.io"
 // Google blocks sign-in inside embedded web views by user agent; present as Safari.
 let safariUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
 
@@ -26,6 +27,19 @@ let dragScript = """
   }, true);
 })();
 """
+
+// Frosted window glass: a vibrancy view sits behind the transparent page and fills the window.
+func glassContainer(around web: WKWebView, material: NSVisualEffectView.Material) -> NSVisualEffectView {
+  let glass = NSVisualEffectView()
+  glass.material = material
+  glass.blendingMode = .behindWindow
+  glass.state = .followsWindowActiveState
+  web.autoresizingMask = [.width, .height]
+  web.frame = glass.bounds
+  if #available(macOS 12.0, *) { web.underPageBackgroundColor = .clear }
+  glass.addSubview(web)
+  return glass
+}
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate, WKDownloadDelegate, NSWindowDelegate, WKScriptMessageHandler {
   var window: NSWindow!
@@ -61,8 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     window.titleVisibility = .hidden
     window.titlebarSeparatorStyle = .none
     window.minSize = NSSize(width: 720, height: 520)
-    window.backgroundColor = NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(red: 0.098, green: 0.098, blue: 0.098, alpha: 1) : .white }
-    window.contentView = web
+    window.backgroundColor = .clear
+    window.isOpaque = false
+    window.contentView = glassContainer(around: web, material: .sidebar)
     window.delegate = self
     window.isReleasedWhenClosed = false
     window.setFrameAutosaveName("StackyMain")
@@ -109,8 +124,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     p.isMovableByWindowBackground = true
     for b in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] { p.standardWindowButton(b)?.isHidden = true }   // the page has its own close button
-    p.backgroundColor = window.backgroundColor
-    p.contentView = mini
+    p.backgroundColor = .clear
+    p.isOpaque = false
+    p.contentView = glassContainer(around: mini, material: .hudWindow)
     p.isReleasedWhenClosed = false
     p.delegate = self
     p.setFrameAutosaveName("StackyFloat")
