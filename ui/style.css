@@ -2138,8 +2138,83 @@ main[data-route]:has(.board){max-width:none}
 }
 /* no rubber-band flash of white behind the app, and no tap highlight boxes */
 html{background:var(--bg)}
-@media(display-mode:standalone){html,body{overscroll-behavior-y:none}}
 *{-webkit-tap-highlight-color:transparent}
+
+/* Stopwatch counts up with no end, so it has no ring: just the clock */
+.st-ring.bare svg{display:none}
+.st-ring.bare{aspect-ratio:auto;min-height:200px;display:grid;place-items:center}
+.st-ring.bare .st-centre{position:static}
+
+/* ═════════════ Floating window: the normal timer, small (12 Nov) ═════════════ */
+html.mini-mode body{padding:0;align-items:stretch}
+html.mini-mode #float-timer.player{display:block;padding:0;border-radius:0;height:100%}
+html.mini-mode.in-float-panel body{padding-top:0}
+.mp{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:100%;box-sizing:border-box;padding:12px 16px 14px;font-variant-numeric:tabular-nums;user-select:none;-webkit-user-select:none}
+html.mini-mode.in-float-panel .mp{padding-top:20px}
+.mp-head{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
+.mp-what{display:flex;align-items:center;gap:7px;min-width:0;flex:1;font-size:13px}
+.mp-what i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--c)}
+.float-timer.running .mp-what i{animation:breathe 1.6s ease-in-out infinite}
+.mp-what strong{font-weight:600;white-space:nowrap}
+.mp-what small{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-close{flex:none;display:grid;place-items:center;width:24px;height:24px;padding:0;border:0;border-radius:6px;background:none;color:var(--muted);cursor:pointer}
+.mp-close svg{width:14px;height:14px}
+.mp-close:hover{background:var(--hover);color:var(--ink)}
+.mp-clock{font-size:42px;font-weight:700;letter-spacing:-.025em;line-height:1.05}
+.float-timer.player.active:not(.running) .mp-clock{color:var(--muted)}
+.mp-info{margin:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.mp-ctl{display:flex;justify-content:center;gap:8px;margin-top:4px}
+.mp-ctl .button{min-height:30px;padding:4px 14px;font-size:13px}
+.mp-ctl .button.primary{background:var(--c);border-color:var(--c);color:#fff}
+.mp-bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:color-mix(in srgb,var(--ink) 10%,transparent)}
+.mp-bar i{display:block;height:100%;background:var(--c);transition:width 1s linear}
+@media(prefers-reduced-motion:reduce){.mp-bar i{transition:none}.float-timer.running .mp-what i{animation:none}}
+/* ═════════════ iPhone/iPad: natural scrolling and a translucent header (13 Nov) ═════════════ */
+/* Touch screens keep the iOS bounce and momentum; only mouse/trackpad layouts lock overscroll. */
+@media (pointer:coarse){html,body{overscroll-behavior:auto!important}}
+@media (max-width:760px){
+  .topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 78%,transparent)!important;
+    -webkit-backdrop-filter:saturate(1.8) blur(18px);backdrop-filter:saturate(1.8) blur(18px);
+    border-bottom:1px solid color-mix(in srgb,var(--rule-2) 70%,transparent)}
+  .panes main{padding-top:14px}
+}
+
+/* ═════════════ Phone: sidebar under the page, two layers (13 Nov) ═════════════ */
+@media (max-width:760px){
+  :root{--drawer:0;--drawer-w:min(300px,82vw)}
+  html:has(body.nav-open){--drawer:1}
+  html:has(body.nav-open),body.nav-open{background:var(--side)}
+  body.nav-open{overflow:hidden}
+  /* the sidebar sits still underneath; the page moves */
+  .sidebar{transform:none!important;transition:none!important;z-index:1!important;width:var(--drawer-w)!important;
+    padding-top:calc(14px + env(safe-area-inset-top))!important;background:var(--side)!important;
+    opacity:calc(.4 + var(--drawer)*.6)}
+  .work{position:relative;z-index:2;min-height:100dvh;background:var(--bg);transform-origin:0 50%;
+    border-radius:calc(var(--drawer)*22px);
+    box-shadow:0 0 0 calc(var(--drawer)*1px) color-mix(in srgb,var(--ink) 10%,transparent),-12px 0 40px rgba(0,0,0,calc(var(--drawer)*.35));
+    transition:transform .38s cubic-bezier(.2,.85,.25,1),border-radius .38s cubic-bezier(.2,.85,.25,1),box-shadow .38s}
+  /* only move the page while the sidebar is opening or open, so pinned panels stay put otherwise */
+  html.drawer-drag .work,html:has(body.nav-open) .work{transform:translateX(calc(var(--drawer)*var(--drawer-w))) scale(calc(1 - var(--drawer)*.07));overflow:clip}
+  html.drawer-drag .work,html.drawer-drag .sidebar{transition:none!important}
+  body.nav-open .scrim{display:none!important}
+  .sidebar{transition:opacity .38s!important}
+}
+@media (max-width:760px) and (prefers-reduced-motion:reduce){.work{transition:none}}
+
+/* ═════════════ Phone fixes: no surprise zoom, aligned two-layer card (13 Nov) ═════════════ */
+@media (max-width:760px){
+  /* iPhone zooms into any field under 16px and stays zoomed; 16px stops that */
+  input,select,textarea{font-size:16px!important}
+  /* nothing may push the page wider than the screen (iPhone would zoom out to fit) */
+  html,body{overflow-x:clip;max-width:100%}
+  /* shrink around the visible part of the page and clip the card to it, rounded on every corner */
+  html.drawer-drag .work,html:has(body.nav-open) .work{
+    transform-origin:0 calc(var(--sy,0px) + 50dvh);
+    clip-path:inset(var(--sy,0px) 0 calc(100% - var(--sy,0px) - 100dvh) 0 round calc(var(--drawer)*22px));
+    overflow:visible}
+  .sidebar{box-shadow:none!important;border-right:0!important}
+  .side-grip{display:none!important}
+}
 
 /* ═════════════ Glass (13 Nov) ═════════════ */
 /* A soft colour wash sits behind the whole app; chrome and cards are frosted panes over it.
@@ -2212,6 +2287,9 @@ html.in-mac-app:not(.mac-fullscreen) body::before{background:transparent!importa
 html.in-float-panel::before{display:none}
 html.in-float-panel,html.in-float-panel body{background:transparent!important}
 html.in-float-panel #float-timer{background:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+
+/* phone: the sidebar sits under the page as a second layer, so it has no edge line */
+@media(max-width:760px){.sidebar{box-shadow:none!important}}
 
 /* fallbacks: no blur support, or the system asks for less transparency */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){

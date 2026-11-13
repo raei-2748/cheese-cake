@@ -1316,7 +1316,7 @@ document.addEventListener('pointerup',event=>{
 });
 document.addEventListener('pointercancel',()=>{ if (calDrag) { calDrag=null; document.documentElement.classList.remove('cal-dragging'); render(); } });
 document.addEventListener('click',event=>{ if (swallowClick) { swallowClick=false; event.stopPropagation(); event.preventDefault(); } },true);
-// A drawn block asks what it is for. Quick-add words work here too: "Chem prac #che !high".
+// A drawn block asks what it is for. Quick-add words work here too: "Physics prac #phy !high".
 function nameBlock(d) {
   const g=d.ghost;
   g.classList.add('naming');
@@ -1670,6 +1670,7 @@ function matrixPage() {
 // Pomodoro rounds. Elapsed time is stored, not derived from a deadline, so
 // pausing, reloading and switching tabs never lose minutes.
 const TIMER_KEY='hsc-stack:timer:v2';
+const FINISH_KEY='stacky:finish-request';   // the floating window asks the main window to open the log form
 const freshTimer = () => ({mode:'open',phase:'focus',running:false,elapsed:0,runFrom:0,startedAt:null,taskId:null,course:'',cycle:0});
 let timer=(()=>{ try { return {...freshTimer(),...JSON.parse(localStorage.getItem(TIMER_KEY))}; } catch { return freshTimer(); } })();
 const pomo = () => data?.settings?.pomo ?? {focus:25,short:5,long:15,every:4};
@@ -1679,7 +1680,6 @@ const examPresets = [
   {id:'mx1',name:'Maths Ext 1 paper',course:'mx1',reading:10,writing:120},
   {id:'mx2',name:'Maths Ext 2 paper',course:'mx2',reading:10,writing:180},
   {id:'phy',name:'Physics paper',course:'phy',reading:5,writing:180},
-  {id:'che',name:'Chemistry paper',course:'che',reading:5,writing:180},
   {id:'eco',name:'Economics paper',course:'eco',reading:5,writing:180},
   {id:'eng1',name:'English Adv Paper 1',course:'eng',reading:10,writing:90},
   {id:'eng2',name:'English Adv Paper 2',course:'eng',reading:5,writing:120}
@@ -1912,7 +1912,7 @@ async function popOutTimer() {
   if (window.webkit?.messageHandlers?.stackyFloat) { window.webkit.messageHandlers.stackyFloat.postMessage('open'); return; }
   if ('documentPictureInPicture' in window) {
     try {
-      const pip=await documentPictureInPicture.requestWindow({width:360,height:76});
+      const pip=await documentPictureInPicture.requestWindow({width:340,height:172});
       pip.document.body.style.cssText='margin:0;background:#191919;overflow:hidden';
       const f=pip.document.createElement('iframe');
       f.src=url; f.style.cssText='border:0;width:100vw;height:100vh;display:block';
@@ -1920,13 +1920,14 @@ async function popOutTimer() {
       return;
     } catch (e) { /* fall through */ }
   }
-  window.open(url,'stacky-timer','popup,width=360,height=96');
+  window.open(url,'stacky-timer','popup,width=340,height=172');
   notify('This browser cannot keep the timer on top. Use Chrome or the Stacky Mac app for that.');
 }
 function renderFloat() {
   const show = MINI || (data && data.settings.floatTimer!==false && route().name!=='focus' && !fullTimer);
   floatEl.hidden = !show;
   if (!show) { floatEl.innerHTML=''; return; }
+  if (MINI) { renderPlayer(); return; }
   const active=sessionActive(), brk=isBreak(timer.phase), c=course(timer.course);
   const colour = brk ? 'var(--sky)' : c?.colour ?? '#787774';
   const mode = timer.mode==='exam' ? examCfg().name : timer.mode==='timed' ? pomo().focus+' min' : 'Stopwatch';
@@ -1945,8 +1946,24 @@ function renderFloat() {
       : (active ? (brk ? ib('timer-skip', FI.skip, 'Skip break') : ib('timer-finish', FI.stop, timer.mode==='exam'?'End exam':'Finish and log')) : '')+
         ib('timer-popout', FI.popout, 'Float on top of other windows')+ib('timer-full', FI.full, 'Full screen (f)'));
 }
+// The floating window: the normal timer, small. Subject, clock, state and the same buttons
+// as the Study page. Finish opens the log form in the main window.
+function renderPlayer() {
+  const active=sessionActive(), brk=isBreak(timer.phase), c=course(timer.course), t=row('tasks',timer.taskId);
+  const up=countsUp(), secs=shownSecs();
+  floatEl.className='float-timer player'+(timer.running?' running':'')+(active?' active':'');
+  floatEl.style.setProperty('--c', brk ? 'var(--sky)' : c?.colour ?? '#787774');
+  floatEl.innerHTML = '<div class="mp">'+
+    '<div class="mp-head"><span class="mp-what"><i></i><strong>'+h(brk ? phaseName[timer.phase] : c?.short ?? 'General')+'</strong>'+(t&&!brk?'<small>'+h(t.title)+'</small>':'')+'</span>'+
+      '<button type="button" class="mp-close" data-action="float-close" title="Close floating timer" aria-label="Close floating timer">'+FI.close+'</button></div>'+
+    '<div id="float-time" class="mp-clock" role="timer" aria-live="off">'+clock(secs)+'</div>'+
+    '<p class="mp-info">'+h(timerState()+' · '+timerInfo())+'</p>'+
+    '<div class="mp-ctl">'+timerControls('Start')+'</div>'+
+    (up?'':'<div class="mp-bar"><i id="mini-bar" style="width:'+(100*ringFrac(secs)).toFixed(2)+'%"></i></div>')+'</div>';
+}
 function updateTimerDom() {
   const secs=shownSecs();
+  const mb=$('mini-bar'); if (mb) mb.style.width=(100*ringFrac(secs)).toFixed(2)+'%';
   const ft=$('float-time'); if (ft) ft.textContent=clock(secs);
   const ring=$('timer-ring'); if (ring) ring.style.strokeDashoffset=String(2*Math.PI*92*(1-ringFrac(secs)));
   const text=$('timer-text'); if (text) text.textContent=clock(secs);
@@ -2047,7 +2064,7 @@ function focusPage() {
     '<div class="st-grid">'+
       '<section class="st-timer'+(timer.running?' running':'')+(onBreak?' break':'')+(active?' active':'')+'" aria-label="Timer">'+
         (onBreak?'<p class="st-break">Stand up, look away from the screen, drink some water.</p>':'<div class="st-picks">'+chips+taskPick+'</div>')+
-        '<div class="st-ring"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="st-track" cx="100" cy="100" r="'+R+'"/><circle id="timer-ring" class="st-prog" cx="100" cy="100" r="'+R+'" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-ringFrac(secs))).toFixed(2)+'"/></svg>'+
+        '<div class="st-ring'+(countsUp()?' bare':'')+'"><svg viewBox="0 0 200 200" aria-hidden="true"><circle class="st-track" cx="100" cy="100" r="'+R+'"/><circle id="timer-ring" class="st-prog" cx="100" cy="100" r="'+R+'" stroke-dasharray="'+C.toFixed(2)+'" stroke-dashoffset="'+(C*(1-ringFrac(secs))).toFixed(2)+'"/></svg>'+
           '<div class="st-centre"><div id="timer-text" class="st-clock" role="timer" aria-live="off">'+clock(secs)+'</div><span class="st-state">'+(timer.running?'<i></i>':'')+h(state)+'</span></div></div>'+
         '<p class="st-info">'+h(info)+'</p>'+
         (lengths?'<div class="st-lengths">'+lengths+'</div>':'')+
@@ -2396,7 +2413,7 @@ function stackActions(id, el) {
     'cal-add':()=>modal('Add task · '+pretty(id,{weekday:'long',day:'numeric',month:'short'}),field('q','Task','',{full:true,required:true,placeholder:'e.g. Physics depth study 4pm 1h #phy'}),'Add',v=>{ createFromQuick(v.q,{date:id}); }),
     'timer-start':()=>{startTimer();render();},
     'timer-pause':()=>{pauseTimer();render();},
-    'timer-finish':finishSession,
+    'timer-finish':()=>{ if (!MINI) return finishSession(); pauseTimer(); render(); try { localStorage.setItem(FINISH_KEY,String(Date.now())); } catch {} window.webkit?.messageHandlers?.stackyFloat?.postMessage('main'); },
     'timer-full':openFull,
     'timer-popout':popOutTimer,
     'float-close':()=>{ if (window.webkit?.messageHandlers?.stackyFloat) window.webkit.messageHandlers.stackyFloat.postMessage('close'); else window.close(); },
@@ -2587,6 +2604,7 @@ document.addEventListener('drop',event=>{
   });
 });
 window.addEventListener('storage',event=>{
+  if (event.key===FINISH_KEY && !MINI && data && event.newValue && !dialog.open && sessionActive()) { try { timer={...freshTimer(),...JSON.parse(localStorage.getItem(TIMER_KEY))}; } catch {} finishSession(); try { window.focus(); } catch {} return; }
   if (event.key===TIMER_KEY) { try { timer={...freshTimer(),...JSON.parse(event.newValue)}; } catch {} if (data) render(); }
   // Another tab saved. Pick up its records so this tab does not overwrite them.
   if (event.key===LOCAL_KEY && localMode && data && event.newValue) {
@@ -2722,7 +2740,7 @@ function contextFor(target, event) {
   ]]; }
   // An empty part of the calendar.
   if ((el=idOf('.wk-col'))) { const m=Math.min(DAY_MINS-60,Math.floor(minuteAt(el,event.clientY)/30)*30), day=el.dataset.day; return [pretty(day,{weekday:'long',day:'numeric',month:'short'})+' · '+hm(m), [
-    {label:'New block at '+hm(m),icon:'calendar',run:()=>modal('New block · '+pretty(day,{weekday:'short',day:'numeric',month:'short'})+', '+hm(m),field('q','What is it for?','',{full:true,required:true,placeholder:'e.g. Chem prac write-up #che !high'}),'Add',v=>{ createFromQuick(v.q,{date:day,time:fromMin(m),minutes:60}); })},
+    {label:'New block at '+hm(m),icon:'calendar',run:()=>modal('New block · '+pretty(day,{weekday:'short',day:'numeric',month:'short'})+', '+hm(m),field('q','What is it for?','',{full:true,required:true,placeholder:'e.g. Physics prac write-up #phy !high'}),'Add',v=>{ createFromQuick(v.q,{date:day,time:fromMin(m),minutes:60}); })},
     {label:'Add an all-day task',icon:'sun',run:()=>runAction('cal-add',day)}
   ]]; }
   if ((el=idOf('.cal-cell,.wk-allcell'))) { const day=el.dataset.dropDate; if (day) return [pretty(day,{weekday:'long',day:'numeric',month:'short'}), [

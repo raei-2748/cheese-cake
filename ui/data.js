@@ -22,12 +22,6 @@ export const courses = [
     ['M7 · The Nature of Light','Wave models of light','Photons and the photoelectric effect','Light and special relativity'],
     ['M8 · From the Universe to the Atom','Stars and nucleosynthesis','Atomic models and spectra','Quantum mechanics','Nuclear and particle physics']
   ]},
-  { id:'che', icon:'flask', short:'Chemistry', name:'Chemistry', code:'CH', colour:'#91602d', year:'2017', url:nesa+'science/chemistry-stage-6-2017', modules:[
-    ['M5 · Equilibrium and Acid Reactions','Dynamic equilibrium and Le Châtelier','Equilibrium constants','Solubility equilibria'],
-    ['M6 · Acid/Base Reactions','Acid–base models, strength and pH','Titrations and curves','Buffers and equilibrium'],
-    ['M7 · Organic Chemistry','Naming, structures and isomers','Organic reactions and pathways','Polymers'],
-    ['M8 · Applying Chemical Ideas','Qualitative and quantitative analysis','Spectroscopy and structure','Chemical synthesis']
-  ]},
   { id:'eco', icon:'trend', short:'Economics', name:'Economics', code:'EC', colour:'#98563e', year:'2009', url:nesa+'hsie/economics-stage-6-2009', modules:[
     ['The Global Economy','Globalisation and trade','Protection and trade agreements','Development and country case study'],
     ['Australia’s Place in the Global Economy','Trade and financial flows','Balance of payments','Exchange rates and external stability'],
